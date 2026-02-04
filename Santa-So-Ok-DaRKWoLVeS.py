@@ -27,6 +27,7 @@ GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
 GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
+GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
 UPDATE_CHECK_DELAY = 3
 
 def _parse_version(s):
@@ -146,11 +147,134 @@ def _download_garden_script(script_type="normal"):
             f.write(script_content)
         
         log('[%s] [Garden-Auto] Script başarıyla indirildi: %s (%d byte)' % (pName, script_path, content_length))
+        
+        # GitHub'dan versiyon bilgisini al ve local'e kaydet
+        try:
+            cache_buster_v = int(time.time())
+            version_url = GITHUB_SCRIPT_VERSIONS_URL + '?v=' + str(cache_buster_v)
+            req_v = urllib.request.Request(version_url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
+            with urllib.request.urlopen(req_v, timeout=10) as r_v:
+                github_versions = json.loads(r_v.read().decode('utf-8'))
+                
+            if script_filename in github_versions:
+                local_versions = _get_local_script_versions()
+                local_versions[script_filename] = github_versions[script_filename]
+                _save_local_script_versions(local_versions)
+                log('[%s] [Garden-Auto] Script versiyonu kaydedildi: v%s' % (pName, github_versions[script_filename]))
+        except Exception:
+            pass  # Versiyon kaydedilemese de devam et
+        
         return script_path
         
     except Exception as ex:
         log('[%s] [Garden-Auto] Script indirme hatası: %s' % (pName, str(ex)))
         return False
+
+def _get_local_script_versions():
+    """Local script versiyonlarını döndürür"""
+    try:
+        sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
+        versions_file = os.path.join(sc_folder, "versions.json")
+        
+        if os.path.exists(versions_file):
+            with open(versions_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
+    except Exception as ex:
+        log('[%s] [Script-Update] Local versiyon okuma hatası: %s' % (pName, str(ex)))
+        return {}
+
+def _save_local_script_versions(versions):
+    """Local script versiyonlarını kaydeder"""
+    try:
+        sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
+        if not os.path.exists(sc_folder):
+            os.makedirs(sc_folder)
+        
+        versions_file = os.path.join(sc_folder, "versions.json")
+        with open(versions_file, 'w', encoding='utf-8') as f:
+            json.dump(versions, f, indent=2, ensure_ascii=False)
+        
+        log('[%s] [Script-Update] Local versiyonlar güncellendi' % pName)
+        return True
+    except Exception as ex:
+        log('[%s] [Script-Update] Local versiyon kaydetme hatası: %s' % (pName, str(ex)))
+        return False
+
+def _check_script_updates():
+    """GitHub'daki script versiyonlarını kontrol eder ve gerekirse günceller"""
+    try:
+        log('[%s] [Script-Update] Script güncellemeleri kontrol ediliyor...' % pName)
+        
+        # GitHub'dan versions.json'ı indir
+        cache_buster = int(time.time())
+        url_with_cache_buster = GITHUB_SCRIPT_VERSIONS_URL + '?v=' + str(cache_buster)
+        
+        req = urllib.request.Request(
+            url_with_cache_buster,
+            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+        )
+        
+        with urllib.request.urlopen(req, timeout=15) as r:
+            github_versions_data = r.read()
+        
+        if not github_versions_data:
+            log('[%s] [Script-Update] GitHub versions.json indirilemedi' % pName)
+            return False
+        
+        github_versions = json.loads(github_versions_data.decode('utf-8'))
+        local_versions = _get_local_script_versions()
+        
+        sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
+        updated_count = 0
+        
+        # Her script için versiyon kontrolü
+        for script_name, github_version in github_versions.items():
+            local_version = local_versions.get(script_name, "0.0")
+            
+            # GitHub versiyonu daha yeniyse güncelle
+            if github_version != local_version:
+                log('[%s] [Script-Update] %s güncelleniyor... (v%s -> v%s)' % (pName, script_name, local_version, github_version))
+                
+                script_path = os.path.join(sc_folder, script_name)
+                
+                # Eski dosyayı sil
+                if os.path.exists(script_path):
+                    try:
+                        os.remove(script_path)
+                        log('[%s] [Script-Update] Eski %s silindi' % (pName, script_name))
+                    except Exception as ex:
+                        log('[%s] [Script-Update] Eski dosya silinemedi: %s' % (pName, str(ex)))
+                
+                # Yeni dosyayı indir
+                script_type = "wizz-cleric" if "wizz-cleric" in script_name else "normal"
+                download_result = _download_garden_script(script_type)
+                
+                if download_result:
+                    # Local versiyonu güncelle
+                    local_versions[script_name] = github_version
+                    updated_count += 1
+                    log('[%s] [Script-Update] %s başarıyla güncellendi (v%s)' % (pName, script_name, github_version))
+                else:
+                    log('[%s] [Script-Update] %s güncellenemedi!' % (pName, script_name))
+        
+        # Güncellenen versiyon bilgisini kaydet
+        if updated_count > 0:
+            _save_local_script_versions(local_versions)
+            log('[%s] [Script-Update] %d script güncellendi' % (pName, updated_count))
+        else:
+            log('[%s] [Script-Update] Tüm scriptler güncel' % pName)
+        
+        return True
+        
+    except Exception as ex:
+        log('[%s] [Script-Update] Güncelleme kontrolü hatası: %s' % (pName, str(ex)))
+        return False
+
+def _check_script_updates_thread():
+    """Script güncellemelerini thread'de kontrol eder"""
+    time.sleep(5)  # Plugin yüklenene kadar bekle
+    _check_script_updates()
 
 def _check_update_thread(skip_delay=False):
     global _update_status_text, _update_label_ref
@@ -1237,6 +1361,7 @@ _tab2_widgets = []
 _tab3_widgets = []
 _tab4_widgets = []
 _tab5_widgets = []
+_tab6_widgets = []
 _current_tab = 1
 
 def _tab_move(widget_list, offscreen):
@@ -1252,6 +1377,7 @@ def _show_tab1():
     _tab_move(_tab3_widgets, True)
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
     _tab_move(_tab1_widgets, False)
     _current_tab = 1
     try:
@@ -1265,6 +1391,7 @@ def _show_tab2():
     _tab_move(_tab3_widgets, True)
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
     _tab_move(_tab2_widgets, False)
     _current_tab = 2
     try:
@@ -1278,6 +1405,7 @@ def _show_tab3():
     _tab_move(_tab2_widgets, True)
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
     _tab_move(_tab3_widgets, False)
     _current_tab = 3
     try:
@@ -1291,6 +1419,7 @@ def _show_tab4():
     _tab_move(_tab2_widgets, True)
     _tab_move(_tab3_widgets, True)
     _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
     _tab_move(_tab4_widgets, False)
     _current_tab = 4
     try:
@@ -1304,10 +1433,25 @@ def _show_tab5():
     _tab_move(_tab2_widgets, True)
     _tab_move(_tab3_widgets, True)
     _tab_move(_tab4_widgets, True)
+    _tab_move(_tab6_widgets, True)
     _tab_move(_tab5_widgets, False)
     _current_tab = 5
     try:
         QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w, _tab_bar_y + _tab_bar_h - 3)
+    except Exception:
+        pass
+
+def _show_tab6():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, False)
+    _current_tab = 6
+    try:
+        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + _tab_bar_h - 3)
     except Exception:
         pass
 
@@ -1326,15 +1470,19 @@ def _add_tab4(w, x, y):
 def _add_tab5(w, x, y):
     _tab5_widgets.append((w, x, y))
 
+def _add_tab6(w, x, y):
+    _tab6_widgets.append((w, x, y))
+
 _tab_bar_y = 8
 _tab_bar_x = 10
 _tab_bar_w = 700
 _tab_bar_h = 26
 _tab1_btn_w = 114
 _tab2_btn_w = 83
-_tab3_btn_w = 98
-_tab4_btn_w = 60
-_tab5_btn_w = 63
+_tab3_btn_w = 95
+_tab4_btn_w = 80
+_tab5_btn_w = 75
+_tab6_btn_w = 63
 _tab_spacing = 0
 
 QtBind.createList(gui, _tab_bar_x, _tab_bar_y, _tab_bar_w, _tab_bar_h)
@@ -1342,7 +1490,8 @@ QtBind.createButton(gui, '_show_tab1', 'Banka/Çanta Birleştir', _tab_bar_x + 3
 QtBind.createButton(gui, '_show_tab2', 'Auto Dungeon', _tab_bar_x + 3 + _tab1_btn_w, _tab_bar_y + 2)
 QtBind.createButton(gui, '_show_tab3', 'Garden Dungeon', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + 2)
 QtBind.createButton(gui, '_show_tab4', 'Auto Hwt', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab5', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w, _tab_bar_y + 2)
+QtBind.createButton(gui, '_show_tab5', 'Oto Kervan', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w, _tab_bar_y + 2)
+QtBind.createButton(gui, '_show_tab6', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + 2)
 _tab_indicator = QtBind.createList(gui, _tab_bar_x + 3, _tab_bar_y + _tab_bar_h - 3, _tab1_btn_w - 1, 4)
 
 _content_y = _tab_bar_y + _tab_bar_h - 1
@@ -1565,8 +1714,8 @@ _gd_note_y = _gd_status_y + 22
 _add_tab3(QtBind.createLabel(gui, 'Script türünü seç, sonra Başlat', _gd_title_x, _gd_note_y), _gd_title_x, _gd_note_y)
 
 # Tab 4 - Auto Hwt
-_hwt_container_w = 500
-_hwt_container_h = 260
+_hwt_container_w = 380
+_hwt_container_h = 240
 _hwt_container_x = _tab_bar_x + (_tab_bar_w - _hwt_container_w) // 2
 _hwt_container_y = _content_y + 15
 
@@ -1579,49 +1728,67 @@ _hwt_title_y = _hwt_container_y + 15
 _add_tab4(QtBind.createLabel(gui, 'Auto Hwt', _hwt_title_x, _hwt_title_y), _hwt_title_x, _hwt_title_y)
 _add_tab4(QtBind.createLabel(gui, 'Yakında eklenecek...', _hwt_title_x, _hwt_title_y + 30), _hwt_title_x, _hwt_title_y + 30)
 
-# Tab 5 - Hakkımda
+# Tab 5 - Oto Kervan
+_kervan_container_w = 380
+_kervan_container_h = 240
+_kervan_container_x = _tab_bar_x + (_tab_bar_w - _kervan_container_w) // 2
+_kervan_container_y = _content_y + 15
+
+_kervan_container = QtBind.createList(gui, _kervan_container_x, _kervan_container_y, _kervan_container_w, _kervan_container_h)
+_add_tab5(_kervan_container, _kervan_container_x, _kervan_container_y)
+
+_kervan_title_x = _kervan_container_x + 20
+_kervan_title_y = _kervan_container_y + 15
+
+_add_tab5(QtBind.createLabel(gui, 'Oto Kervan', _kervan_title_x, _kervan_title_y), _kervan_title_x, _kervan_title_y)
+_add_tab5(QtBind.createLabel(gui, 'Yakında eklenecek...', _kervan_title_x, _kervan_title_y + 30), _kervan_title_x, _kervan_title_y + 30)
+
+# Tab 6 - Hakkımda
 _t3_container_x = _tab_bar_x + 30
 _t3_container_y = _content_y + 15
 _t3_container_w = _tab_bar_w - 60
 _t3_container_h = 245
 
 _t3_container = QtBind.createList(gui, _t3_container_x, _t3_container_y, _t3_container_w, _t3_container_h)
-_add_tab5(_t3_container, _t3_container_x, _t3_container_y)
+_add_tab6(_t3_container, _t3_container_x, _t3_container_y)
 
 _t3_x = _t3_container_x + 15
 _t3_y = _t3_container_y + 15
 
-_add_tab5(QtBind.createLabel(gui, '╔═════════════════════════╗', _t3_x, _t3_y), _t3_x, _t3_y)
-_add_tab5(QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _t3_x, _t3_y + 16), _t3_x, _t3_y + 16)
-_add_tab5(QtBind.createLabel(gui, '╚═════════════════════════╝', _t3_x, _t3_y + 32), _t3_x, _t3_y + 32)
+_add_tab6(QtBind.createLabel(gui, '╔═════════════════════════╗', _t3_x, _t3_y), _t3_x, _t3_y)
+_add_tab6(QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _t3_x, _t3_y + 16), _t3_x, _t3_y + 16)
+_add_tab6(QtBind.createLabel(gui, '╚═════════════════════════╝', _t3_x, _t3_y + 32), _t3_x, _t3_y + 32)
 
 _version_y = _t3_y + 58
-_add_tab5(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _t3_x, _version_y)
+_add_tab6(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _t3_x, _version_y)
 
 _btn_y = _version_y + 26
-_add_tab5(QtBind.createButton(gui, 'check_update', 'Kontrol', _t3_x, _btn_y), _t3_x, _btn_y)
-_add_tab5(QtBind.createButton(gui, 'do_auto_update', 'Güncelle', _t3_x + 70, _btn_y), _t3_x + 70, _btn_y)
+_add_tab6(QtBind.createButton(gui, 'check_update', 'Kontrol', _t3_x, _btn_y), _t3_x, _btn_y)
+_add_tab6(QtBind.createButton(gui, 'do_auto_update', 'Güncelle', _t3_x + 70, _btn_y), _t3_x + 70, _btn_y)
 
 _status_y = _btn_y + 30
 _update_label_ref = QtBind.createLabel(gui, '', _t3_x, _status_y)
-_add_tab5(_update_label_ref, _t3_x, _status_y)
+_add_tab6(_update_label_ref, _t3_x, _status_y)
 
 _features_y = _status_y + 35
-_add_tab5(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
-_add_tab5(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
-_add_tab5(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
-_add_tab5(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
-_add_tab5(QtBind.createLabel(gui, '• Garden Dungeon otomatik oynatma', _t3_x, _features_y + 82), _t3_x, _features_y + 82)
-_add_tab5(QtBind.createLabel(gui, '• Auto Hwt sistemi', _t3_x, _features_y + 102), _t3_x, _features_y + 102)
-_add_tab5(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 122), _t3_x, _features_y + 122)
+_add_tab6(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
+_add_tab6(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
+_add_tab6(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
+_add_tab6(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
+_add_tab6(QtBind.createLabel(gui, '• Garden Dungeon otomatik oynatma', _t3_x, _features_y + 82), _t3_x, _features_y + 82)
+_add_tab6(QtBind.createLabel(gui, '• Auto Hwt sistemi', _t3_x, _features_y + 102), _t3_x, _features_y + 102)
+_add_tab6(QtBind.createLabel(gui, '• Oto Kervan sistemi', _t3_x, _features_y + 122), _t3_x, _features_y + 122)
+_add_tab6(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 142), _t3_x, _features_y + 142)
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
 _tab_move(_tab4_widgets, True)
 _tab_move(_tab5_widgets, True)
+_tab_move(_tab6_widgets, True)
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
 threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()
+threading.Thread(target=_check_script_updates_thread, name=pName + '_script_update', daemon=True).start()
 
 # Auto Dungeon klasörünü oluştur
 if not os.path.exists(getPath()):
