@@ -103,30 +103,38 @@ def _download_garden_script():
         script_path = os.path.join(sc_folder, "garden-dungeon.txt")
         
         log('[%s] [Garden-Auto] GitHub\'dan script indiriliyor...' % pName)
+        log('[%s] [Garden-Auto] URL: %s' % (pName, GITHUB_GARDEN_SCRIPT_URL))
         
         # sc klasörü yoksa oluştur
         if not os.path.exists(sc_folder):
             os.makedirs(sc_folder)
-            log('[%s] [Garden-Auto] sc klasörü oluşturuldu' % pName)
+            log('[%s] [Garden-Auto] sc klasörü oluşturuldu: %s' % (pName, sc_folder))
         
-        # GitHub'dan indir
+        # GitHub'dan indir (cache bypass için timestamp ekle)
+        import time
+        cache_buster = int(time.time())
+        url_with_cache_buster = GITHUB_GARDEN_SCRIPT_URL + '?v=' + str(cache_buster)
+        
         req = urllib.request.Request(
-            GITHUB_GARDEN_SCRIPT_URL,
+            url_with_cache_buster,
             headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
         )
         
         with urllib.request.urlopen(req, timeout=15) as r:
             script_content = r.read()
         
-        if not script_content or len(script_content) < 10:
-            log('[%s] [Garden-Auto] İndirilen script geçersiz' % pName)
+        content_length = len(script_content) if script_content else 0
+        log('[%s] [Garden-Auto] İndirilen boyut: %d byte' % (pName, content_length))
+        
+        if not script_content or content_length < 10:
+            log('[%s] [Garden-Auto] İndirilen script geçersiz (çok kısa: %d byte)' % (pName, content_length))
             return False
         
         # Dosyaya kaydet
         with open(script_path, 'wb') as f:
             f.write(script_content)
         
-        log('[%s] [Garden-Auto] Script başarıyla indirildi: %s' % (pName, script_path))
+        log('[%s] [Garden-Auto] Script başarıyla indirildi: %s (%d byte)' % (pName, script_path, content_length))
         return True
         
     except Exception as ex:
