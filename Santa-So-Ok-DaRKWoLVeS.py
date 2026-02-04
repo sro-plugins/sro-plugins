@@ -25,6 +25,7 @@ GITHUB_REPO = 'sro-plugins/sro-plugins'
 GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_REPO
 GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
 GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
+GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 UPDATE_CHECK_DELAY = 3
 
 def _parse_version(s):
@@ -87,6 +88,50 @@ dimensionalItemActivated = None
 lstMobsData = []
 lstIgnore = []
 lstOnlyCount = []
+
+# Garden Dungeon global değişkenleri
+_garden_dungeon_running = False
+_garden_dungeon_script_path = ""
+_garden_dungeon_thread = None
+_garden_dungeon_stop_event = threading.Event()
+_garden_dungeon_lock = threading.Lock()
+
+def _download_garden_script():
+    """GitHub'dan garden-dungeon.txt dosyasını indirir"""
+    try:
+        sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
+        script_path = os.path.join(sc_folder, "garden-dungeon.txt")
+        
+        log('[%s] [Garden-Auto] GitHub\'dan script indiriliyor...' % pName)
+        
+        # sc klasörü yoksa oluştur
+        if not os.path.exists(sc_folder):
+            os.makedirs(sc_folder)
+            log('[%s] [Garden-Auto] sc klasörü oluşturuldu' % pName)
+        
+        # GitHub'dan indir
+        req = urllib.request.Request(
+            GITHUB_GARDEN_SCRIPT_URL,
+            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+        )
+        
+        with urllib.request.urlopen(req, timeout=15) as r:
+            script_content = r.read()
+        
+        if not script_content or len(script_content) < 10:
+            log('[%s] [Garden-Auto] İndirilen script geçersiz' % pName)
+            return False
+        
+        # Dosyaya kaydet
+        with open(script_path, 'wb') as f:
+            f.write(script_content)
+        
+        log('[%s] [Garden-Auto] Script başarıyla indirildi: %s' % (pName, script_path))
+        return True
+        
+    except Exception as ex:
+        log('[%s] [Garden-Auto] Script indirme hatası: %s' % (pName, str(ex)))
+        return False
 
 def _check_update_thread(skip_delay=False):
     global _update_status_text, _update_label_ref
@@ -652,6 +697,151 @@ def bank_sort_stop():
         _bank_sort_thread = None
     log('[%s] Banka sıralama durduruldu.' % pName)
 
+# ______________________________ Garden Dungeon Fonksiyonları ______________________________ #
+
+def _garden_dungeon_loop():
+    global _garden_dungeon_running
+    try:
+        script_path = _garden_dungeon_script_path
+        
+        log('[%s] [Garden-Auto] Garden Dungeon başlatılıyor...' % pName)
+        
+        # Önce "garden-auto" isminde bir training area var mı kontrol et
+        area_set = False
+        try:
+            area_set = set_training_area('garden-auto')
+            if area_set:
+                log('[%s] [Garden-Auto] Training area "garden-auto" aktif edildi' % pName)
+                # Script path varsa training area'nın scriptini güncelle
+                if script_path and os.path.exists(script_path):
+                    set_training_script(script_path)
+                    log('[%s] [Garden-Auto] Training script güncellendi: %s' % (pName, script_path))
+        except Exception as ex:
+            log('[%s] [Garden-Auto] Training area seçimi başarısız: %s' % (pName, str(ex)))
+        
+        # Eğer training area yoksa, yeni bir training area oluştur
+        if not area_set and script_path and os.path.exists(script_path):
+            # Mevcut pozisyonu al
+            pos = get_position()
+            if pos:
+                # Training position set et (bu yeni bir training area oluşturur)
+                region = pos.get('region', 0)
+                x = pos.get('x', 0)
+                y = pos.get('y', 0)
+                z = pos.get('z', 0)
+                
+                set_training_position(region, x, y, z)
+                set_training_radius(50.0)  # Varsayılan radius
+                log('[%s] [Garden-Auto] Training position ayarlandı: (%d, %.1f, %.1f, %.1f)' % (pName, region, x, y, z))
+                
+                # Şimdi script'i set et (artık aktif training area var)
+                result = set_training_script(script_path)
+                if result:
+                    log('[%s] [Garden-Auto] Training script ayarlandı: %s' % (pName, script_path))
+                    area_set = True
+                else:
+                    log('[%s] [Garden-Auto] Training script ayarlanamadı!' % pName)
+            else:
+                log('[%s] [Garden-Auto] Pozisyon alınamadı!' % pName)
+        elif not area_set and not script_path:
+            log('[%s] [Garden-Auto] Script bulunamadı ve training area yok!' % pName)
+            _garden_dungeon_running = False
+            return
+        
+        if not area_set:
+            log('[%s] [Garden-Auto] Training area oluşturulamadı!' % pName)
+            _garden_dungeon_running = False
+            return
+        
+        start_bot()
+        _garden_dungeon_running = True
+        log('[%s] [Garden-Auto] Bot başlatıldı' % pName)
+        
+        # Thread çalışırken bot'un durumunu kontrol et
+        while not _garden_dungeon_stop_event.is_set():
+            time.sleep(1)
+        
+        log('[%s] [Garden-Auto] Garden Dungeon durduruluyor...' % pName)
+        stop_bot()
+        _garden_dungeon_running = False
+    except Exception as ex:
+        log('[%s] [Garden-Auto] Hata: %s' % (pName, str(ex)))
+        _garden_dungeon_running = False
+
+def garden_dungeon_start():
+    global _garden_dungeon_thread, _garden_dungeon_running, _garden_dungeon_script_path
+    
+    # Textbox'tan script yolunu al ve temizle
+    script_path_from_ui = QtBind.text(gui, tbxGardenScriptPath).strip()
+    
+    # Tırnak işaretlerini temizle (baş ve sondaki " ve ' karakterlerini)
+    if script_path_from_ui:
+        # Başta ve sonda " veya ' varsa kaldır
+        script_path_from_ui = script_path_from_ui.strip('"').strip("'").strip()
+    
+    # Eğer textbox'ta bir şey varsa onu kullan
+    if script_path_from_ui:
+        _garden_dungeon_script_path = script_path_from_ui
+        log('[%s] [Garden-Auto] Script yolu: %s' % (pName, _garden_dungeon_script_path))
+    # Yoksa varsayılanı kullan
+    elif not _garden_dungeon_script_path:
+        _garden_dungeon_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
+        log('[%s] [Garden-Auto] Varsayılan script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
+    
+    # Training area "garden-auto" var mı kontrol et (script olmasa da çalışabilir)
+    has_training_area = False
+    try:
+        current_area = get_training_area()
+        if current_area and current_area.get('name') == 'garden-auto':
+            has_training_area = True
+    except Exception:
+        pass
+    
+    # Script dosyasının var olup olmadığını kontrol et (training area yoksa script şart)
+    if not has_training_area and not os.path.exists(_garden_dungeon_script_path):
+        # Varsayılan script ise GitHub'dan indirmeyi dene
+        default_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
+        if _garden_dungeon_script_path == default_script:
+            log('[%s] [Garden-Auto] Varsayılan script bulunamadı, GitHub\'dan indiriliyor...' % pName)
+            QtBind.setText(gui, lblGardenScriptStatus, 'Durum: GitHub\'dan indiriliyor...')
+            
+            if _download_garden_script():
+                log('[%s] [Garden-Auto] Script başarıyla indirildi' % pName)
+                QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script indirildi ✓')
+            else:
+                log('[%s] [Garden-Auto] Script indirilemedi!' % pName)
+                QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script indirilemedi! ✗')
+                return
+        else:
+            # Özel script ise indirme, hata ver
+            log('[%s] [Garden-Auto] Script bulunamadı: %s' % (pName, _garden_dungeon_script_path))
+            QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script bulunamadı! ✗')
+            return
+    
+    with _garden_dungeon_lock:
+        if _garden_dungeon_thread and _garden_dungeon_thread.is_alive():
+            log('[%s] [Garden-Auto] Garden Dungeon zaten çalışıyor.' % pName)
+            QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Zaten çalışıyor...')
+            return
+        _garden_dungeon_stop_event.clear()
+        _garden_dungeon_thread = threading.Thread(target=_garden_dungeon_loop, name=pName + '_garden_dungeon', daemon=True)
+        _garden_dungeon_thread.start()
+    
+    QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Çalışıyor... ▶')
+    log('[%s] [Garden-Auto] Garden Dungeon başlatıldı.' % pName)
+
+def garden_dungeon_stop():
+    global _garden_dungeon_thread, _garden_dungeon_running
+    with _garden_dungeon_lock:
+        _garden_dungeon_stop_event.set()
+        if _garden_dungeon_thread and _garden_dungeon_thread.is_alive():
+            _garden_dungeon_thread.join(timeout=3)
+        _garden_dungeon_thread = None
+        _garden_dungeon_running = False
+    stop_bot()
+    QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Durduruldu ■')
+    log('[%s] [Garden-Auto] Garden Dungeon durduruldu.' % pName)
+
 # ______________________________ Auto Dungeon Fonksiyonları ______________________________ #
 
 def getPath():
@@ -1018,6 +1208,8 @@ TAB_OFFSCREEN = -3000
 _tab1_widgets = []
 _tab2_widgets = []
 _tab3_widgets = []
+_tab4_widgets = []
+_tab5_widgets = []
 _current_tab = 1
 
 def _tab_move(widget_list, offscreen):
@@ -1031,6 +1223,8 @@ def _show_tab1():
     global _current_tab
     _tab_move(_tab2_widgets, True)
     _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
     _tab_move(_tab1_widgets, False)
     _current_tab = 1
     try:
@@ -1042,6 +1236,8 @@ def _show_tab2():
     global _current_tab
     _tab_move(_tab1_widgets, True)
     _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
     _tab_move(_tab2_widgets, False)
     _current_tab = 2
     try:
@@ -1053,11 +1249,38 @@ def _show_tab3():
     global _current_tab
     _tab_move(_tab1_widgets, True)
     _tab_move(_tab2_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
     _tab_move(_tab3_widgets, False)
     _current_tab = 3
     try:
-        _ind_w = _tab3_btn_w - 3
         QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + _tab_bar_h - 3)
+    except Exception:
+        pass
+
+def _show_tab4():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab5_widgets, True)
+    _tab_move(_tab4_widgets, False)
+    _current_tab = 4
+    try:
+        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w, _tab_bar_y + _tab_bar_h - 3)
+    except Exception:
+        pass
+
+def _show_tab5():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, False)
+    _current_tab = 5
+    try:
+        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w, _tab_bar_y + _tab_bar_h - 3)
     except Exception:
         pass
 
@@ -1070,19 +1293,29 @@ def _add_tab2(w, x, y):
 def _add_tab3(w, x, y):
     _tab3_widgets.append((w, x, y))
 
+def _add_tab4(w, x, y):
+    _tab4_widgets.append((w, x, y))
+
+def _add_tab5(w, x, y):
+    _tab5_widgets.append((w, x, y))
+
 _tab_bar_y = 8
 _tab_bar_x = 10
 _tab_bar_w = 700
 _tab_bar_h = 26
 _tab1_btn_w = 114
 _tab2_btn_w = 83
-_tab3_btn_w = 63
+_tab3_btn_w = 98
+_tab4_btn_w = 60
+_tab5_btn_w = 63
 _tab_spacing = 0
 
 QtBind.createList(gui, _tab_bar_x, _tab_bar_y, _tab_bar_w, _tab_bar_h)
 QtBind.createButton(gui, '_show_tab1', 'Banka/Çanta Birleştir', _tab_bar_x + 3, _tab_bar_y + 2)
 QtBind.createButton(gui, '_show_tab2', 'Auto Dungeon', _tab_bar_x + 3 + _tab1_btn_w, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab3', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + 2)
+QtBind.createButton(gui, '_show_tab3', 'Garden Dungeon', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + 2)
+QtBind.createButton(gui, '_show_tab4', 'Auto Hwt', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w, _tab_bar_y + 2)
+QtBind.createButton(gui, '_show_tab5', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w, _tab_bar_y + 2)
 _tab_indicator = QtBind.createList(gui, _tab_bar_x + 3, _tab_bar_y + _tab_bar_h - 3, _tab1_btn_w - 1, 4)
 
 _content_y = _tab_bar_y + _tab_bar_h - 1
@@ -1260,41 +1493,99 @@ lstMonsterCounter = QtBind.createList(gui, _t2_right_x, _t2_y + 23, 197, 237)
 _add_tab2(lstMonsterCounter, _t2_right_x, _t2_y + 23)
 QtBind.append(gui, lstMonsterCounter, 'İsim (Tür)')
 
+# Tab 3 - Garden Dungeon
+_t3_y = _content_y + 10
+_t3_x = _tab_bar_x + 20
+
+_gd_container_w = 380
+_gd_container_h = 240
+_gd_container_x = _tab_bar_x + (_tab_bar_w - _gd_container_w) // 2
+_gd_container_y = _content_y + 15
+
+_gd_container = QtBind.createList(gui, _gd_container_x, _gd_container_y, _gd_container_w, _gd_container_h)
+_add_tab3(_gd_container, _gd_container_x, _gd_container_y)
+
+_gd_title_x = _gd_container_x + 20
+_gd_title_y = _gd_container_y + 15
+
+# Nasıl Çalışır bölümü
+_gd_howto_y = _gd_title_y
+_add_tab3(QtBind.createLabel(gui, 'Nasıl Çalışır?', _gd_title_x, _gd_howto_y), _gd_title_x, _gd_howto_y)
+_add_tab3(QtBind.createLabel(gui, '1 - Garden Dungeon\'a gir', _gd_title_x + 10, _gd_howto_y + 20), _gd_title_x + 10, _gd_howto_y + 20)
+_add_tab3(QtBind.createLabel(gui, '2 - Script gir (isteğe bağlı) ya da direkt Başlat\'a bas', _gd_title_x + 10, _gd_howto_y + 36), _gd_title_x + 10, _gd_howto_y + 36)
+
+_gd_script_y = _gd_howto_y + 65
+_add_tab3(QtBind.createLabel(gui, 'Script Dosya Yolu (boş bırakırsan varsayılan):', _gd_title_x, _gd_script_y), _gd_title_x, _gd_script_y)
+tbxGardenScriptPath = QtBind.createLineEdit(gui, "", _gd_title_x, _gd_script_y + 18, 310, 20)
+_add_tab3(tbxGardenScriptPath, _gd_title_x, _gd_script_y + 18)
+
+_gd_btn_y = _gd_script_y + 48
+_gd_btn_center_x = _gd_container_x + (_gd_container_w - 170) // 2
+_add_tab3(QtBind.createButton(gui, 'garden_dungeon_start', '  Başla  ', _gd_btn_center_x, _gd_btn_y), _gd_btn_center_x, _gd_btn_y)
+_add_tab3(QtBind.createButton(gui, 'garden_dungeon_stop', ' Durdur ', _gd_btn_center_x + 85, _gd_btn_y), _gd_btn_center_x + 85, _gd_btn_y)
+
+_gd_status_y = _gd_btn_y + 35
+lblGardenScriptStatus = QtBind.createLabel(gui, 'Durum: Hazır', _gd_title_x, _gd_status_y)
+_add_tab3(lblGardenScriptStatus, _gd_title_x, _gd_status_y)
+
+_gd_note_y = _gd_status_y + 22
+_add_tab3(QtBind.createLabel(gui, 'Varsayılan script: sc/garden-dungeon.txt', _gd_title_x, _gd_note_y), _gd_title_x, _gd_note_y)
+
+# Tab 4 - Auto Hwt
+_hwt_container_w = 380
+_hwt_container_h = 240
+_hwt_container_x = _tab_bar_x + (_tab_bar_w - _hwt_container_w) // 2
+_hwt_container_y = _content_y + 15
+
+_hwt_container = QtBind.createList(gui, _hwt_container_x, _hwt_container_y, _hwt_container_w, _hwt_container_h)
+_add_tab4(_hwt_container, _hwt_container_x, _hwt_container_y)
+
+_hwt_title_x = _hwt_container_x + 20
+_hwt_title_y = _hwt_container_y + 15
+
+_add_tab4(QtBind.createLabel(gui, 'Auto Hwt', _hwt_title_x, _hwt_title_y), _hwt_title_x, _hwt_title_y)
+_add_tab4(QtBind.createLabel(gui, 'Yakında eklenecek...', _hwt_title_x, _hwt_title_y + 30), _hwt_title_x, _hwt_title_y + 30)
+
+# Tab 5 - Hakkımda
 _t3_container_x = _tab_bar_x + 30
 _t3_container_y = _content_y + 15
 _t3_container_w = _tab_bar_w - 60
 _t3_container_h = 245
 
 _t3_container = QtBind.createList(gui, _t3_container_x, _t3_container_y, _t3_container_w, _t3_container_h)
-_add_tab3(_t3_container, _t3_container_x, _t3_container_y)
+_add_tab5(_t3_container, _t3_container_x, _t3_container_y)
 
 _t3_x = _t3_container_x + 15
 _t3_y = _t3_container_y + 15
 
-_add_tab3(QtBind.createLabel(gui, '╔═════════════════════════╗', _t3_x, _t3_y), _t3_x, _t3_y)
-_add_tab3(QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _t3_x, _t3_y + 16), _t3_x, _t3_y + 16)
-_add_tab3(QtBind.createLabel(gui, '╚═════════════════════════╝', _t3_x, _t3_y + 32), _t3_x, _t3_y + 32)
+_add_tab5(QtBind.createLabel(gui, '╔═════════════════════════╗', _t3_x, _t3_y), _t3_x, _t3_y)
+_add_tab5(QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _t3_x, _t3_y + 16), _t3_x, _t3_y + 16)
+_add_tab5(QtBind.createLabel(gui, '╚═════════════════════════╝', _t3_x, _t3_y + 32), _t3_x, _t3_y + 32)
 
 _version_y = _t3_y + 58
-_add_tab3(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _t3_x, _version_y)
+_add_tab5(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _t3_x, _version_y)
 
 _btn_y = _version_y + 26
-_add_tab3(QtBind.createButton(gui, 'check_update', 'Kontrol', _t3_x, _btn_y), _t3_x, _btn_y)
-_add_tab3(QtBind.createButton(gui, 'do_auto_update', 'Güncelle', _t3_x + 70, _btn_y), _t3_x + 70, _btn_y)
+_add_tab5(QtBind.createButton(gui, 'check_update', 'Kontrol', _t3_x, _btn_y), _t3_x, _btn_y)
+_add_tab5(QtBind.createButton(gui, 'do_auto_update', 'Güncelle', _t3_x + 70, _btn_y), _t3_x + 70, _btn_y)
 
 _status_y = _btn_y + 30
 _update_label_ref = QtBind.createLabel(gui, '', _t3_x, _status_y)
-_add_tab3(_update_label_ref, _t3_x, _status_y)
+_add_tab5(_update_label_ref, _t3_x, _status_y)
 
 _features_y = _status_y + 35
-_add_tab3(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
-_add_tab3(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
-_add_tab3(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
-_add_tab3(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
-_add_tab3(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 82), _t3_x, _features_y + 82)
+_add_tab5(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
+_add_tab5(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
+_add_tab5(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
+_add_tab5(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
+_add_tab5(QtBind.createLabel(gui, '• Garden Dungeon otomatik oynatma', _t3_x, _features_y + 82), _t3_x, _features_y + 82)
+_add_tab5(QtBind.createLabel(gui, '• Auto Hwt sistemi', _t3_x, _features_y + 102), _t3_x, _features_y + 102)
+_add_tab5(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 122), _t3_x, _features_y + 122)
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
+_tab_move(_tab4_widgets, True)
+_tab_move(_tab5_widgets, True)
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
 threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()
