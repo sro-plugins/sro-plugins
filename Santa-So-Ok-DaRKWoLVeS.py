@@ -6,16 +6,19 @@ import time
 import struct
 import copy
 import json
+import os
 import urllib.request
 
 pName = 'Santa-So-Ok-DaRKWoLVeS'
-pVersion = '1.2'
+PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
+pVersion = '1.2.1'
 
 MOVE_DELAY = 0.25
 
 GITHUB_REPO = 'brkcnszgn/sro-plugins'
 GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_REPO
 GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
+GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
 UPDATE_CHECK_DELAY = 3
 
 def _parse_version(s):
@@ -49,35 +52,60 @@ def _fetch_github_latest():
         log('[%s] Güncelleme kontrolü hatası: %s' % (pName, str(ex)))
         return None
 
+def _get_update_download_url():
+    try:
+        req = urllib.request.Request(
+            GITHUB_API_LATEST,
+            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read().decode('utf-8'))
+        assets = data.get('assets') or []
+        for a in assets:
+            name = (a.get('name') or '').lower()
+            if name == PLUGIN_FILENAME.lower() or name.endswith('.py'):
+                u = a.get('browser_download_url')
+                if u:
+                    return u
+    except Exception:
+        pass
+    return GITHUB_RAW_MAIN
+
 _update_label_ref = None
 _update_status_text = ''
 
 def _check_update_thread(skip_delay=False):
     global _update_status_text, _update_label_ref
-    if not skip_delay:
-        time.sleep(UPDATE_CHECK_DELAY)
-    result = _fetch_github_latest()
-    if result is None:
-        _update_status_text = 'Sürüm kontrol edilemedi'
+    try:
+        if not skip_delay:
+            time.sleep(UPDATE_CHECK_DELAY)
+        result = _fetch_github_latest()
+        if result is None:
+            _update_status_text = 'Sürüm kontrol edilemedi'
+            log('[%s] Sürüm kontrolü başarısız (ağ veya API hatası).' % pName)
+        else:
+            tag, url = result
+            latest_tuple = _parse_version(tag)
+            current_tuple = _parse_version(pVersion)
+            if _version_less(current_tuple, latest_tuple):
+                _update_status_text = 'Yeni sürüm: %s (indir)' % tag
+                log('[%s] Güncelleme var: %s → %s | %s' % (pName, pVersion, tag, url))
+            else:
+                _update_status_text = 'Güncel (v%s)' % pVersion
+                log('[%s] Sürüm güncel: v%s' % (pName, pVersion))
         if _update_label_ref is not None:
             try:
                 QtBind.setText(gui, _update_label_ref, _update_status_text)
             except Exception:
                 pass
-        return
-    tag, url = result
-    latest_tuple = _parse_version(tag)
-    current_tuple = _parse_version(pVersion)
-    if _version_less(current_tuple, latest_tuple):
-        _update_status_text = 'Yeni sürüm: %s (indir)' % tag
-        log('[%s] Güncelleme var: %s → %s | %s' % (pName, pVersion, tag, url))
-    else:
-        _update_status_text = 'Güncel (v%s)' % pVersion
-    if _update_label_ref is not None:
-        try:
-            QtBind.setText(gui, _update_label_ref, _update_status_text)
-        except Exception:
-            pass
+    except Exception as ex:
+        _update_status_text = 'Hata'
+        log('[%s] Sürüm kontrolü hatası: %s' % (pName, str(ex)))
+        if _update_label_ref is not None:
+            try:
+                QtBind.setText(gui, _update_label_ref, _update_status_text)
+            except Exception:
+                pass
 
 def check_update():
     global _update_status_text
@@ -89,6 +117,51 @@ def check_update():
             pass
     log('[%s] Güncelleme kontrol ediliyor...' % pName)
     t = threading.Thread(target=lambda: _check_update_thread(skip_delay=True), name=pName + '_update_check', daemon=True)
+    t.start()
+
+def _do_auto_update_thread():
+    global _update_status_text, _update_label_ref
+    try:
+        if _update_label_ref is not None:
+            try:
+                QtBind.setText(gui, _update_label_ref, 'İndiriliyor...')
+            except Exception:
+                pass
+        log('[%s] Güncelleme indiriliyor...' % pName)
+        download_url = _get_update_download_url()
+        req = urllib.request.Request(download_url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            new_content = r.read()
+        if not new_content or len(new_content) < 500:
+            log('[%s] Güncelleme indirilemedi: dosya geçersiz.' % pName)
+            _update_status_text = 'İndirme başarısız'
+            if _update_label_ref is not None:
+                try:
+                    QtBind.setText(gui, _update_label_ref, _update_status_text)
+                except Exception:
+                    pass
+            return
+        plugin_path = os.path.abspath(__file__)
+        with open(plugin_path, 'wb') as f:
+            f.write(new_content)
+        log('[%s] Güncelleme tamamlandı. Eklentiyi yeniden yükleyin.' % pName)
+        _update_status_text = 'Güncellendi - yeniden yükleyin'
+        if _update_label_ref is not None:
+            try:
+                QtBind.setText(gui, _update_label_ref, _update_status_text)
+            except Exception:
+                pass
+    except Exception as ex:
+        log('[%s] Güncelleme hatası: %s' % (pName, str(ex)))
+        _update_status_text = 'Hata: %s' % str(ex)[:30]
+        if _update_label_ref is not None:
+            try:
+                QtBind.setText(gui, _update_label_ref, _update_status_text)
+            except Exception:
+                pass
+
+def do_auto_update():
+    t = threading.Thread(target=_do_auto_update_thread, name=pName + '_auto_update', daemon=True)
     t.start()
 
 NPC_STORAGE_SERVERNAMES = [
@@ -610,7 +683,8 @@ QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _store_inner_x + 88, _by2 +
 _uy = _y3 + 58
 QtBind.createLabel(gui, 'Sürüm: v' + pVersion, 15, _uy)
 _update_label_ref = QtBind.createLabel(gui, '...', 95, _uy)
-QtBind.createButton(gui, 'check_update', 'Güncelleme kontrol', 15, _uy + 20)
+QtBind.createButton(gui, 'check_update', 'Kontrol', 15, _uy + 20)
+QtBind.createButton(gui, 'do_auto_update', 'Güncelle', 75, _uy + 20)
 
 _author_x = 10
 _author_y = _uy + 52
