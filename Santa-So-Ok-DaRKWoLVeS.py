@@ -1558,18 +1558,18 @@ _add_tab3(QtBind.createLabel(gui, 'Script Dosya Yolu (boş bırakırsan varsayı
 tbxGardenScriptPath = QtBind.createLineEdit(gui, "", _gd_title_x, _gd_script_y + 18, 310, 20)
 _add_tab3(tbxGardenScriptPath, _gd_title_x, _gd_script_y + 18)
 
-_gd_btn_y = _gd_script_y + 48
+# Script türü seçim butonları (üstte)
+_gd_type_y = _gd_script_y + 48
 _gd_btn_center_x = _gd_container_x + (_gd_container_w - 170) // 2
+_add_tab3(QtBind.createButton(gui, 'garden_dungeon_select_wizz_cleric', 'Wizz/Cleric', _gd_btn_center_x, _gd_type_y), _gd_btn_center_x, _gd_type_y)
+_add_tab3(QtBind.createButton(gui, 'garden_dungeon_select_normal', 'Normal', _gd_btn_center_x + 85, _gd_type_y), _gd_btn_center_x + 85, _gd_type_y)
+
+# Başla/Durdur butonları (altta, hizalı)
+_gd_btn_y = _gd_type_y + 30
 _add_tab3(QtBind.createButton(gui, 'garden_dungeon_start', '  Başla  ', _gd_btn_center_x, _gd_btn_y), _gd_btn_center_x, _gd_btn_y)
 _add_tab3(QtBind.createButton(gui, 'garden_dungeon_stop', ' Durdur ', _gd_btn_center_x + 85, _gd_btn_y), _gd_btn_center_x + 85, _gd_btn_y)
 
-# Script türü seçim butonları
-_gd_type_y = _gd_btn_y + 35
-_gd_type_btn_x = _gd_container_x + (_gd_container_w - 210) // 2
-_add_tab3(QtBind.createButton(gui, 'garden_dungeon_select_wizz_cleric', 'Wizz/Cleric', _gd_type_btn_x, _gd_type_y), _gd_type_btn_x, _gd_type_y)
-_add_tab3(QtBind.createButton(gui, 'garden_dungeon_select_normal', 'Normal', _gd_type_btn_x + 105, _gd_type_y), _gd_type_btn_x + 105, _gd_type_y)
-
-_gd_status_y = _gd_type_y + 30
+_gd_status_y = _gd_btn_y + 30
 lblGardenScriptStatus = QtBind.createLabel(gui, 'Durum: Hazır', _gd_title_x, _gd_status_y)
 _add_tab3(lblGardenScriptStatus, _gd_title_x, _gd_status_y)
 
@@ -1577,8 +1577,8 @@ _gd_note_y = _gd_status_y + 22
 _add_tab3(QtBind.createLabel(gui, 'Script türünü seç, sonra Başlat', _gd_title_x, _gd_note_y), _gd_title_x, _gd_note_y)
 
 # Tab 4 - Auto Hwt
-_hwt_container_w = 380
-_hwt_container_h = 240
+_hwt_container_w = 500
+_hwt_container_h = 260
 _hwt_container_x = _tab_bar_x + (_tab_bar_w - _hwt_container_w) // 2
 _hwt_container_y = _content_y + 15
 
