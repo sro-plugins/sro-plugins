@@ -11,7 +11,7 @@ import urllib.request
 
 pName = 'Santa-So-Ok-DaRKWoLVeS'
 PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
-pVersion = '1.2.3'
+pVersion = '1.2.4'
 
 MOVE_DELAY = 0.25
 
@@ -781,7 +781,7 @@ _add_tab2(QtBind.createLabel(gui, 'Yakında eklenir...', _t2_x, _t2_y + 30), _t2
 _t3_container_x = _tab_bar_x + 30
 _t3_container_y = _content_y + 15
 _t3_container_w = _tab_bar_w - 60
-_t3_container_h = 240
+_t3_container_h = 245
 
 _t3_container = QtBind.createList(gui, _t3_container_x, _t3_container_y, _t3_container_w, _t3_container_h)
 _add_tab3(_t3_container, _t3_container_x, _t3_container_y)
@@ -804,7 +804,7 @@ _status_y = _btn_y + 30
 _update_label_ref = QtBind.createLabel(gui, '', _t3_x, _status_y)
 _add_tab3(_update_label_ref, _t3_x, _status_y)
 
-_features_y = _status_y + 28
+_features_y = _status_y + 35
 _add_tab3(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
 _add_tab3(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
 _add_tab3(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
