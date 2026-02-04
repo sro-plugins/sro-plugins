@@ -1,0 +1,10 @@
+# Garden Dungeon Training Script
+# Bu script Garden Dungeon için kullanılır
+# İçeriği kendinize göre düzenleyebilirsiniz
+
+# Örnek komutlar:
+# move x y z
+# attack
+# wait 1000
+
+# Şimdilik boş, istediğiniz komutları ekleyebilirsiniz
