@@ -725,52 +725,40 @@ def _garden_dungeon_loop():
         
         log('[%s] [Garden-Auto] Garden Dungeon başlatılıyor...' % pName)
         
-        # Önce "garden-auto" isminde bir training area var mı kontrol et
-        area_set = False
-        try:
-            area_set = set_training_area('garden-auto')
-            if area_set:
-                log('[%s] [Garden-Auto] Training area "garden-auto" aktif edildi' % pName)
-                # Script path varsa training area'nın scriptini güncelle
-                if script_path and os.path.exists(script_path):
-                    set_training_script(script_path)
-                    log('[%s] [Garden-Auto] Training script güncellendi: %s' % (pName, script_path))
-        except Exception as ex:
-            log('[%s] [Garden-Auto] Training area seçimi başarısız: %s' % (pName, str(ex)))
-        
-        # Eğer training area yoksa, yeni bir training area oluştur
-        if not area_set and script_path and os.path.exists(script_path):
-            # Mevcut pozisyonu al
-            pos = get_position()
-            if pos:
-                # Training position set et (bu yeni bir training area oluşturur)
-                region = pos.get('region', 0)
-                x = pos.get('x', 0)
-                y = pos.get('y', 0)
-                z = pos.get('z', 0)
-                
-                set_training_position(region, x, y, z)
-                set_training_radius(50.0)  # Varsayılan radius
-                log('[%s] [Garden-Auto] Training position ayarlandı: (%d, %.1f, %.1f, %.1f)' % (pName, region, x, y, z))
-                
-                # Şimdi script'i set et (artık aktif training area var)
-                result = set_training_script(script_path)
-                if result:
-                    log('[%s] [Garden-Auto] Training script ayarlandı: %s' % (pName, script_path))
-                    area_set = True
-                else:
-                    log('[%s] [Garden-Auto] Training script ayarlanamadı!' % pName)
-            else:
-                log('[%s] [Garden-Auto] Pozisyon alınamadı!' % pName)
-        elif not area_set and not script_path:
-            log('[%s] [Garden-Auto] Script bulunamadı ve training area yok!' % pName)
+        # Script kontrolü
+        if not script_path or not os.path.exists(script_path):
+            log('[%s] [Garden-Auto] Script bulunamadı: %s' % (pName, script_path))
             _garden_dungeon_running = False
             return
         
-        if not area_set:
-            log('[%s] [Garden-Auto] Training area oluşturulamadı!' % pName)
+        # Her başlatmada mevcut pozisyonu al ve training area'yı güncelle
+        pos = get_position()
+        if not pos:
+            log('[%s] [Garden-Auto] Pozisyon alınamadı!' % pName)
             _garden_dungeon_running = False
             return
+        
+        # Training position'ı karakterin mevcut konumuna göre ayarla
+        region = pos.get('region', 0)
+        x = pos.get('x', 0)
+        y = pos.get('y', 0)
+        z = pos.get('z', 0)
+        
+        set_training_position(region, x, y, z)
+        set_training_radius(50.0)
+        log('[%s] [Garden-Auto] Training position ayarlandı: (%d, %.1f, %.1f, %.1f)' % (pName, region, x, y, z))
+        
+        # Script'i ayarla
+        result = set_training_script(script_path)
+        if result:
+            log('[%s] [Garden-Auto] Training script ayarlandı: %s' % (pName, script_path))
+        else:
+            log('[%s] [Garden-Auto] Training script ayarlanamadı!' % pName)
+            _garden_dungeon_running = False
+            return
+        
+        # Kısa bir bekleme süresi (training area'nın hazır olması için)
+        time.sleep(0.5)
         
         start_bot()
         _garden_dungeon_running = True
