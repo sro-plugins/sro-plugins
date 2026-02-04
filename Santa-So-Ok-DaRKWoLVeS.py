@@ -11,7 +11,7 @@ import urllib.request
 
 pName = 'Santa-So-Ok-DaRKWoLVeS'
 PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
-pVersion = '1.2.2'
+pVersion = '1.2.3'
 
 MOVE_DELAY = 0.25
 
@@ -640,57 +640,178 @@ def bank_sort_stop():
 
 gui = QtBind.init(__name__, pName)
 
-_y1 = 10
-_frame1 = QtBind.createList(gui, 10, _y1 - 2, 180, 52)
-QtBind.createLabel(gui, 'Jewel Box Kırdır', 15, _y1)
-QtBind.createButton(gui, 'jewel_start', 'Başla', 15, _y1 + 22)
-QtBind.createButton(gui, 'jewel_stop', 'Durdur', 95, _y1 + 22)
+TAB_OFFSCREEN = -3000
+_tab1_widgets = []
+_tab2_widgets = []
+_tab3_widgets = []
+_current_tab = 1
 
-_y2 = _y1 + 58
-_frame2 = QtBind.createList(gui, 10, _y2 - 2, 180, 52)
-QtBind.createLabel(gui, 'Çantayı Birleştir', 15, _y2)
-QtBind.createButton(gui, 'merge_start', 'Başla', 15, _y2 + 22)
-QtBind.createButton(gui, 'merge_stop', 'Durdur', 95, _y2 + 22)
+def _tab_move(widget_list, offscreen):
+    for w, x, y in widget_list:
+        try:
+            QtBind.move(gui, w, TAB_OFFSCREEN if offscreen else x, TAB_OFFSCREEN if offscreen else y)
+        except Exception:
+            pass
 
-_y3 = _y2 + 58
-_frame3 = QtBind.createList(gui, 10, _y3 - 2, 180, 52)
-QtBind.createLabel(gui, 'Çantayı Sırala', 15, _y3)
-QtBind.createButton(gui, 'sort_start', 'Başla', 15, _y3 + 22)
-QtBind.createButton(gui, 'sort_stop', 'Durdur', 95, _y3 + 22)
+def _show_tab1():
+    global _current_tab
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab1_widgets, False)
+    _current_tab = 1
+    try:
+        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3, _tab_bar_y + _tab_bar_h - 3)
+    except Exception:
+        pass
 
-_store_x = 200
-_store_y = 10
-_store_w = 200
-STORE_PAD = 12
-_store_h = 22 + 20 + 58 + 52 + 4
-_store_inner_x = _store_x + STORE_PAD
-_store_inner_y = _store_y + STORE_PAD
-_store_inner_w = _store_w - 2 * STORE_PAD
+def _show_tab2():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab2_widgets, False)
+    _current_tab = 2
+    try:
+        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w, _tab_bar_y + _tab_bar_h - 3)
+    except Exception:
+        pass
 
-_store_frame = QtBind.createList(gui, _store_x - 2, _store_y - 2, _store_w + 4, _store_h + 4)
-QtBind.createLabel(gui, 'Banka NPC yakındaysa otomatik açılır.', _store_inner_x, _store_inner_y)
-_by1 = _store_inner_y + 22
-_store_merge_frame = QtBind.createList(gui, _store_inner_x, _by1 - 2, _store_inner_w, 52)
-QtBind.createLabel(gui, 'Bankayı Birleştir', _store_inner_x + 8, _by1)
-QtBind.createButton(gui, 'bank_merge_start', 'Başla', _store_inner_x + 8, _by1 + 22)
-QtBind.createButton(gui, 'bank_merge_stop', 'Durdur', _store_inner_x + 88, _by1 + 22)
+def _show_tab3():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, False)
+    _current_tab = 3
+    try:
+        _ind_w = _tab3_btn_w - 3
+        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + _tab_bar_h - 3)
+    except Exception:
+        pass
+
+def _add_tab1(w, x, y):
+    _tab1_widgets.append((w, x, y))
+
+def _add_tab2(w, x, y):
+    _tab2_widgets.append((w, x, y))
+
+def _add_tab3(w, x, y):
+    _tab3_widgets.append((w, x, y))
+
+_tab_bar_y = 8
+_tab_bar_x = 10
+_tab_bar_w = 700
+_tab_bar_h = 26
+_tab1_btn_w = 114
+_tab2_btn_w = 83
+_tab3_btn_w = 63
+_tab_spacing = 0
+
+QtBind.createList(gui, _tab_bar_x, _tab_bar_y, _tab_bar_w, _tab_bar_h)
+QtBind.createButton(gui, '_show_tab1', 'Banka/Çanta Birleştir', _tab_bar_x + 3, _tab_bar_y + 2)
+QtBind.createButton(gui, '_show_tab2', 'Auto Dungeon', _tab_bar_x + 3 + _tab1_btn_w, _tab_bar_y + 2)
+QtBind.createButton(gui, '_show_tab3', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + 2)
+_tab_indicator = QtBind.createList(gui, _tab_bar_x + 3, _tab_bar_y + _tab_bar_h - 3, _tab1_btn_w - 1, 4)
+
+_content_y = _tab_bar_y + _tab_bar_h - 1
+_content_container_h = 270
+QtBind.createList(gui, _tab_bar_x, _content_y, _tab_bar_w, _content_container_h)
+
+_jewel_y = _content_y + 12
+_jewel_w = 280
+_jewel_h = 62
+_jewel_x = _tab_bar_x + (_tab_bar_w - _jewel_w) // 2
+
+_jewel_container = QtBind.createList(gui, _jewel_x, _jewel_y, _jewel_w, _jewel_h)
+_add_tab1(_jewel_container, _jewel_x, _jewel_y)
+_add_tab1(QtBind.createLabel(gui, 'So-Ok Event Kullanma', _jewel_x + 70, _jewel_y + 8), _jewel_x + 70, _jewel_y + 8)
+_add_tab1(QtBind.createButton(gui, 'jewel_start', 'Başla', _jewel_x + 60, _jewel_y + 32), _jewel_x + 60, _jewel_y + 32)
+_add_tab1(QtBind.createButton(gui, 'jewel_stop', 'Durdur', _jewel_x + 140, _jewel_y + 32), _jewel_x + 140, _jewel_y + 32)
+
+_row2_y = _jewel_y + _jewel_h + 12
+_container_w = 280
+_container_h = 160
+_container_gap = 30
+_total_w = _container_w * 2 + _container_gap
+_container_start_x = _tab_bar_x + (_tab_bar_w - _total_w) // 2
+
+_inv_container_x = _container_start_x
+_bank_container_x = _container_start_x + _container_w + _container_gap
+
+_inv_container = QtBind.createList(gui, _inv_container_x, _row2_y, _container_w, _container_h)
+_add_tab1(_inv_container, _inv_container_x, _row2_y)
+_add_tab1(QtBind.createLabel(gui, 'Çanta İşlemleri', _inv_container_x + 12, _row2_y + 8), _inv_container_x + 12, _row2_y + 8)
+
+_iy1 = _row2_y + 32
+_frame2 = QtBind.createList(gui, _inv_container_x + 12, _iy1, _container_w - 24, 50)
+_add_tab1(_frame2, _inv_container_x + 12, _iy1)
+_add_tab1(QtBind.createLabel(gui, 'Çantayı Birleştir', _inv_container_x + 20, _iy1 + 5), _inv_container_x + 20, _iy1 + 5)
+_add_tab1(QtBind.createButton(gui, 'merge_start', 'Başla', _inv_container_x + 20, _iy1 + 25), _inv_container_x + 20, _iy1 + 25)
+_add_tab1(QtBind.createButton(gui, 'merge_stop', 'Durdur', _inv_container_x + 100, _iy1 + 25), _inv_container_x + 100, _iy1 + 25)
+
+_iy2 = _iy1 + 58
+_frame3 = QtBind.createList(gui, _inv_container_x + 12, _iy2, _container_w - 24, 50)
+_add_tab1(_frame3, _inv_container_x + 12, _iy2)
+_add_tab1(QtBind.createLabel(gui, 'Çantayı Sırala', _inv_container_x + 20, _iy2 + 5), _inv_container_x + 20, _iy2 + 5)
+_add_tab1(QtBind.createButton(gui, 'sort_start', 'Başla', _inv_container_x + 20, _iy2 + 25), _inv_container_x + 20, _iy2 + 25)
+_add_tab1(QtBind.createButton(gui, 'sort_stop', 'Durdur', _inv_container_x + 100, _iy2 + 25), _inv_container_x + 100, _iy2 + 25)
+
+_bank_container = QtBind.createList(gui, _bank_container_x, _row2_y, _container_w, _container_h)
+_add_tab1(_bank_container, _bank_container_x, _row2_y)
+_add_tab1(QtBind.createLabel(gui, 'Banka İşlemleri', _bank_container_x + 12, _row2_y + 8), _bank_container_x + 12, _row2_y + 8)
+_add_tab1(QtBind.createLabel(gui, 'Banka NPC yakındaysa otomatik açılır.', _bank_container_x + 12, _row2_y + 24), _bank_container_x + 12, _row2_y + 24)
+
+_by1 = _row2_y + 46
+_store_merge_frame = QtBind.createList(gui, _bank_container_x + 12, _by1, _container_w - 24, 50)
+_add_tab1(_store_merge_frame, _bank_container_x + 12, _by1)
+_add_tab1(QtBind.createLabel(gui, 'Bankayı Birleştir', _bank_container_x + 20, _by1 + 5), _bank_container_x + 20, _by1 + 5)
+_add_tab1(QtBind.createButton(gui, 'bank_merge_start', 'Başla', _bank_container_x + 20, _by1 + 25), _bank_container_x + 20, _by1 + 25)
+_add_tab1(QtBind.createButton(gui, 'bank_merge_stop', 'Durdur', _bank_container_x + 100, _by1 + 25), _bank_container_x + 100, _by1 + 25)
+
 _by2 = _by1 + 58
-_store_sort_frame = QtBind.createList(gui, _store_inner_x, _by2 - 2, _store_inner_w, 52)
-QtBind.createLabel(gui, 'Bankayı Sırala', _store_inner_x + 8, _by2)
-QtBind.createButton(gui, 'bank_sort_start', 'Başla', _store_inner_x + 8, _by2 + 22)
-QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _store_inner_x + 88, _by2 + 22)
+_store_sort_frame = QtBind.createList(gui, _bank_container_x + 12, _by2, _container_w - 24, 50)
+_add_tab1(_store_sort_frame, _bank_container_x + 12, _by2)
+_add_tab1(QtBind.createLabel(gui, 'Bankayı Sırala', _bank_container_x + 20, _by2 + 5), _bank_container_x + 20, _by2 + 5)
+_add_tab1(QtBind.createButton(gui, 'bank_sort_start', 'Başla', _bank_container_x + 20, _by2 + 25), _bank_container_x + 20, _by2 + 25)
+_add_tab1(QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _bank_container_x + 100, _by2 + 25), _bank_container_x + 100, _by2 + 25)
 
-_uy = _y3 + 58
-QtBind.createLabel(gui, 'Sürüm: v' + pVersion, 15, _uy)
-_update_label_ref = QtBind.createLabel(gui, '...', 95, _uy)
-QtBind.createButton(gui, 'check_update', 'Kontrol', 15, _uy + 20)
-QtBind.createButton(gui, 'do_auto_update', 'Güncelle', 75, _uy + 20)
+_t2_y = _content_y + 40
+_t2_x = _tab_bar_x + 30
+_add_tab2(QtBind.createLabel(gui, 'Auto Dungeon Özelliği', _t2_x, _t2_y), _t2_x, _t2_y)
+_add_tab2(QtBind.createLabel(gui, 'Yakında eklenir...', _t2_x, _t2_y + 30), _t2_x, _t2_y + 30)
 
-_author_x = 10
-_author_y = _uy + 52
-QtBind.createLabel(gui, '╔═════════════════════════╗', _author_x, _author_y)
-QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _author_x, _author_y + 16)
-QtBind.createLabel(gui, '╚═════════════════════════╝', _author_x, _author_y + 32)
+_t3_container_x = _tab_bar_x + 30
+_t3_container_y = _content_y + 15
+_t3_container_w = _tab_bar_w - 60
+_t3_container_h = 240
+
+_t3_container = QtBind.createList(gui, _t3_container_x, _t3_container_y, _t3_container_w, _t3_container_h)
+_add_tab3(_t3_container, _t3_container_x, _t3_container_y)
+
+_t3_x = _t3_container_x + 15
+_t3_y = _t3_container_y + 15
+
+_add_tab3(QtBind.createLabel(gui, '╔═════════════════════════╗', _t3_x, _t3_y), _t3_x, _t3_y)
+_add_tab3(QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _t3_x, _t3_y + 16), _t3_x, _t3_y + 16)
+_add_tab3(QtBind.createLabel(gui, '╚═════════════════════════╝', _t3_x, _t3_y + 32), _t3_x, _t3_y + 32)
+
+_version_y = _t3_y + 58
+_add_tab3(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _t3_x, _version_y)
+
+_btn_y = _version_y + 26
+_add_tab3(QtBind.createButton(gui, 'check_update', 'Kontrol', _t3_x, _btn_y), _t3_x, _btn_y)
+_add_tab3(QtBind.createButton(gui, 'do_auto_update', 'Güncelle', _t3_x + 70, _btn_y), _t3_x + 70, _btn_y)
+
+_status_y = _btn_y + 30
+_update_label_ref = QtBind.createLabel(gui, '', _t3_x, _status_y)
+_add_tab3(_update_label_ref, _t3_x, _status_y)
+
+_features_y = _status_y + 28
+_add_tab3(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
+_add_tab3(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
+_add_tab3(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
+_add_tab3(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
+
+_tab_move(_tab2_widgets, True)
+_tab_move(_tab3_widgets, True)
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
 threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()
