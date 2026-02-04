@@ -8,12 +8,18 @@ import copy
 import json
 import os
 import urllib.request
+import sqlite3
 
 pName = 'Santa-So-Ok-DaRKWoLVeS'
 PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
-pVersion = '1.2.4'
+pVersion = '1.3.0'
 
 MOVE_DELAY = 0.25
+
+# Auto Dungeon constants
+DIMENSIONAL_COOLDOWN_DELAY = 7200  # saniye (2 saat)
+WAIT_DROPS_DELAY_MAX = 10  # saniye
+COUNT_MOBS_DELAY = 1.0  # saniye
 
 GITHUB_REPO = 'sro-plugins/sro-plugins'
 GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_REPO
@@ -73,6 +79,14 @@ def _get_update_download_url():
 
 _update_label_ref = None
 _update_status_text = ''
+
+# Auto Dungeon global değişkenleri
+character_data = None
+itemUsedByPlugin = None
+dimensionalItemActivated = None
+lstMobsData = []
+lstIgnore = []
+lstOnlyCount = []
 
 def _check_update_thread(skip_delay=False):
     global _update_status_text, _update_label_ref
@@ -638,6 +652,366 @@ def bank_sort_stop():
         _bank_sort_thread = None
     log('[%s] Banka sıralama durduruldu.' % pName)
 
+# ______________________________ Auto Dungeon Fonksiyonları ______________________________ #
+
+def getPath():
+    return get_config_dir() + pName + "\\"
+
+def getConfig():
+    return getPath() + character_data['server'] + "_" + character_data['name'] + ".json"
+
+def isJoined():
+    global character_data
+    character_data = get_character_data()
+    if not (character_data and "name" in character_data and character_data["name"]):
+        character_data = None
+    return character_data
+
+def ListContains(text, lst):
+    text = text.lower()
+    for i in range(len(lst)):
+        if lst[i].lower() == text:
+            return True
+    return False
+
+def GetDistance(ax, ay, bx, by):
+    return ((bx - ax) ** 2 + (by - ay) ** 2) ** (0.5)
+
+def GetFilterConnection():
+    path = get_config_dir() + character_data['server'] + '_' + character_data['name'] + '.db3'
+    return sqlite3.connect(path)
+
+def IsPickable(filterCursor, ItemID):
+    return filterCursor.execute('SELECT EXISTS(SELECT 1 FROM pickfilter WHERE id=? AND pick=1 LIMIT 1)', (ItemID,)).fetchone()[0]
+
+def WaitPickableDrops(filterCursor, waiting=0):
+    if waiting >= WAIT_DROPS_DELAY_MAX:
+        log('[%s] Dropları bekleme süresi doldu!' % pName)
+        return
+    drops = get_drops()
+    if drops:
+        drop = None
+        for key in drops:
+            value = drops[key]
+            if IsPickable(filterCursor, value['model']):
+                drop = value
+                break
+        if drop:
+            log('[%s] "%s" toplanması bekleniyor...' % (pName, drop['name']))
+            time.sleep(1.0)
+            WaitPickableDrops(filterCursor, waiting + 1)
+
+def getMobCount(position, radius):
+    QtBind.clear(gui, lstMonsterCounter)
+    QtBind.append(gui, lstMonsterCounter, 'İsim (Tür)')
+    count = 0
+    p = position if radius != None else None
+    monsters = get_monsters()
+    if monsters:
+        for key, mob in monsters.items():
+            if mob['type'] in lstIgnore:
+                continue
+            if len(lstOnlyCount) > 0:
+                if not mob['type'] in lstOnlyCount:
+                    continue
+            elif ListContains(mob['name'], lstMobsData):
+                continue
+            if radius != None:
+                if round(GetDistance(p['x'], p['y'], mob['x'], mob['y']), 2) > radius:
+                    continue
+            QtBind.append(gui, lstMonsterCounter, mob['name'] + ' (' + str(mob['type']) + ')')
+            count += 1
+    return count
+
+def AttackMobs(wait, isAttacking, position, radius):
+    count = getMobCount(position, radius)
+    if count > 0:
+        if not isAttacking:
+            start_bot()
+            log("[%s] Bu bölgede (%d) canavar öldürülüyor. Yarıçap: %s" % (pName, count, str(radius) if radius != None else "Max."))
+        threading.Timer(wait, AttackMobs, [wait, True, position, radius]).start()
+    else:
+        log("[%s] Tüm canavarlar öldürüldü!" % pName)
+        conn = GetFilterConnection()
+        cursor = conn.cursor()
+        WaitPickableDrops(cursor)
+        conn.close()
+        stop_bot()
+        set_training_position(0, 0, 0, 0)
+        log("[%s] Script konumuna geri dönülüyor..." % pName)
+        threading.Timer(2.5, move_to, [position['x'], position['y'], position['z']]).start()
+        threading.Timer(5.0, start_bot).start()
+
+def AttackArea(args):
+    radius = None
+    if len(args) >= 2:
+        radius = round(float(args[1]), 2)
+    p = get_position()
+    if getMobCount(p, radius) > 0:
+        stop_bot()
+        set_training_position(p['region'], p['x'], p['y'], p['z'])
+        if radius != None:
+            set_training_radius(radius)
+        else:
+            set_training_radius(100.0)
+        threading.Timer(0.001, AttackMobs, [COUNT_MOBS_DELAY, False, p, radius]).start()
+    else:
+        log("[%s] Bu bölgede canavar yok. Yarıçap: %s" % (pName, str(radius) if radius != None else "Max."))
+    return 0
+
+def GetDimensionalHole(Name):
+    searchByName = Name != ''
+    items = get_inventory()['items']
+    for slot, item in enumerate(items):
+        if item:
+            match = False
+            if searchByName:
+                match = (Name == item['name'])
+            else:
+                itemData = get_item(item['model'])
+                match = (itemData['tid1'] == 3 and itemData['tid2'] == 12 and itemData['tid3'] == 7)
+            if match:
+                item['slot'] = slot
+                return item
+    return None
+
+def GetDimensionalPillarUID(Name):
+    npcs = get_npcs()
+    if npcs:
+        for uid, npc in npcs.items():
+            item = get_item(npc['model'])
+            if item and item['name'] == Name:
+                return uid
+    return 0
+
+def EnterToDimensional(Name):
+    uid = GetDimensionalPillarUID(Name)
+    if uid:
+        log('[%s] Boyutsal delik seçiliyor...' % pName)
+        packet = struct.pack('I', uid)
+        inject_joymax(0x7045, packet, False)
+        time.sleep(1.0)
+        log('[%s] Boyutsal deliğe giriliyor...' % pName)
+        inject_joymax(0x704B, packet, False)
+        packet += struct.pack('H', 3)
+        inject_joymax(0x705A, packet, False)
+        threading.Timer(5.0, start_bot).start()
+        return
+    log('[%s] "%s" yakınınızda bulunamadı!' % (pName, Name))
+
+def GoDimensionalThread(Name):
+    if dimensionalItemActivated:
+        Name = dimensionalItemActivated['name']
+        log('[%s] %s hala açık!' % (pName, '"' + Name + '"' if Name else 'Boyutsal Delik'))
+        EnterToDimensional(Name)
+        return
+    item = GetDimensionalHole(Name)
+    if item:
+        log('[%s] "%s" kullanılıyor...' % (pName, item['name']))
+        p = struct.pack('B', item['slot'])
+        locale = get_locale()
+        if locale in [56, 18, 61]:
+            p += b'\x30\x0C\x0C\x07'
+        else:
+            p += b'\x6C\x3E'
+        global itemUsedByPlugin
+        itemUsedByPlugin = item
+        inject_joymax(0x704C, p, True)
+    else:
+        log('[%s] %s envanterinizde bulunamadı' % (pName, '"' + Name + '"' if Name else 'Boyutsal Delik'))
+
+def GoDimensional(args):
+    stop_bot()
+    name = ''
+    if len(args) > 1:
+        name = args[1]
+    threading.Timer(0.001, GoDimensionalThread, [name]).start()
+    return 0
+
+def btnAddMob_clicked():
+    global lstMobsData
+    text = QtBind.text(gui, tbxMobs)
+    if text and not ListContains(text, lstMobsData):
+        lstMobsData.append(text)
+        QtBind.append(gui, lstMobs, text)
+        QtBind.setText(gui, tbxMobs, "")
+        saveConfigs()
+        log('[%s] Canavar eklendi [%s]' % (pName, text))
+
+def btnRemMob_clicked():
+    global lstMobsData
+    selected = QtBind.text(gui, lstMobs)
+    if selected:
+        lstMobsData.remove(selected)
+        QtBind.remove(gui, lstMobs, selected)
+        saveConfigs()
+        log('[%s] Canavar kaldırıldı [%s]' % (pName, selected))
+
+def Checkbox_Checked(checked, gListName, mobType):
+    gListReference = globals()[gListName]
+    if checked:
+        gListReference.append(mobType)
+    else:
+        gListReference.remove(mobType)
+    saveConfigs()
+
+def cbxIgnoreGeneral_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 0)
+def cbxOnlyCountGeneral_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 0)
+
+def cbxIgnoreChampion_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 1)
+def cbxOnlyCountChampion_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 1)
+
+def cbxIgnoreGiant_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 4)
+def cbxOnlyCountGiant_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 4)
+
+def cbxIgnoreTitan_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 5)
+def cbxOnlyCountTitan_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 5)
+
+def cbxIgnoreStrong_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 6)
+def cbxOnlyCountStrong_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 6)
+
+def cbxIgnoreElite_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 7)
+def cbxOnlyCountElite_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 7)
+
+def cbxIgnoreUnique_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 8)
+def cbxOnlyCountUnique_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 8)
+
+def cbxIgnoreParty_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 16)
+def cbxOnlyCountParty_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 16)
+
+def cbxIgnoreChampionParty_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 17)
+def cbxOnlyCountChampionParty_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 17)
+
+def cbxIgnoreGiantParty_clicked(checked):
+    Checkbox_Checked(checked, "lstIgnore", 20)
+def cbxOnlyCountGiantParty_clicked(checked):
+    Checkbox_Checked(checked, "lstOnlyCount", 20)
+
+def cbxAcceptForgottenWorld_checked(checked):
+    saveConfigs()
+
+def loadDefaultConfig():
+    global lstMobsData, lstIgnore, lstOnlyCount
+    lstMobsData = []
+    QtBind.clear(gui, lstMobs)
+    lstIgnore = []
+    QtBind.setChecked(gui, cbxIgnoreGeneral, False)
+    QtBind.setChecked(gui, cbxIgnoreChampion, False)
+    QtBind.setChecked(gui, cbxIgnoreGiant, False)
+    QtBind.setChecked(gui, cbxIgnoreTitan, False)
+    QtBind.setChecked(gui, cbxIgnoreStrong, False)
+    QtBind.setChecked(gui, cbxIgnoreElite, False)
+    QtBind.setChecked(gui, cbxIgnoreUnique, False)
+    QtBind.setChecked(gui, cbxIgnoreParty, False)
+    QtBind.setChecked(gui, cbxIgnoreChampionParty, False)
+    QtBind.setChecked(gui, cbxIgnoreGiantParty, False)
+    lstOnlyCount = []
+    QtBind.setChecked(gui, cbxOnlyCountGeneral, False)
+    QtBind.setChecked(gui, cbxOnlyCountChampion, False)
+    QtBind.setChecked(gui, cbxOnlyCountGiant, False)
+    QtBind.setChecked(gui, cbxOnlyCountTitan, False)
+    QtBind.setChecked(gui, cbxOnlyCountStrong, False)
+    QtBind.setChecked(gui, cbxOnlyCountElite, False)
+    QtBind.setChecked(gui, cbxOnlyCountUnique, False)
+    QtBind.setChecked(gui, cbxOnlyCountParty, False)
+    QtBind.setChecked(gui, cbxOnlyCountChampionParty, False)
+    QtBind.setChecked(gui, cbxOnlyCountGiantParty, False)
+    QtBind.setChecked(gui, cbxAcceptForgottenWorld, False)
+
+def loadConfigs():
+    loadDefaultConfig()
+    if isJoined() and os.path.exists(getConfig()):
+        data = {}
+        with open(getConfig(), "r") as f:
+            data = json.load(f)
+        if "Ignore Names" in data:
+            global lstMobsData
+            lstMobsData = data["Ignore Names"]
+            for name in lstMobsData:
+                QtBind.append(gui, lstMobs, name)
+        if "Ignore Types" in data:
+            global lstIgnore
+            for t in data["Ignore Types"]:
+                if t == 8:
+                    QtBind.setChecked(gui, cbxIgnoreUnique, True)
+                elif t == 7:
+                    QtBind.setChecked(gui, cbxIgnoreElite, True)
+                elif t == 6:
+                    QtBind.setChecked(gui, cbxIgnoreStrong, True)
+                elif t == 5:
+                    QtBind.setChecked(gui, cbxIgnoreTitan, True)
+                elif t == 4:
+                    QtBind.setChecked(gui, cbxIgnoreGiant, True)
+                elif t == 1:
+                    QtBind.setChecked(gui, cbxIgnoreChampion, True)
+                elif t == 0:
+                    QtBind.setChecked(gui, cbxIgnoreGeneral, True)
+                elif t == 16:
+                    QtBind.setChecked(gui, cbxIgnoreParty, True)
+                elif t == 17:
+                    QtBind.setChecked(gui, cbxIgnoreChampionParty, True)
+                elif t == 20:
+                    QtBind.setChecked(gui, cbxIgnoreGiantParty, True)
+                else:
+                    continue
+                lstIgnore.append(t)
+        if "OnlyCount Types" in data:
+            global lstOnlyCount
+            for t in data["OnlyCount Types"]:
+                if t == 8:
+                    QtBind.setChecked(gui, cbxOnlyCountUnique, True)
+                elif t == 7:
+                    QtBind.setChecked(gui, cbxOnlyCountElite, True)
+                elif t == 6:
+                    QtBind.setChecked(gui, cbxOnlyCountStrong, True)
+                elif t == 5:
+                    QtBind.setChecked(gui, cbxOnlyCountTitan, True)
+                elif t == 4:
+                    QtBind.setChecked(gui, cbxOnlyCountGiant, True)
+                elif t == 1:
+                    QtBind.setChecked(gui, cbxOnlyCountChampion, True)
+                elif t == 0:
+                    QtBind.setChecked(gui, cbxOnlyCountGeneral, True)
+                elif t == 16:
+                    QtBind.setChecked(gui, cbxOnlyCountParty, True)
+                elif t == 17:
+                    QtBind.setChecked(gui, cbxOnlyCountChampionParty, True)
+                elif t == 20:
+                    QtBind.setChecked(gui, cbxOnlyCountGiantParty, True)
+                else:
+                    continue
+                lstOnlyCount.append(t)
+        if 'Accept ForgottenWorld' in data and data['Accept ForgottenWorld']:
+            QtBind.setChecked(gui, cbxAcceptForgottenWorld, True)
+
+def saveConfigs():
+    if isJoined():
+        data = {}
+        data['OnlyCount Types'] = lstOnlyCount
+        data['Ignore Types'] = lstIgnore
+        data['Ignore Names'] = lstMobsData
+        data['Accept ForgottenWorld'] = QtBind.isChecked(gui, cbxAcceptForgottenWorld)
+        with open(getConfig(), "w") as f:
+            f.write(json.dumps(data, indent=4, sort_keys=True))
+
 gui = QtBind.init(__name__, pName)
 
 TAB_OFFSCREEN = -3000
@@ -773,10 +1147,118 @@ _add_tab1(QtBind.createLabel(gui, 'Bankayı Sırala', _bank_container_x + 20, _b
 _add_tab1(QtBind.createButton(gui, 'bank_sort_start', 'Başla', _bank_container_x + 20, _by2 + 25), _bank_container_x + 20, _by2 + 25)
 _add_tab1(QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _bank_container_x + 100, _by2 + 25), _bank_container_x + 100, _by2 + 25)
 
-_t2_y = _content_y + 40
-_t2_x = _tab_bar_x + 30
-_add_tab2(QtBind.createLabel(gui, 'Auto Dungeon Özelliği', _t2_x, _t2_y), _t2_x, _t2_y)
-_add_tab2(QtBind.createLabel(gui, 'Yakında eklenir...', _t2_x, _t2_y + 30), _t2_x, _t2_y + 30)
+# Tab 2 - Auto Dungeon
+_t2_y = _content_y + 10
+_t2_x = _tab_bar_x + 20
+
+# Sol taraf - Canavar isimleri
+lblMobs = QtBind.createLabel(gui, '#  Sayılmayacak canavar adları  #\n#       Canavar Sayacından       #', _t2_x, _t2_y)
+_add_tab2(lblMobs, _t2_x, _t2_y)
+tbxMobs = QtBind.createLineEdit(gui, "", _t2_x, _t2_y + 35, 100, 20)
+_add_tab2(tbxMobs, _t2_x, _t2_y + 35)
+lstMobs = QtBind.createList(gui, _t2_x, _t2_y + 56, 176, 170)
+_add_tab2(lstMobs, _t2_x, _t2_y + 56)
+btnAddMob = QtBind.createButton(gui, 'btnAddMob_clicked', "    Ekle    ", _t2_x + 101, _t2_y + 34)
+_add_tab2(btnAddMob, _t2_x + 101, _t2_y + 34)
+btnRemMob = QtBind.createButton(gui, 'btnRemMob_clicked', "   Kaldır   ", _t2_x + 49, _t2_y + 226)
+_add_tab2(btnRemMob, _t2_x + 49, _t2_y + 226)
+
+# Orta - Canavar Sayacı tercihleri
+_t2_mid_x = _t2_x + 210
+lblPreferences = QtBind.createLabel(gui, '#  Canavar Sayacı tercihleri  #', _t2_mid_x, _t2_y)
+_add_tab2(lblPreferences, _t2_mid_x, _t2_y)
+
+_y = _t2_y + 26
+lblGeneral = QtBind.createLabel(gui, 'General (0)', _t2_mid_x, _y)
+_add_tab2(lblGeneral, _t2_mid_x, _y)
+cbxIgnoreGeneral = QtBind.createCheckBox(gui, 'cbxIgnoreGeneral_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreGeneral, _t2_mid_x + 105, _y)
+cbxOnlyCountGeneral = QtBind.createCheckBox(gui, 'cbxOnlyCountGeneral_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountGeneral, _t2_mid_x + 165, _y)
+
+_y += 20
+lblChampion = QtBind.createLabel(gui, 'Champion (1)', _t2_mid_x, _y)
+_add_tab2(lblChampion, _t2_mid_x, _y)
+cbxIgnoreChampion = QtBind.createCheckBox(gui, 'cbxIgnoreChampion_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreChampion, _t2_mid_x + 105, _y)
+cbxOnlyCountChampion = QtBind.createCheckBox(gui, 'cbxOnlyCountChampion_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountChampion, _t2_mid_x + 165, _y)
+
+_y += 20
+lblGiant = QtBind.createLabel(gui, 'Giant (4)', _t2_mid_x, _y)
+_add_tab2(lblGiant, _t2_mid_x, _y)
+cbxIgnoreGiant = QtBind.createCheckBox(gui, 'cbxIgnoreGiant_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreGiant, _t2_mid_x + 105, _y)
+cbxOnlyCountGiant = QtBind.createCheckBox(gui, 'cbxOnlyCountGiant_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountGiant, _t2_mid_x + 165, _y)
+
+_y += 20
+lblTitan = QtBind.createLabel(gui, 'Titan (5)', _t2_mid_x, _y)
+_add_tab2(lblTitan, _t2_mid_x, _y)
+cbxIgnoreTitan = QtBind.createCheckBox(gui, 'cbxIgnoreTitan_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreTitan, _t2_mid_x + 105, _y)
+cbxOnlyCountTitan = QtBind.createCheckBox(gui, 'cbxOnlyCountTitan_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountTitan, _t2_mid_x + 165, _y)
+
+_y += 20
+lblStrong = QtBind.createLabel(gui, 'Strong (6)', _t2_mid_x, _y)
+_add_tab2(lblStrong, _t2_mid_x, _y)
+cbxIgnoreStrong = QtBind.createCheckBox(gui, 'cbxIgnoreStrong_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreStrong, _t2_mid_x + 105, _y)
+cbxOnlyCountStrong = QtBind.createCheckBox(gui, 'cbxOnlyCountStrong_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountStrong, _t2_mid_x + 165, _y)
+
+_y += 20
+lblElite = QtBind.createLabel(gui, 'Elite (7)', _t2_mid_x, _y)
+_add_tab2(lblElite, _t2_mid_x, _y)
+cbxIgnoreElite = QtBind.createCheckBox(gui, 'cbxIgnoreElite_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreElite, _t2_mid_x + 105, _y)
+cbxOnlyCountElite = QtBind.createCheckBox(gui, 'cbxOnlyCountElite_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountElite, _t2_mid_x + 165, _y)
+
+_y += 20
+lblUnique = QtBind.createLabel(gui, 'Unique (8)', _t2_mid_x, _y)
+_add_tab2(lblUnique, _t2_mid_x, _y)
+cbxIgnoreUnique = QtBind.createCheckBox(gui, 'cbxIgnoreUnique_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreUnique, _t2_mid_x + 105, _y)
+cbxOnlyCountUnique = QtBind.createCheckBox(gui, 'cbxOnlyCountUnique_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountUnique, _t2_mid_x + 165, _y)
+
+_y += 20
+lblParty = QtBind.createLabel(gui, 'Party (16)', _t2_mid_x, _y)
+_add_tab2(lblParty, _t2_mid_x, _y)
+cbxIgnoreParty = QtBind.createCheckBox(gui, 'cbxIgnoreParty_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreParty, _t2_mid_x + 105, _y)
+cbxOnlyCountParty = QtBind.createCheckBox(gui, 'cbxOnlyCountParty_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountParty, _t2_mid_x + 165, _y)
+
+_y += 20
+lblChampionParty = QtBind.createLabel(gui, 'ChampionParty (17)', _t2_mid_x, _y)
+_add_tab2(lblChampionParty, _t2_mid_x, _y)
+cbxIgnoreChampionParty = QtBind.createCheckBox(gui, 'cbxIgnoreChampionParty_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreChampionParty, _t2_mid_x + 105, _y)
+cbxOnlyCountChampionParty = QtBind.createCheckBox(gui, 'cbxOnlyCountChampionParty_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountChampionParty, _t2_mid_x + 165, _y)
+
+_y += 20
+lblGiantParty = QtBind.createLabel(gui, 'GiantParty (20)', _t2_mid_x, _y)
+_add_tab2(lblGiantParty, _t2_mid_x, _y)
+cbxIgnoreGiantParty = QtBind.createCheckBox(gui, 'cbxIgnoreGiantParty_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+_add_tab2(cbxIgnoreGiantParty, _t2_mid_x + 105, _y)
+cbxOnlyCountGiantParty = QtBind.createCheckBox(gui, 'cbxOnlyCountGiantParty_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+_add_tab2(cbxOnlyCountGiantParty, _t2_mid_x + 165, _y)
+
+_y += 30
+cbxAcceptForgottenWorld = QtBind.createCheckBox(gui, 'cbxAcceptForgottenWorld_checked', 'Unutulmuş Dünya davetlerini kabul et', _t2_mid_x, _y)
+_add_tab2(cbxAcceptForgottenWorld, _t2_mid_x, _y)
+
+# Sağ taraf - Canavar Sayacı
+_t2_right_x = _t2_mid_x + 260
+lblMonsterCounter = QtBind.createLabel(gui, '#       Canavar Sayacı       #', _t2_right_x, _t2_y)
+_add_tab2(lblMonsterCounter, _t2_right_x, _t2_y)
+lstMonsterCounter = QtBind.createList(gui, _t2_right_x, _t2_y + 23, 197, 237)
+_add_tab2(lstMonsterCounter, _t2_right_x, _t2_y + 23)
+QtBind.append(gui, lstMonsterCounter, 'İsim (Tür)')
 
 _t3_container_x = _tab_bar_x + 30
 _t3_container_y = _content_y + 15
@@ -808,10 +1290,48 @@ _features_y = _status_y + 35
 _add_tab3(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
 _add_tab3(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
 _add_tab3(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
-_add_tab3(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
+_add_tab3(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
+_add_tab3(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 82), _t3_x, _features_y + 82)
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
 threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()
+
+# Auto Dungeon klasörünü oluştur
+if not os.path.exists(getPath()):
+    os.makedirs(getPath())
+    log('[%s] %s klasörü oluşturuldu' % (pName, pName))
+
+# ______________________________ Events ______________________________ #
+
+def joined_game():
+    loadConfigs()
+
+def handle_joymax(opcode, data):
+    # SERVER_DIMENSIONAL_INVITATION_REQUEST
+    if opcode == 0x751A:
+        if QtBind.isChecked(gui, cbxAcceptForgottenWorld):
+            packet = data[:4]
+            packet += b'\x00\x00\x00\x00'
+            packet += b'\x01'
+            inject_joymax(0x751C, packet, False)
+            log('[%s] Unutulmuş Dünya daveti kabul edildi!' % pName)
+    # SERVER_INVENTORY_ITEM_USE
+    elif opcode == 0xB04C:
+        global itemUsedByPlugin
+        if itemUsedByPlugin:
+            if data[0] == 1:
+                log('[%s] "%s" açıldı' % (pName, itemUsedByPlugin['name']))
+                global dimensionalItemActivated
+                dimensionalItemActivated = itemUsedByPlugin
+                def DimensionalCooldown():
+                    global dimensionalItemActivated
+                    dimensionalItemActivated = None
+                threading.Timer(DIMENSIONAL_COOLDOWN_DELAY, DimensionalCooldown).start()
+                threading.Timer(1.0, EnterToDimensional, [itemUsedByPlugin['name']]).start()
+            else:
+                log('[%s] "%s" açılamadı' % (pName, itemUsedByPlugin['name']))
+            itemUsedByPlugin = None
+    return True
