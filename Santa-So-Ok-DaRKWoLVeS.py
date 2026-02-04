@@ -15,7 +15,7 @@ pVersion = '1.2.1'
 
 MOVE_DELAY = 0.25
 
-GITHUB_REPO = 'brkcnszgn/sro-plugins'
+GITHUB_REPO = 'sro-plugins/sro-plugins'
 GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_REPO
 GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
 GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
