@@ -26,6 +26,7 @@ GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_R
 GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
 GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
+GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 UPDATE_CHECK_DELAY = 3
 
 def _parse_version(s):
@@ -92,18 +93,28 @@ lstOnlyCount = []
 # Garden Dungeon global değişkenleri
 _garden_dungeon_running = False
 _garden_dungeon_script_path = ""
+_garden_dungeon_script_type = "normal"  # "normal" veya "wizz-cleric"
 _garden_dungeon_thread = None
 _garden_dungeon_stop_event = threading.Event()
 _garden_dungeon_lock = threading.Lock()
 
-def _download_garden_script():
-    """GitHub'dan garden-dungeon.txt dosyasını indirir"""
+def _download_garden_script(script_type="normal"):
+    """GitHub'dan garden-dungeon script dosyasını indirir"""
     try:
         sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
-        script_path = os.path.join(sc_folder, "garden-dungeon.txt")
         
-        log('[%s] [Garden-Auto] GitHub\'dan script indiriliyor...' % pName)
-        log('[%s] [Garden-Auto] URL: %s' % (pName, GITHUB_GARDEN_SCRIPT_URL))
+        # Script türüne göre dosya adı ve URL belirle
+        if script_type == "wizz-cleric":
+            script_filename = "garden-dungeon-wizz-cleric.txt"
+            download_url = GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL
+        else:
+            script_filename = "garden-dungeon.txt"
+            download_url = GITHUB_GARDEN_SCRIPT_URL
+        
+        script_path = os.path.join(sc_folder, script_filename)
+        
+        log('[%s] [Garden-Auto] GitHub\'dan script indiriliyor... (Tür: %s)' % (pName, script_type))
+        log('[%s] [Garden-Auto] URL: %s' % (pName, download_url))
         
         # sc klasörü yoksa oluştur
         if not os.path.exists(sc_folder):
@@ -113,7 +124,7 @@ def _download_garden_script():
         # GitHub'dan indir (cache bypass için timestamp ekle)
         import time
         cache_buster = int(time.time())
-        url_with_cache_buster = GITHUB_GARDEN_SCRIPT_URL + '?v=' + str(cache_buster)
+        url_with_cache_buster = download_url + '?v=' + str(cache_buster)
         
         req = urllib.request.Request(
             url_with_cache_buster,
@@ -135,7 +146,7 @@ def _download_garden_script():
             f.write(script_content)
         
         log('[%s] [Garden-Auto] Script başarıyla indirildi: %s (%d byte)' % (pName, script_path, content_length))
-        return True
+        return script_path
         
     except Exception as ex:
         log('[%s] [Garden-Auto] Script indirme hatası: %s' % (pName, str(ex)))
@@ -776,8 +787,20 @@ def _garden_dungeon_loop():
         log('[%s] [Garden-Auto] Hata: %s' % (pName, str(ex)))
         _garden_dungeon_running = False
 
+def garden_dungeon_select_normal():
+    global _garden_dungeon_script_type
+    _garden_dungeon_script_type = "normal"
+    QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Normal script seçildi')
+    log('[%s] [Garden-Auto] Normal script seçildi' % pName)
+
+def garden_dungeon_select_wizz_cleric():
+    global _garden_dungeon_script_type
+    _garden_dungeon_script_type = "wizz-cleric"
+    QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Wizz/Cleric script seçildi')
+    log('[%s] [Garden-Auto] Wizz/Cleric script seçildi' % pName)
+
 def garden_dungeon_start():
-    global _garden_dungeon_thread, _garden_dungeon_running, _garden_dungeon_script_path
+    global _garden_dungeon_thread, _garden_dungeon_running, _garden_dungeon_script_path, _garden_dungeon_script_type
     
     # Textbox'tan script yolunu al ve temizle
     script_path_from_ui = QtBind.text(gui, tbxGardenScriptPath).strip()
@@ -790,11 +813,15 @@ def garden_dungeon_start():
     # Eğer textbox'ta bir şey varsa onu kullan
     if script_path_from_ui:
         _garden_dungeon_script_path = script_path_from_ui
-        log('[%s] [Garden-Auto] Script yolu: %s' % (pName, _garden_dungeon_script_path))
-    # Yoksa varsayılanı kullan
+        log('[%s] [Garden-Auto] Özel script yolu: %s' % (pName, _garden_dungeon_script_path))
+    # Yoksa seçilen türe göre varsayılanı kullan
     elif not _garden_dungeon_script_path:
-        _garden_dungeon_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
-        log('[%s] [Garden-Auto] Varsayılan script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
+        if _garden_dungeon_script_type == "wizz-cleric":
+            _garden_dungeon_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon-wizz-cleric.txt")
+            log('[%s] [Garden-Auto] Wizz/Cleric script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
+        else:
+            _garden_dungeon_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
+            log('[%s] [Garden-Auto] Normal script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
     
     # Training area "garden-auto" var mı kontrol et (script olmasa da çalışabilir)
     has_training_area = False
@@ -807,13 +834,17 @@ def garden_dungeon_start():
     
     # Script dosyasının var olup olmadığını kontrol et (training area yoksa script şart)
     if not has_training_area and not os.path.exists(_garden_dungeon_script_path):
-        # Varsayılan script ise GitHub'dan indirmeyi dene
-        default_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
-        if _garden_dungeon_script_path == default_script:
-            log('[%s] [Garden-Auto] Varsayılan script bulunamadı, GitHub\'dan indiriliyor...' % pName)
+        # Varsayılan scriptlerden biri mi kontrol et
+        default_normal = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
+        default_wizz = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon-wizz-cleric.txt")
+        
+        if _garden_dungeon_script_path in [default_normal, default_wizz]:
+            log('[%s] [Garden-Auto] Script bulunamadı, GitHub\'dan indiriliyor...' % pName)
             QtBind.setText(gui, lblGardenScriptStatus, 'Durum: GitHub\'dan indiriliyor...')
             
-            if _download_garden_script():
+            downloaded_path = _download_garden_script(_garden_dungeon_script_type)
+            if downloaded_path:
+                _garden_dungeon_script_path = downloaded_path
                 log('[%s] [Garden-Auto] Script başarıyla indirildi' % pName)
                 QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script indirildi ✓')
             else:
@@ -822,7 +853,7 @@ def garden_dungeon_start():
                 return
         else:
             # Özel script ise indirme, hata ver
-            log('[%s] [Garden-Auto] Script bulunamadı: %s' % (pName, _garden_dungeon_script_path))
+            log('[%s] [Garden-Auto] Özel script bulunamadı: %s' % (pName, _garden_dungeon_script_path))
             QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script bulunamadı! ✗')
             return
     
@@ -1532,12 +1563,18 @@ _gd_btn_center_x = _gd_container_x + (_gd_container_w - 170) // 2
 _add_tab3(QtBind.createButton(gui, 'garden_dungeon_start', '  Başla  ', _gd_btn_center_x, _gd_btn_y), _gd_btn_center_x, _gd_btn_y)
 _add_tab3(QtBind.createButton(gui, 'garden_dungeon_stop', ' Durdur ', _gd_btn_center_x + 85, _gd_btn_y), _gd_btn_center_x + 85, _gd_btn_y)
 
-_gd_status_y = _gd_btn_y + 35
+# Script türü seçim butonları
+_gd_type_y = _gd_btn_y + 35
+_gd_type_btn_x = _gd_container_x + (_gd_container_w - 210) // 2
+_add_tab3(QtBind.createButton(gui, 'garden_dungeon_select_wizz_cleric', 'Wizz/Cleric', _gd_type_btn_x, _gd_type_y), _gd_type_btn_x, _gd_type_y)
+_add_tab3(QtBind.createButton(gui, 'garden_dungeon_select_normal', 'Normal', _gd_type_btn_x + 105, _gd_type_y), _gd_type_btn_x + 105, _gd_type_y)
+
+_gd_status_y = _gd_type_y + 30
 lblGardenScriptStatus = QtBind.createLabel(gui, 'Durum: Hazır', _gd_title_x, _gd_status_y)
 _add_tab3(lblGardenScriptStatus, _gd_title_x, _gd_status_y)
 
 _gd_note_y = _gd_status_y + 22
-_add_tab3(QtBind.createLabel(gui, 'Varsayılan script: sc/garden-dungeon.txt', _gd_title_x, _gd_note_y), _gd_title_x, _gd_note_y)
+_add_tab3(QtBind.createLabel(gui, 'Script türünü seç, sonra Başlat', _gd_title_x, _gd_note_y), _gd_title_x, _gd_note_y)
 
 # Tab 4 - Auto Hwt
 _hwt_container_w = 380
