@@ -9,6 +9,7 @@ import json
 import os
 import urllib.request
 import sqlite3
+import hashlib
 
 pName = 'Santa-So-Ok-DaRKWoLVeS'
 PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
@@ -157,10 +158,22 @@ def _download_garden_script(script_type="normal"):
                 github_versions = json.loads(r_v.read().decode('utf-8'))
                 
             if script_filename in github_versions:
+                # İndirilen dosyanın hash'ini hesapla
+                file_hash = _calculate_file_hash(script_path)
+                
+                github_info = github_versions[script_filename]
+                if isinstance(github_info, dict):
+                    github_version = github_info.get("version", "1.0")
+                else:
+                    github_version = github_info
+                
                 local_versions = _get_local_script_versions()
-                local_versions[script_filename] = github_versions[script_filename]
+                local_versions[script_filename] = {
+                    "version": github_version,
+                    "sha256": file_hash if file_hash else ""
+                }
                 _save_local_script_versions(local_versions)
-                log('[%s] [Garden-Auto] Script versiyonu kaydedildi: v%s' % (pName, github_versions[script_filename]))
+                log('[%s] [Garden-Auto] Script versiyonu kaydedildi: v%s (hash: %s)' % (pName, github_version, file_hash[:8] if file_hash else "N/A"))
         except Exception:
             pass  # Versiyon kaydedilemese de devam et
         
@@ -169,6 +182,23 @@ def _download_garden_script(script_type="normal"):
     except Exception as ex:
         log('[%s] [Garden-Auto] Script indirme hatası: %s' % (pName, str(ex)))
         return False
+
+def _calculate_file_hash(file_path):
+    """Dosyanın SHA256 hash'ini hesaplar"""
+    try:
+        if not os.path.exists(file_path):
+            return None
+        
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            # Büyük dosyalar için chunk'lar halinde oku
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        
+        return sha256_hash.hexdigest()
+    except Exception as ex:
+        log('[%s] [Script-Update] Hash hesaplama hatası: %s' % (pName, str(ex)))
+        return None
 
 def _get_local_script_versions():
     """Local script versiyonlarını döndürür"""
@@ -228,15 +258,47 @@ def _check_script_updates():
         sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
         updated_count = 0
         
-        # Her script için versiyon kontrolü
-        for script_name, github_version in github_versions.items():
-            local_version = local_versions.get(script_name, "0.0")
+        # Her script için hash kontrolü
+        for script_name, github_info in github_versions.items():
+            # Yeni format: {"version": "1.0", "sha256": "abc123..."}
+            # Eski format desteği: "1.0" (string)
+            if isinstance(github_info, dict):
+                github_version = github_info.get("version", "0.0")
+                github_hash = github_info.get("sha256", "")
+            else:
+                github_version = github_info
+                github_hash = ""
             
-            # GitHub versiyonu daha yeniyse güncelle
-            if github_version != local_version:
-                log('[%s] [Script-Update] %s güncelleniyor... (v%s -> v%s)' % (pName, script_name, local_version, github_version))
-                
-                script_path = os.path.join(sc_folder, script_name)
+            script_path = os.path.join(sc_folder, script_name)
+            
+            # Local dosyanın hash'ini hesapla
+            local_hash = _calculate_file_hash(script_path) if os.path.exists(script_path) else None
+            
+            # Local versiyon bilgisi
+            local_info = local_versions.get(script_name, {})
+            if isinstance(local_info, dict):
+                local_version = local_info.get("version", "0.0")
+                local_stored_hash = local_info.get("sha256", "")
+            else:
+                local_version = local_info
+                local_stored_hash = ""
+            
+            # Güncelleme gerekli mi kontrol et
+            needs_update = False
+            update_reason = ""
+            
+            if not os.path.exists(script_path):
+                needs_update = True
+                update_reason = "dosya yok"
+            elif github_hash and local_hash and github_hash != local_hash:
+                needs_update = True
+                update_reason = "hash farklı"
+            elif github_version != local_version:
+                needs_update = True
+                update_reason = "versiyon farklı"
+            
+            if needs_update:
+                log('[%s] [Script-Update] %s güncelleniyor... (v%s -> v%s, sebep: %s)' % (pName, script_name, local_version, github_version, update_reason))
                 
                 # Eski dosyayı sil
                 if os.path.exists(script_path):
@@ -251,8 +313,14 @@ def _check_script_updates():
                 download_result = _download_garden_script(script_type)
                 
                 if download_result:
+                    # İndirilen dosyanın hash'ini hesapla
+                    new_hash = _calculate_file_hash(script_path)
+                    
                     # Local versiyonu güncelle
-                    local_versions[script_name] = github_version
+                    local_versions[script_name] = {
+                        "version": github_version,
+                        "sha256": new_hash if new_hash else github_hash
+                    }
                     updated_count += 1
                     log('[%s] [Script-Update] %s başarıyla güncellendi (v%s)' % (pName, script_name, github_version))
                 else:
