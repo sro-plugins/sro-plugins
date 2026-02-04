@@ -11,7 +11,7 @@ import urllib.request
 
 pName = 'Santa-So-Ok-DaRKWoLVeS'
 PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
-pVersion = '1.2.1'
+pVersion = '1.2.2'
 
 MOVE_DELAY = 0.25
 
