@@ -1,22 +1,96 @@
 # -*- coding: utf-8 -*-
-"""
-Santa-So-Ok-DaRKWoLVeS – Jewel Box kırdırma, çanta/banka birleştir, çanta/banka sırala (ayrı ayrı, manuel).
-
-Banka: Banka NPC'sini açmadan kullanmayın. Store (banka) işlemleri sağda, ayrı çerçevede.
-"""
 from phBot import *
 import QtBind
 import threading
 import time
 import struct
 import copy
+import json
+import urllib.request
 
 pName = 'Santa-So-Ok-DaRKWoLVeS'
-pVersion = '1.1'
+pVersion = '1.2'
 
 MOVE_DELAY = 0.25
 
-# Banka (storage) NPC servername listesi – npc_get_id için
+GITHUB_REPO = 'brkcnszgn/sro-plugins'
+GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_REPO
+GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
+UPDATE_CHECK_DELAY = 3
+
+def _parse_version(s):
+    if not s or not isinstance(s, str):
+        return (0, 0, 0)
+    s = s.strip().lstrip('vV')
+    parts = s.split('.')
+    out = []
+    for i in range(3):
+        try:
+            out.append(int(parts[i]) if i < len(parts) else 0)
+        except (ValueError, IndexError):
+            out.append(0)
+    return tuple(out)
+
+def _version_less(current_tuple, latest_tuple):
+    return current_tuple < latest_tuple
+
+def _fetch_github_latest():
+    try:
+        req = urllib.request.Request(
+            GITHUB_API_LATEST,
+            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read().decode('utf-8'))
+        tag = data.get('tag_name') or ''
+        url = data.get('html_url') or GITHUB_RELEASES_URL
+        return tag, url
+    except Exception as ex:
+        log('[%s] Güncelleme kontrolü hatası: %s' % (pName, str(ex)))
+        return None
+
+_update_label_ref = None
+_update_status_text = ''
+
+def _check_update_thread(skip_delay=False):
+    global _update_status_text, _update_label_ref
+    if not skip_delay:
+        time.sleep(UPDATE_CHECK_DELAY)
+    result = _fetch_github_latest()
+    if result is None:
+        _update_status_text = 'Sürüm kontrol edilemedi'
+        if _update_label_ref is not None:
+            try:
+                QtBind.setText(gui, _update_label_ref, _update_status_text)
+            except Exception:
+                pass
+        return
+    tag, url = result
+    latest_tuple = _parse_version(tag)
+    current_tuple = _parse_version(pVersion)
+    if _version_less(current_tuple, latest_tuple):
+        _update_status_text = 'Yeni sürüm: %s (indir)' % tag
+        log('[%s] Güncelleme var: %s → %s | %s' % (pName, pVersion, tag, url))
+    else:
+        _update_status_text = 'Güncel (v%s)' % pVersion
+    if _update_label_ref is not None:
+        try:
+            QtBind.setText(gui, _update_label_ref, _update_status_text)
+        except Exception:
+            pass
+
+def check_update():
+    global _update_status_text
+    _update_status_text = 'Kontrol ediliyor...'
+    if _update_label_ref is not None:
+        try:
+            QtBind.setText(gui, _update_label_ref, _update_status_text)
+        except Exception:
+            pass
+    log('[%s] Güncelleme kontrol ediliyor...' % pName)
+    t = threading.Thread(target=lambda: _check_update_thread(skip_delay=True), name=pName + '_update_check', daemon=True)
+    t.start()
+
 NPC_STORAGE_SERVERNAMES = [
     'NPC_CH_WAREHOUSE_M', 'NPC_CH_WAREHOUSE_W', 'NPC_EU_WAREHOUSE',
     'NPC_WC_WAREHOUSE_M', 'NPC_WC_WAREHOUSE_W', 'NPC_CA_WAREHOUSE',
@@ -24,7 +98,6 @@ NPC_STORAGE_SERVERNAMES = [
     'NPC_SD_T_AREA_WAREHOUSE2'
 ]
 
-# -------- Jewel Box kırdırma --------
 JEWEL_INJECT_PACKETS = [
     (0x7045, False, b'\xE9\x00\x00\x00'),
     (0x7046, False, b'\xE9\x00\x00\x00\x02'),
@@ -74,7 +147,6 @@ def jewel_stop():
         _jewel_thread = None
     log('[%s] Jewel Box kırdırma durduruldu.' % pName)
 
-# -------- Çantayı birleştir / sırala (ortak yardımcılar) --------
 def _send_move(source_slot, destination_slot):
     inv = get_inventory()
     if not inv or not inv.get('items') or inv.get('size', 0) == 0:
@@ -112,7 +184,6 @@ def _slot_is_full(slot_item):
     except Exception:
         return False
 
-# -------- Çantayı birleştir --------
 _merge_stop_event = threading.Event()
 _merge_thread = None
 _merge_lock = threading.Lock()
@@ -187,7 +258,6 @@ def merge_stop():
         _merge_thread = None
     log('[%s] Birleştirme durduruldu.' % pName)
 
-# -------- Çantayı sıralı --------
 def _array_sort_by_subkey(array, subkey):
     if not isinstance(array, list):
         return False
@@ -281,9 +351,7 @@ def sort_stop():
         _sort_thread = None
     log('[%s] Sıralama durduruldu.' % pName)
 
-# -------- Banka (storage): birleştir / sırala --------
 def _npc_get_id_storage():
-    """Banka NPC ID (2 byte). Karakter banka NPC'sine yakın olmalı."""
     try:
         npcs = get_npcs()
         if not npcs:
@@ -301,7 +369,6 @@ def _npc_get_id_storage():
     return None
 
 def _open_storage_npc():
-    """Banka NPC'sini seçip depoyu açar. Karakter banka NPC'sine yakın olmalı."""
     npc_id = _npc_get_id_storage()
     if not npc_id:
         log('[%s] Banka NPC bulunamadı. Banka NPC\'sinin yakınına gidin.' % pName)
@@ -320,7 +387,6 @@ def _open_storage_npc():
     return True
 
 def _send_move_storage(source_slot, destination_slot):
-    """Banka içinde taşıma. Banka NPC açık olmalı."""
     st = get_storage()
     if not st or not st.get('items') or st.get('size', 0) == 0:
         return False
@@ -499,37 +565,30 @@ def bank_sort_stop():
         _bank_sort_thread = None
     log('[%s] Banka sıralama durduruldu.' % pName)
 
-# -------- GUI --------
 gui = QtBind.init(__name__, pName)
 
-# Her blok: önce çerçeve (stroke) olarak liste kutusu, sonra label ve butonlar
-# 1) Jewel Box Kırdır
 _y1 = 10
 _frame1 = QtBind.createList(gui, 10, _y1 - 2, 180, 52)
 QtBind.createLabel(gui, 'Jewel Box Kırdır', 15, _y1)
 QtBind.createButton(gui, 'jewel_start', 'Başla', 15, _y1 + 22)
 QtBind.createButton(gui, 'jewel_stop', 'Durdur', 95, _y1 + 22)
 
-# 2) Çantayı Birleştir
 _y2 = _y1 + 58
 _frame2 = QtBind.createList(gui, 10, _y2 - 2, 180, 52)
 QtBind.createLabel(gui, 'Çantayı Birleştir', 15, _y2)
 QtBind.createButton(gui, 'merge_start', 'Başla', 15, _y2 + 22)
 QtBind.createButton(gui, 'merge_stop', 'Durdur', 95, _y2 + 22)
 
-# 3) Çantayı Sıralı
 _y3 = _y2 + 58
 _frame3 = QtBind.createList(gui, 10, _y3 - 2, 180, 52)
 QtBind.createLabel(gui, 'Çantayı Sırala', 15, _y3)
 QtBind.createButton(gui, 'sort_start', 'Başla', 15, _y3 + 22)
 QtBind.createButton(gui, 'sort_stop', 'Durdur', 95, _y3 + 22)
 
-# Sağ taraf: Store (Banka) bölümü – stroke'tan içeri padding
 _store_x = 200
 _store_y = 10
 _store_w = 200
 STORE_PAD = 12
-# Dış stroke yüksekliği: not + iki blok, altında az boşluk
 _store_h = 22 + 20 + 58 + 52 + 4
 _store_inner_x = _store_x + STORE_PAD
 _store_inner_y = _store_y + STORE_PAD
@@ -537,24 +596,27 @@ _store_inner_w = _store_w - 2 * STORE_PAD
 
 _store_frame = QtBind.createList(gui, _store_x - 2, _store_y - 2, _store_w + 4, _store_h + 4)
 QtBind.createLabel(gui, 'Banka NPC yakındaysa otomatik açılır.', _store_inner_x, _store_inner_y)
-# Bankayı Birleştir (stroke içinde)
 _by1 = _store_inner_y + 22
 _store_merge_frame = QtBind.createList(gui, _store_inner_x, _by1 - 2, _store_inner_w, 52)
 QtBind.createLabel(gui, 'Bankayı Birleştir', _store_inner_x + 8, _by1)
 QtBind.createButton(gui, 'bank_merge_start', 'Başla', _store_inner_x + 8, _by1 + 22)
 QtBind.createButton(gui, 'bank_merge_stop', 'Durdur', _store_inner_x + 88, _by1 + 22)
-# Bankayı Sırala (stroke içinde)
 _by2 = _by1 + 58
 _store_sort_frame = QtBind.createList(gui, _store_inner_x, _by2 - 2, _store_inner_w, 52)
 QtBind.createLabel(gui, 'Bankayı Sırala', _store_inner_x + 8, _by2)
 QtBind.createButton(gui, 'bank_sort_start', 'Başla', _store_inner_x + 8, _by2 + 22)
 QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _store_inner_x + 88, _by2 + 22)
 
-# En altta: Viski template (Author)
+_uy = _y3 + 58
+QtBind.createLabel(gui, 'Sürüm: v' + pVersion, 15, _uy)
+_update_label_ref = QtBind.createLabel(gui, '...', 95, _uy)
+QtBind.createButton(gui, 'check_update', 'Güncelleme kontrol', 15, _uy + 20)
+
 _author_x = 10
-_author_y = _y3 + 58
+_author_y = _uy + 52
 QtBind.createLabel(gui, '╔═════════════════════════╗', _author_x, _author_y)
 QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _author_x, _author_y + 16)
 QtBind.createLabel(gui, '╚═════════════════════════╝', _author_x, _author_y + 32)
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
+threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()
