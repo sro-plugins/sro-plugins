@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from phBot import *
+import phBot
 import QtBind
 import threading
 import time
-import struct
 import copy
 import json
 import os
@@ -99,6 +99,8 @@ _garden_dungeon_script_type = "normal"  # "normal" veya "wizz-cleric"
 _garden_dungeon_thread = None
 _garden_dungeon_stop_event = threading.Event()
 _garden_dungeon_lock = threading.Lock()
+
+# Oto Kervan global değişkenleri (şu an kullanılmıyor - gelecek geliştirme için)
 
 def _download_garden_script(script_type="normal"):
     """GitHub'dan garden-dungeon script dosyasını indirir"""
@@ -1061,6 +1063,21 @@ def garden_dungeon_stop():
     QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Durduruldu ■')
     log('[%s] [Garden-Auto] Garden Dungeon durduruldu.' % pName)
 
+# ______________________________ Oto Kervan Fonksiyonları ______________________________ #
+# (Gelecek geliştirme için - şu an sadece tasarım mevcut)
+
+def kervan_go_to_custom():
+    """Manuel koordinat girişi (henüz aktif değil)"""
+    log('[%s] [Oto-Kervan] Manuel koordinat özelliği henüz geliştirilme aşamasında...' % pName)
+
+def kervan_hotan_to_jangan():
+    """Jangana Git butonu (henüz aktif değil)"""
+    log('[%s] [Oto-Kervan] Jangana Git özelliği henüz geliştirilme aşamasında...' % pName)
+
+def kervan_jangan_to_hotan():
+    """Hotana Git butonu (henüz aktif değil)"""
+    log('[%s] [Oto-Kervan] Hotana Git özelliği henüz geliştirilme aşamasında...' % pName)
+
 # ______________________________ Auto Dungeon Fonksiyonları ______________________________ #
 
 def getPath():
@@ -1797,8 +1814,8 @@ _add_tab4(QtBind.createLabel(gui, 'Auto Hwt', _hwt_title_x, _hwt_title_y), _hwt_
 _add_tab4(QtBind.createLabel(gui, 'Yakında eklenecek...', _hwt_title_x, _hwt_title_y + 30), _hwt_title_x, _hwt_title_y + 30)
 
 # Tab 5 - Oto Kervan
-_kervan_container_w = 380
-_kervan_container_h = 240
+_kervan_container_w = 450
+_kervan_container_h = 220
 _kervan_container_x = _tab_bar_x + (_tab_bar_w - _kervan_container_w) // 2
 _kervan_container_y = _content_y + 15
 
@@ -1808,8 +1825,38 @@ _add_tab5(_kervan_container, _kervan_container_x, _kervan_container_y)
 _kervan_title_x = _kervan_container_x + 20
 _kervan_title_y = _kervan_container_y + 15
 
-_add_tab5(QtBind.createLabel(gui, 'Oto Kervan', _kervan_title_x, _kervan_title_y), _kervan_title_x, _kervan_title_y)
-_add_tab5(QtBind.createLabel(gui, 'Yakında eklenecek...', _kervan_title_x, _kervan_title_y + 30), _kervan_title_x, _kervan_title_y + 30)
+_add_tab5(QtBind.createLabel(gui, '═══════════ Oto Kervan Yürüme ═══════════', _kervan_title_x, _kervan_title_y), _kervan_title_x, _kervan_title_y)
+
+# Açıklama
+_kervan_desc_y = _kervan_title_y + 30
+_add_tab5(QtBind.createLabel(gui, 'Bulunduğu konumdan hedef şehre otomatik yürür.', _kervan_title_x, _kervan_desc_y), _kervan_title_x, _kervan_desc_y)
+
+# Manuel koordinat girişi
+_kervan_input_y = _kervan_desc_y + 30
+_add_tab5(QtBind.createLabel(gui, 'Manuel Koordinat:', _kervan_title_x, _kervan_input_y), _kervan_title_x, _kervan_input_y)
+_add_tab5(QtBind.createLabel(gui, 'X:', _kervan_title_x + 110, _kervan_input_y), _kervan_title_x + 110, _kervan_input_y)
+tbxKervanX = QtBind.createLineEdit(gui, '', _kervan_title_x + 125, _kervan_input_y, 60, 18)
+_add_tab5(tbxKervanX, _kervan_title_x + 125, _kervan_input_y)
+_add_tab5(QtBind.createLabel(gui, 'Y:', _kervan_title_x + 195, _kervan_input_y), _kervan_title_x + 195, _kervan_input_y)
+tbxKervanY = QtBind.createLineEdit(gui, '', _kervan_title_x + 210, _kervan_input_y, 60, 18)
+_add_tab5(tbxKervanY, _kervan_title_x + 210, _kervan_input_y)
+btnKervanGo = QtBind.createButton(gui, 'kervan_go_to_custom', 'Git', _kervan_title_x + 280, _kervan_input_y - 2)
+_add_tab5(btnKervanGo, _kervan_title_x + 280, _kervan_input_y - 2)
+
+# Önceden tanımlı butonlar - Ortada yan yana
+_kervan_btn_y = _kervan_input_y + 35
+_kervan_btn_center_x = _kervan_container_x + (_kervan_container_w - 260) // 2
+
+btnKervanJangan = QtBind.createButton(gui, 'kervan_hotan_to_jangan', 'Jangana Git', _kervan_btn_center_x, _kervan_btn_y)
+_add_tab5(btnKervanJangan, _kervan_btn_center_x, _kervan_btn_y)
+btnKervanHotan = QtBind.createButton(gui, 'kervan_jangan_to_hotan', 'Hotana Git', _kervan_btn_center_x + 130, _kervan_btn_y)
+_add_tab5(btnKervanHotan, _kervan_btn_center_x + 130, _kervan_btn_y)
+
+# Koordinat bilgisi
+_kervan_info_y = _kervan_btn_y + 40
+_add_tab5(QtBind.createLabel(gui, 'Hedef Koordinatlar:', _kervan_title_x, _kervan_info_y), _kervan_title_x, _kervan_info_y)
+_add_tab5(QtBind.createLabel(gui, 'Jangan: (6495, 1005)', _kervan_title_x + 20, _kervan_info_y + 20), _kervan_title_x + 20, _kervan_info_y + 20)
+_add_tab5(QtBind.createLabel(gui, 'Hotan: (153, 74)', _kervan_title_x + 20, _kervan_info_y + 40), _kervan_title_x + 20, _kervan_info_y + 40)
 
 # Tab 6 - Hakkımda
 _t3_container_x = _tab_bar_x + 30
