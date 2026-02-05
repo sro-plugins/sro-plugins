@@ -28,6 +28,10 @@ GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO,
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
+# Oto Kervan: GitHub'daki karavan scriptleri klasörü (API ile liste, raw ile indirme)
+GITHUB_CARAVAN_FOLDER = 'PHBOT Caravan SC'
+GITHUB_API_CARAVAN_CONTENTS = 'https://api.github.com/repos/%s/contents/%s' % (GITHUB_REPO, 'PHBOT%20Caravan%20SC')
+GITHUB_RAW_CARAVAN_SCRIPT = ('https://raw.githubusercontent.com/%s/main/PHBOT%%20Caravan%%20SC/%%s' % GITHUB_REPO)
 # Bu eklenti sürümüyle birlikte gelen script versiyonları (kullanıcı manipüle edemez).
 # Repo'da script + versions.json güncellediğinde burayı da aynı versiyonlara çek ve eklenti sürümünü yayınla.
 EMBEDDED_SCRIPT_VERSIONS = {
@@ -105,7 +109,13 @@ _garden_dungeon_thread = None
 _garden_dungeon_stop_event = threading.Event()
 _garden_dungeon_lock = threading.Lock()
 
-# Oto Kervan global değişkenleri (şu an kullanılmıyor - gelecek geliştirme için)
+# Oto Kervan global değişkenleri
+_caravan_script_list = []  # GitHub'dan gelen .txt dosya adları
+_caravan_running = False
+_caravan_script_path = ""
+_caravan_thread = None
+_caravan_stop_event = threading.Event()
+_caravan_lock = threading.Lock()
 
 def _download_garden_script(script_type="normal"):
     """GitHub'dan garden-dungeon script dosyasını indirir"""
@@ -158,6 +168,52 @@ def _download_garden_script(script_type="normal"):
         return script_path
     except Exception as ex:
         log('[%s] [Garden-Auto] Script indirme hatası: %s' % (pName, str(ex)))
+        return False
+
+def _fetch_caravan_script_list():
+    """GitHub API ile PHBOT Caravan SC klasöründeki .txt dosyalarının listesini döndürür."""
+    try:
+        req = urllib.request.Request(
+            GITHUB_API_CARAVAN_CONTENTS,
+            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=12) as r:
+            data = json.loads(r.read().decode('utf-8'))
+        names = []
+        for item in (data if isinstance(data, list) else []):
+            if isinstance(item, dict) and item.get('type') == 'file':
+                name = item.get('name') or ''
+                if name.endswith('.txt'):
+                    names.append(name)
+        names.sort(key=lambda x: x.lower())
+        return names
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] Script listesi alınamadı: %s' % (pName, str(ex)))
+        return []
+
+def _get_caravan_script_folder():
+    """Oto Kervan scriptlerinin yerel klasör yolunu döndürür (plugin ile aynı dizinde)."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), GITHUB_CARAVAN_FOLDER)
+
+def _download_caravan_script(filename):
+    """GitHub'dan tek bir karavan scriptini indirir; yerel yol döndürür veya False."""
+    try:
+        folder = _get_caravan_script_folder()
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        script_path = os.path.join(folder, filename)
+        url = GITHUB_RAW_CARAVAN_SCRIPT % (filename,)
+        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            content = r.read()
+        if not content or len(content) < 10:
+            return False
+        with open(script_path, 'wb') as f:
+            f.write(content)
+        log('[%s] [Oto-Kervan] Script indirildi: %s' % (pName, filename))
+        return script_path
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] İndirme hatası (%s): %s' % (pName, filename, str(ex)))
         return False
 
 def _get_script_versions_cache_path():
@@ -1000,19 +1056,95 @@ def garden_dungeon_stop():
     log('[%s] [Garden-Auto] Garden Dungeon durduruldu.' % pName)
 
 # ______________________________ Oto Kervan Fonksiyonları ______________________________ #
-# (Gelecek geliştirme için - şu an sadece tasarım mevcut)
 
-def kervan_go_to_custom():
-    """Manuel koordinat girişi (henüz aktif değil)"""
-    log('[%s] [Oto-Kervan] Manuel koordinat özelliği henüz geliştirilme aşamasında...' % pName)
+def kervan_refresh_list():
+    """GitHub'dan karavan script listesini çeker ve listeyi günceller."""
+    QtBind.setText(gui, lblKervanStatus, 'Durum: Liste yükleniyor...')
+    names = _fetch_caravan_script_list()
+    QtBind.clear(gui, lstKervanScripts)
+    if not names:
+        QtBind.append(gui, lstKervanScripts, '(Liste alınamadı - Yenile\'yi tekrar deneyin)')
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Liste alınamadı')
+        log('[%s] [Oto-Kervan] Script listesi boş veya hata.' % pName)
+        return
+    for name in names:
+        QtBind.append(gui, lstKervanScripts, name)
+    QtBind.setText(gui, lblKervanStatus, 'Durum: %d script listelendi' % len(names))
+    log('[%s] [Oto-Kervan] %d karavan scripti listelendi.' % (pName, len(names)))
 
-def kervan_hotan_to_jangan():
-    """Jangana Git butonu (henüz aktif değil)"""
-    log('[%s] [Oto-Kervan] Jangana Git özelliği henüz geliştirilme aşamasında...' % pName)
+def _caravan_loop():
+    global _caravan_running
+    try:
+        script_path = _caravan_script_path
+        log('[%s] [Oto-Kervan] Karavan başlatılıyor: %s' % (pName, script_path))
+        if not script_path or not os.path.exists(script_path):
+            log('[%s] [Oto-Kervan] Script bulunamadı: %s' % (pName, script_path))
+            _caravan_running = False
+            return
+        pos = get_position()
+        if not pos:
+            log('[%s] [Oto-Kervan] Pozisyon alınamadı!' % pName)
+            _caravan_running = False
+            return
+        region = pos.get('region', 0)
+        x, y, z = pos.get('x', 0), pos.get('y', 0), pos.get('z', 0)
+        set_training_position(region, x, y, z)
+        set_training_radius(50.0)
+        result = set_training_script(script_path)
+        if not result:
+            log('[%s] [Oto-Kervan] Training script ayarlanamadı!' % pName)
+            _caravan_running = False
+            return
+        time.sleep(0.5)
+        start_bot()
+        _caravan_running = True
+        log('[%s] [Oto-Kervan] Bot başlatıldı' % pName)
+        while not _caravan_stop_event.is_set():
+            time.sleep(1)
+        log('[%s] [Oto-Kervan] Karavan durduruluyor...' % pName)
+        stop_bot()
+        _caravan_running = False
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] Hata: %s' % (pName, str(ex)))
+        _caravan_running = False
 
-def kervan_jangan_to_hotan():
-    """Hotana Git butonu (henüz aktif değil)"""
-    log('[%s] [Oto-Kervan] Hotana Git özelliği henüz geliştirilme aşamasında...' % pName)
+def kervan_start():
+    global _caravan_script_path, _caravan_thread
+    selected = QtBind.text(gui, lstKervanScripts).strip()
+    if not selected or selected.startswith('('):
+        log('[%s] [Oto-Kervan] Lütfen listeden bir script seçin.' % pName)
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Önce script seçin')
+        return
+    folder = _get_caravan_script_folder()
+    script_path = os.path.join(folder, selected)
+    if not os.path.exists(script_path):
+        QtBind.setText(gui, lblKervanStatus, 'Durum: İndiriliyor...')
+        script_path = _download_caravan_script(selected)
+        if not script_path:
+            QtBind.setText(gui, lblKervanStatus, 'Durum: İndirilemedi!')
+            return
+    _caravan_script_path = script_path
+    with _caravan_lock:
+        if _caravan_thread and _caravan_thread.is_alive():
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Zaten çalışıyor')
+            return
+        _caravan_stop_event.clear()
+        _caravan_thread = threading.Thread(target=_caravan_loop, name=pName + '_caravan', daemon=True)
+        _caravan_thread.start()
+    QtBind.setText(gui, lblKervanStatus, 'Durum: Çalışıyor... ▶')
+    log('[%s] [Oto-Kervan] Başlatıldı: %s' % (pName, selected))
+
+def kervan_stop():
+    global _caravan_thread, _caravan_running
+    with _caravan_lock:
+        _caravan_stop_event.set()
+        if _caravan_thread and _caravan_thread.is_alive():
+            _caravan_thread.join(timeout=3)
+        _caravan_thread = None
+        _caravan_running = False
+    stop_bot()
+    QtBind.setText(gui, lblKervanStatus, 'Durum: Durduruldu ■')
+    log('[%s] [Oto-Kervan] Durduruldu.' % pName)
 
 # ______________________________ Auto Dungeon Fonksiyonları ______________________________ #
 
@@ -1749,9 +1881,9 @@ _hwt_title_y = _hwt_container_y + 15
 _add_tab4(QtBind.createLabel(gui, 'Auto Hwt', _hwt_title_x, _hwt_title_y), _hwt_title_x, _hwt_title_y)
 _add_tab4(QtBind.createLabel(gui, 'Yakında eklenecek...', _hwt_title_x, _hwt_title_y + 30), _hwt_title_x, _hwt_title_y + 30)
 
-# Tab 5 - Oto Kervan
+# Tab 5 - Oto Kervan (GitHub'dan script listesi, seçilen ile Başla/Durdur)
 _kervan_container_w = 450
-_kervan_container_h = 220
+_kervan_container_h = 260
 _kervan_container_x = _tab_bar_x + (_tab_bar_w - _kervan_container_w) // 2
 _kervan_container_y = _content_y + 15
 
@@ -1759,40 +1891,36 @@ _kervan_container = QtBind.createList(gui, _kervan_container_x, _kervan_containe
 _add_tab5(_kervan_container, _kervan_container_x, _kervan_container_y)
 
 _kervan_title_x = _kervan_container_x + 20
-_kervan_title_y = _kervan_container_y + 15
+_kervan_title_y = _kervan_container_y + 10
 
-_add_tab5(QtBind.createLabel(gui, '═══════════ Oto Kervan Yürüme ═══════════', _kervan_title_x, _kervan_title_y), _kervan_title_x, _kervan_title_y)
+_add_tab5(QtBind.createLabel(gui, '═══════════ Oto Kervan ═══════════', _kervan_title_x, _kervan_title_y), _kervan_title_x, _kervan_title_y)
+_add_tab5(QtBind.createLabel(gui, 'GitHub\'daki karavan scriptlerinden birini seçin; Başla ile yürütün.', _kervan_title_x, _kervan_title_y + 18), _kervan_title_x, _kervan_title_y + 18)
 
-# Açıklama
-_kervan_desc_y = _kervan_title_y + 30
-_add_tab5(QtBind.createLabel(gui, 'Bulunduğu konumdan hedef şehre otomatik yürür.', _kervan_title_x, _kervan_desc_y), _kervan_title_x, _kervan_desc_y)
+# Script listesi
+_kervan_list_y = _kervan_title_y + 42
+_add_tab5(QtBind.createLabel(gui, 'Script listesi:', _kervan_title_x, _kervan_list_y), _kervan_title_x, _kervan_list_y)
+lstKervanScripts = QtBind.createList(gui, _kervan_title_x, _kervan_list_y + 18, 300, 120)
+_add_tab5(lstKervanScripts, _kervan_title_x, _kervan_list_y + 18)
+QtBind.append(gui, lstKervanScripts, '(Önce "Yenile" ile listeyi yükleyin)')
 
-# Manuel koordinat girişi
-_kervan_input_y = _kervan_desc_y + 30
-_add_tab5(QtBind.createLabel(gui, 'Manuel Koordinat:', _kervan_title_x, _kervan_input_y), _kervan_title_x, _kervan_input_y)
-_add_tab5(QtBind.createLabel(gui, 'X:', _kervan_title_x + 110, _kervan_input_y), _kervan_title_x + 110, _kervan_input_y)
-tbxKervanX = QtBind.createLineEdit(gui, '', _kervan_title_x + 125, _kervan_input_y, 60, 18)
-_add_tab5(tbxKervanX, _kervan_title_x + 125, _kervan_input_y)
-_add_tab5(QtBind.createLabel(gui, 'Y:', _kervan_title_x + 195, _kervan_input_y), _kervan_title_x + 195, _kervan_input_y)
-tbxKervanY = QtBind.createLineEdit(gui, '', _kervan_title_x + 210, _kervan_input_y, 60, 18)
-_add_tab5(tbxKervanY, _kervan_title_x + 210, _kervan_input_y)
-btnKervanGo = QtBind.createButton(gui, 'kervan_go_to_custom', 'Git', _kervan_title_x + 280, _kervan_input_y - 2)
-_add_tab5(btnKervanGo, _kervan_title_x + 280, _kervan_input_y - 2)
+# Yenile / Başla / Durdur
+_kervan_btn_y = _kervan_list_y + 145
+_kervan_btn_x = _kervan_title_x
+_add_tab5(QtBind.createButton(gui, 'kervan_refresh_list', ' Yenile ', _kervan_btn_x, _kervan_btn_y), _kervan_btn_x, _kervan_btn_y)
+_add_tab5(QtBind.createButton(gui, 'kervan_start', ' Başla ', _kervan_btn_x + 75, _kervan_btn_y), _kervan_btn_x + 75, _kervan_btn_y)
+_add_tab5(QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_btn_x + 150, _kervan_btn_y), _kervan_btn_x + 150, _kervan_btn_y)
 
-# Önceden tanımlı butonlar - Ortada yan yana
-_kervan_btn_y = _kervan_input_y + 35
-_kervan_btn_center_x = _kervan_container_x + (_kervan_container_w - 260) // 2
+lblKervanStatus = QtBind.createLabel(gui, 'Durum: Hazır', _kervan_title_x, _kervan_btn_y + 28)
+_add_tab5(lblKervanStatus, _kervan_title_x, _kervan_btn_y + 28)
 
-btnKervanJangan = QtBind.createButton(gui, 'kervan_hotan_to_jangan', 'Jangana Git', _kervan_btn_center_x, _kervan_btn_y)
-_add_tab5(btnKervanJangan, _kervan_btn_center_x, _kervan_btn_y)
-btnKervanHotan = QtBind.createButton(gui, 'kervan_jangan_to_hotan', 'Hotana Git', _kervan_btn_center_x + 130, _kervan_btn_y)
-_add_tab5(btnKervanHotan, _kervan_btn_center_x + 130, _kervan_btn_y)
-
-# Koordinat bilgisi
-_kervan_info_y = _kervan_btn_y + 40
-_add_tab5(QtBind.createLabel(gui, 'Hedef Koordinatlar:', _kervan_title_x, _kervan_info_y), _kervan_title_x, _kervan_info_y)
-_add_tab5(QtBind.createLabel(gui, 'Jangan: (6495, 1005)', _kervan_title_x + 20, _kervan_info_y + 20), _kervan_title_x + 20, _kervan_info_y + 20)
-_add_tab5(QtBind.createLabel(gui, 'Hotan: (153, 74)', _kervan_title_x + 20, _kervan_info_y + 40), _kervan_title_x + 20, _kervan_info_y + 40)
+def _caravan_init_load():
+    """Init sonrası GitHub'dan karavan listesini arka planda yükler."""
+    time.sleep(2)
+    try:
+        kervan_refresh_list()
+    except Exception:
+        pass
+threading.Thread(target=_caravan_init_load, name=pName + '_caravan_init', daemon=True).start()
 
 # Tab 6 - Hakkımda
 _t3_container_x = _tab_bar_x + 30
