@@ -122,6 +122,7 @@ _garden_dungeon_lock = threading.Lock()
 
 # Oto Kervan global değişkenleri
 _caravan_script_list = []  # GitHub'dan gelen .txt dosya adları (liste sırası = gösterim sırası)
+_caravan_profile_keys = []
 _caravan_running = False
 _caravan_script_path = ""
 _caravan_thread = None
@@ -301,7 +302,7 @@ def _save_local_script_versions(versions):
 def _check_script_updates():
     """GitHub'daki script versiyonlarını kontrol eder ve gerekirse günceller"""
     try:
-        log('[%s] [Script-Update] Script güncellemeleri kontrol ediliyor...' % pName)
+        log('[%s] [Script-Update] Garden Script güncellemeleri kontrol ediliyor...' % pName)
         
         # GitHub'dan versions.json'ı indir (CDN cache bypass: no-cache + benzersiz query)
         cache_buster = str(int(time.time())) + '_' + str(id(object()))
@@ -1122,6 +1123,8 @@ def kervan_refresh_list():
         QtBind.append(gui, lstKervanScripts, display)
     QtBind.setText(gui, lblKervanStatus, 'Durum: %d script listelendi' % len(names))
     log('[%s] [Oto-Kervan] %d karavan scripti listelendi.' % (pName, len(names)))
+    _caravan_ensure_karavan_profile_on_init()
+    _caravan_fill_profile_combo()
 
 # Bu mesafenin altındaysak rota üzerindeyiz sayılır; üstündeyse bot en yakın script noktasına götürür sonra script devam eder
 CARAVAN_JOIN_STEP = 5
@@ -1209,17 +1212,20 @@ def _caravan_script_from_nearest(script_path, current_region, current_x, current
     return '\n'.join(join_lines) + '\n' + script_from_nearest
 
 def _caravan_temp_script_path():
-    """Karavan için geçici script dosyası (config klasöründe)."""
+    """Karavan için geçici script dosyası; phBot set_training_script'in kabul etmesi için Config kökünde."""
     try:
-        folder = get_config_dir() + pName + "\\"
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        return folder + "caravan_current.txt"
+        config_dir = get_config_dir()
+        if not config_dir:
+            return None
+        config_dir = config_dir.rstrip('/\\')
+        if not os.path.isdir(config_dir):
+            os.makedirs(config_dir, exist_ok=True)
+        path = os.path.join(config_dir, 'caravan_current.txt')
+        return os.path.abspath(path)
     except Exception:
         return None
 
-# Karavan profili: Başlat'ta mevcut config + db3 yedeklenir, karavan profili uygulanır; Durdur'da yedek geri yüklenir.
-# db3 swap mantığı DatabaseProfiles (srocave.com) ile uyumlu: Server_CharName.caravan.db3 -> aktif db3; Durdur'da _caravan_backup.db3 geri yüklenir.
+# Karavan: Başlat'ta config yedeklenir, karavan profili (JSON) uygulanır; Durdur'da yedek geri yüklenir.
 CARAVAN_PROFILE_FILENAME = 'caravan_profile.json'
 CARAVAN_BACKUP_FILENAME = 'caravan_backup.json'
 CARAVAN_DB3_PROFILE_SUFFIX = 'caravan'
@@ -1253,6 +1259,64 @@ def _caravan_db3_dir():
     """Config klasörü (db3 dosyaları burada; get_config_dir() sonunda / veya \\ olabilir)."""
     d = get_config_dir()
     return d.rstrip('/\\') if d else ''
+
+
+def _caravan_get_current_profile_key():
+    """phBot'ta şu an seçili olan profil anahtarını döndürür (örn. Sirion_VisKi.karavan). Config path'ten türetilir."""
+    path = get_config_path()
+    if not path:
+        return None
+    base = os.path.basename(path)
+    if base.endswith('.json'):
+        return base[:-5]  # .json kesilir
+    return None
+
+
+def _caravan_list_profile_keys():
+    """Bu karakter için Config klasöründeki tüm profil dosyalarını listeler. (görünen_ad, profil_anahtarı) listesi."""
+    fn = _caravan_db3_filename()
+    if not fn:
+        return []
+    config_dir = _caravan_db3_dir()
+    if not config_dir or not os.path.isdir(config_dir):
+        return []
+    result = []
+    try:
+        for name in sorted(os.listdir(config_dir)):
+            if not name.endswith('.json'):
+                continue
+            if name == fn + '.json':
+                result.append(('Varsayılan', fn))
+            elif name.startswith(fn + '.'):
+                # Sirion_VisKi.karavan.json -> "karavan"
+                suffix = name[len(fn) + 1:-5]
+                if suffix:
+                    result.append((suffix, fn + '.' + suffix))
+    except Exception:
+        pass
+    return result
+
+
+def _caravan_fill_profile_combo():
+    """Karavan profili combobox'ını Config'teki profillerle doldurur; karavan varsa onu seçer."""
+    global _caravan_profile_keys
+    try:
+        QtBind.clear(gui, comboKervanProfile)
+        _caravan_profile_keys = []
+        items = _caravan_list_profile_keys()
+        default_idx = 0
+        for i, (display, key) in enumerate(items):
+            QtBind.append(gui, comboKervanProfile, display)
+            _caravan_profile_keys.append(key)
+            if 'karavan' in key.lower():
+                default_idx = i
+        if _caravan_profile_keys and hasattr(QtBind, 'setCurrentIndex'):
+            try:
+                QtBind.setCurrentIndex(gui, comboKervanProfile, min(default_idx, len(_caravan_profile_keys) - 1))
+            except Exception:
+                pass
+    except Exception:
+        _caravan_profile_keys = []
 
 def _caravan_db3_current_path():
     """Aktif db3 dosya yolu."""
@@ -1311,11 +1375,7 @@ def _caravan_download_profile_db3(save_path):
     return False
 
 def _caravan_switch_to_caravan_db3():
-    """
-    Aktif db3'i yedekler; karavan db3'ü sırayla: (1) Senin 'Karavan' profilin varsa onu,
-    (2) yoksa .caravan.db3 varsa onu, (3) yoksa repodan indir, (4) indirilemezse mevcut db3'ten oluştur.
-    Sonra seçilen db3'ü aktif yapar. Durdur'da geri yüklemek için yedek path'ini döndürür.
-    """
+    """Aktif db3 yedeklenir; karavan db3 aktif yapılır. Durdur'da yedek geri yüklenir."""
     current = _caravan_db3_current_path()
     caravan = _caravan_db3_caravan_path()
     backup = _caravan_db3_backup_path()
@@ -1324,7 +1384,6 @@ def _caravan_switch_to_caravan_db3():
     if not os.path.exists(current):
         return None
     try:
-        # Hangi karavan db3 kullanılacak? Önce botta var olan "Karavan" profili (DatabaseProfiles), sonra .caravan.db3
         source_db3 = None
         karavan_named = _caravan_db3_karavan_named_path()
         if karavan_named and os.path.exists(karavan_named):
@@ -1418,13 +1477,35 @@ def _caravan_phbot_karavan_json_path():
             return p
     return None
 
+def _caravan_char_has_any_config():
+    """Bu char için Config klasöründe herhangi bir dosya var mı (örn. Sirion_VisKi.json veya .karavan.json)."""
+    fn = _caravan_db3_filename()
+    if not fn:
+        return False
+    config_dir = _caravan_db3_dir()
+    if not config_dir or not os.path.isdir(config_dir):
+        return False
+    try:
+        for name in os.listdir(config_dir):
+            if name.startswith(fn + '.') or name == fn + '.json':
+                return True
+    except Exception:
+        pass
+    return False
+
 def _caravan_download_profile_json(save_path):
     """
-    Repodan profile/ServerName_CharName.karavan.json indirir; save_path (Config/Server_CharName.karavan.json) olarak yazar.
-    Başarılı ise True.
+    Repodan profile/ServerName_CharName.karavan.json indirir; Config içine o anki char adıyla kaydeder:
+    Sirion_VisKi.karavan.json (server + '_' + name + '.karavan.json'). Başarılı ise True.
     """
     if not save_path:
         return False
+    config_dir = os.path.dirname(save_path)
+    if config_dir and not os.path.exists(config_dir):
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except Exception:
+            pass
     try:
         folder_enc = urllib.parse.quote(GITHUB_CARAVAN_PROFILE_FOLDER, safe='')
         url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, folder_enc, GITHUB_CARAVAN_PROFILE_JSON_FILENAME)
@@ -1434,11 +1515,39 @@ def _caravan_download_profile_json(save_path):
         if data:
             with open(save_path, 'wb') as f:
                 f.write(data)
-            log('[%s] [Oto-Kervan] Karavan profili (json) indirildi: profile/%s -> %s' % (pName, GITHUB_CARAVAN_PROFILE_JSON_FILENAME, os.path.basename(save_path)))
+            basename = os.path.basename(save_path)
+            log('[%s] [Oto-Kervan] Karavan profili indirildi; Config içine %s olarak kaydedildi.' % (pName, basename))
             return True
     except Exception:
         pass
     return False
+
+
+def _caravan_ensure_karavan_profile_on_init():
+    """Init'te karavan profili (Server_CharName.karavan.json) yoksa oluşturur (repodan veya mevcut config'ten). Var olanı ezmez."""
+    if _caravan_phbot_karavan_json_path():
+        return
+    save_path = _caravan_karavan_json_path()
+    if not save_path:
+        return
+    if _caravan_download_profile_json(save_path):
+        return
+    path = get_config_path()
+    if not path or not os.path.exists(path):
+        return
+    try:
+        config_dir = os.path.dirname(save_path)
+        if config_dir and not os.path.exists(config_dir):
+            os.makedirs(config_dir, exist_ok=True)
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        data = _caravan_apply_tweaks_to_dict(data)
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        log('[%s] [Oto-Kervan] Init: Karavan profili oluşturuldu (mevcut ayarlardan). Otomatik yapılandırma: "karavan" profilini seçip Başlat\'a basabilirsiniz.' % pName)
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] Init: Karavan profili oluşturulamadı: %s' % (pName, str(ex)))
+
 
 def _caravan_ensure_profile_file(current_config_path):
     """
@@ -1463,11 +1572,7 @@ def _caravan_ensure_profile_file(current_config_path):
         return None
 
 def _caravan_switch_to_profile():
-    """
-    Mevcut config'i yedekler; ardından bu char için phBot karavan profili (Server_CharName.karavan.json)
-    varsa onu aktif config'e yazar; yoksa plugin içi caravan_profile.json (tweak'li) kullanır.
-    Durdur'da yedekten geri yüklenir. Yedek path'ini döndürür; hata olursa None.
-    """
+    """Mevcut config yedeklenir; karavan profili (yerel/repodan) aktif config'e yazılır. Yedek path döner."""
     path = get_config_path()
     if not path or not os.path.exists(path):
         return None
@@ -1477,13 +1582,14 @@ def _caravan_switch_to_profile():
             backup_data = f.read()
         with open(backup_path, 'w', encoding='utf-8') as f:
             f.write(backup_data)
-        # Önce phBot'taki karavan profil JSON'unu kullan (Config/Server_CharName.karavan.json)
         profile_path = _caravan_phbot_karavan_json_path()
         if not profile_path:
-            # Yerel yoksa repodan indir; Config'e o anki char adıyla kaydet (xxx_xxx.karavan.json)
             save_path = _caravan_karavan_json_path()
-            if save_path and _caravan_download_profile_json(save_path):
-                profile_path = save_path
+            if save_path:
+                if not _caravan_char_has_any_config():
+                    log('[%s] [Oto-Kervan] Bu char için Config\'te henüz dosya yok; repodan profil indiriliyor.' % pName)
+                if _caravan_download_profile_json(save_path):
+                    profile_path = save_path
         if not profile_path or not os.path.exists(profile_path):
             profile_path = _caravan_ensure_profile_file(path)
         if not profile_path or not os.path.exists(profile_path):
@@ -1519,16 +1625,27 @@ def _caravan_restore_from_backup(backup_path):
         log('[%s] [Oto-Kervan] Config geri yüklenemedi: %s' % (pName, str(ex)))
 
 def _caravan_loop():
-    """
-    Önce karavan profili (sadece JSON) uygular: config yedeklenir, profile/ServerName_CharName.karavan.json
-    yerel yoksa repodan indirilir, aktif config'e yazılır; script çalıştırılır. Durdurulunca config yedekten geri yüklenir.
-    """
+    """Config yedeklenir, karavan profili (JSON) uygulanır, script çalıştırılır; Durdur'da config geri yüklenir."""
     global _caravan_running
     temp_path = None
     backup_path = None
-    db3_backup_path = None
     try:
-        # 1) Config (JSON): mevcut config yedekle, karavan profilini (yerel veya repodan) aktif config'e yaz
+        current_area = get_training_area()
+        if not current_area:
+            cfg_path_now = get_config_path()
+            if cfg_path_now and os.path.exists(cfg_path_now):
+                try:
+                    with open(cfg_path_now, 'r', encoding='utf-8') as f:
+                        cfg_now = json.load(f)
+                    script_cfg = (cfg_now.get('Loop') or {}).get('Script') or {}
+                    if isinstance(script_cfg, dict):
+                        for area_name in list(script_cfg.keys()):
+                            if area_name and set_training_area(area_name):
+                                log('[%s] [Oto-Kervan] Kasılma alanı aktif edildi: %s' % (pName, area_name))
+                                break
+                except Exception:
+                    pass
+
         backup_path = _caravan_switch_to_profile()
         if not backup_path:
             log('[%s] [Oto-Kervan] Config profil uygulanamadı; mevcut ayarlarla devam ediliyor.' % pName)
@@ -1560,13 +1677,70 @@ def _caravan_loop():
             return
         with open(temp_path, 'w', encoding='utf-8', newline='\n') as f:
             f.write(script_content)
+        current_area = get_training_area()
+        if not current_area and backup_path and os.path.exists(backup_path):
+            try:
+                with open(backup_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                script_cfg = (cfg.get('Loop') or {}).get('Script') or {}
+                if isinstance(script_cfg, dict):
+                    for area_name in list(script_cfg.keys()):
+                        if area_name and set_training_area(area_name):
+                            log('[%s] [Oto-Kervan] Aktif training area seçildi: %s' % (pName, area_name))
+                            break
+            except Exception:
+                pass
         set_training_position(region, cx, cy, cz)
         set_training_radius(600.0)
-        if not set_training_script(temp_path):
-            log('[%s] [Oto-Kervan] Training script atanamadı!' % pName)
-            _caravan_running = False
-            return
+        script_path_for_bot = os.path.abspath(temp_path)
+        script_set_ok = set_training_script(script_path_for_bot)
+        if not script_set_ok:
+            cfg_path = get_config_path()
+            if cfg_path and os.path.exists(cfg_path):
+                try:
+                    with open(cfg_path, 'r', encoding='utf-8') as f:
+                        cfg = json.load(f)
+                    loop = cfg.get('Loop')
+                    if not isinstance(loop, dict):
+                        loop = {}
+                        cfg['Loop'] = loop
+                    script_cfg = loop.get('Script')
+                    if not isinstance(script_cfg, dict):
+                        script_cfg = {}
+                        loop['Script'] = script_cfg
+                    caravan_area = {
+                        'Data': [],
+                        'Enabled': True,
+                        'Path': script_path_for_bot.replace('/', '\\'),
+                        'Pick Radius': 50,
+                        'Polygon': [],
+                        'Radius': 600.0,
+                        'Region': region,
+                        'Type': 0,
+                        'X': float(cx),
+                        'Y': float(cy),
+                        'Z': float(cz),
+                    }
+                    for name in list(script_cfg.keys()):
+                        if isinstance(script_cfg.get(name), dict):
+                            script_cfg[name]['Enabled'] = False
+                    script_cfg['Caravan'] = caravan_area
+                    with open(cfg_path, 'w', encoding='utf-8') as f:
+                        json.dump(cfg, f, indent=4, ensure_ascii=False)
+                    script_set_ok = True
+                    log('[%s] [Oto-Kervan] Kasılma alanı yoktu; config\'e "Caravan" alanı eklendi, script atandı, bot başlatılıyor.' % pName)
+                except Exception as ex:
+                    log('[%s] [Oto-Kervan] Config güncellenemedi: %s' % (pName, str(ex)))
+            if not script_set_ok:
+                log('[%s] [Oto-Kervan] Seçilen script atanamadı. Yol: %s' % (pName, script_path_for_bot))
+                _caravan_running = False
+                return
         time.sleep(0.3)
+        if not get_training_area():
+            log('[%s] [Oto-Kervan] Kasılma: Kasılma alanınızı aktif etmediniz. Bot başlatılamıyor.' % pName)
+            _caravan_running = False
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Durduruldu ■')
+            return
         start_bot()
         _caravan_running = True
         log('[%s] [Oto-Kervan] Karavan scripti dosyadan çalışıyor (training script).' % pName)
@@ -1585,7 +1759,6 @@ def _caravan_loop():
     finally:
         if backup_path:
             _caravan_restore_from_backup(backup_path)
-        # db3 şimdilik kullanılmıyor (sadece JSON ile ilerleniyor)
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
@@ -1594,6 +1767,15 @@ def _caravan_loop():
 
 def kervan_start():
     global _caravan_script_path, _caravan_thread
+    current_key = _caravan_get_current_profile_key()
+    if not current_key:
+        log('[%s] [Oto-Kervan] Profil bilgisi alınamadı. Botu tekrardan açıp Oyuna giriş yapıp tekrar deneyin.' % pName)
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Profil alınamadı')
+        return
+    if 'karavan' not in current_key.lower():
+        log('[%s] [Oto-Kervan] Karavan profili seçili değil. Otomatik yapılandırma profil listesinden karavan profilini seçin, sonra Başlat\'a basın.' % pName)
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Önce Karavan profilini seçin')
+        return
     selected_display = QtBind.text(gui, lstKervanScripts).strip()
     if not selected_display or selected_display.startswith('('):
         log('[%s] [Oto-Kervan] Lütfen listeden bir script seçin.' % pName)
@@ -2393,8 +2575,14 @@ _kervan_title_y = _kervan_container_y + 10
 _add_tab5(QtBind.createLabel(gui, '═══════════ Oto Kervan ═══════════', _kervan_title_x, _kervan_title_y), _kervan_title_x, _kervan_title_y)
 _add_tab5(QtBind.createLabel(gui, 'GitHub\'daki karavan scriptlerinden birini seçin; Başla ile yürütün.', _kervan_title_x, _kervan_title_y + 18), _kervan_title_x, _kervan_title_y + 18)
 
+# Karavan profili listesi (Başlat için ana pencerede karavan profilini seçin)
+_kervan_profile_y = _kervan_title_y + 40
+_add_tab5(QtBind.createLabel(gui, 'Karavan profili:', _kervan_title_x, _kervan_profile_y), _kervan_title_x, _kervan_profile_y)
+comboKervanProfile = QtBind.createCombobox(gui, _kervan_title_x + 95, _kervan_profile_y - 2, 200, 22)
+_add_tab5(comboKervanProfile, _kervan_title_x + 95, _kervan_profile_y - 2)
+
 # Script listesi
-_kervan_list_y = _kervan_title_y + 42
+_kervan_list_y = _kervan_title_y + 68
 _add_tab5(QtBind.createLabel(gui, 'Script listesi:', _kervan_title_x, _kervan_list_y), _kervan_title_x, _kervan_list_y)
 lstKervanScripts = QtBind.createList(gui, _kervan_title_x, _kervan_list_y + 18, 300, 120)
 _add_tab5(lstKervanScripts, _kervan_title_x, _kervan_list_y + 18)
@@ -2411,9 +2599,10 @@ lblKervanStatus = QtBind.createLabel(gui, 'Durum: Hazır', _kervan_title_x, _ker
 _add_tab5(lblKervanStatus, _kervan_title_x, _kervan_btn_y + 28)
 
 def _caravan_init_load():
-    """Init sonrası GitHub'dan karavan listesini arka planda yükler."""
+    """Init sonrası karavan profilini (yoksa) oluşturur, ardından script listesini arka planda yükler."""
     time.sleep(2)
     try:
+        _caravan_ensure_karavan_profile_on_init()
         kervan_refresh_list()
     except Exception:
         pass
