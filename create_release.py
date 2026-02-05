@@ -20,8 +20,8 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.3.0',
-    'name': 'v1.3.0 - Auto Dungeon Feature',
+    'tag_name': 'v1.4.0',
+    'name': 'v1.4.0 - Oto-Kervan profil, Garden Script, temizlik',
     'body': release_notes,
     'draft': False,
     'prerelease': False

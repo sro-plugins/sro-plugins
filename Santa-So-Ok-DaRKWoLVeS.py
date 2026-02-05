@@ -15,7 +15,7 @@ import sqlite3
 
 pName = 'Santa-So-Ok-DaRKWoLVeS'
 PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
-pVersion = '1.3.0'
+pVersion = '1.4.0'
 
 MOVE_DELAY = 0.25
 
