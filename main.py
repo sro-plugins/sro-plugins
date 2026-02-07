@@ -1,12 +1,16 @@
-from fastapi import FastAPI, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import models
 from database import SessionLocal, engine, Base
@@ -16,8 +20,25 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="SRO User Manager System")
 
+security = HTTPBasic()
+
+# Admin Credentials from .env
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "sro123456")
+
+def authenticate_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    if credentials.username != ADMIN_USERNAME or credentials.password != ADMIN_PASSWORD:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
 # Serve static files for admin dashboard
+# We mount this AFTER the api routes to avoid overlap issues if needed
 app.mount("/admin", StaticFiles(directory="public", html=True), name="admin")
+
 
 # Dependency
 def get_db():
@@ -44,7 +65,7 @@ class UserResponse(BaseModel):
 # --- ADMIN ROUTES ---
 
 @app.post("/admin/api/users", response_model=UserResponse)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
+def create_user(user: UserCreate, db: Session = Depends(get_db), admin: str = Depends(authenticate_admin)):
     db_user = models.User(username=user.username)
     db.add(db_user)
     db.commit()
@@ -52,11 +73,12 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     return db_user
 
 @app.get("/admin/api/users", response_model=List[UserResponse])
-def get_users(db: Session = Depends(get_db)):
+def get_users(db: Session = Depends(get_db), admin: str = Depends(authenticate_admin)):
     return db.query(models.User).all()
 
 @app.delete("/admin/api/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(user_id: int, db: Session = Depends(get_db), admin: str = Depends(authenticate_admin)):
+
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
