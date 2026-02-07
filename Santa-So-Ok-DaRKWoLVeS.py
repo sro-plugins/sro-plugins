@@ -24,53 +24,25 @@ DIMENSIONAL_COOLDOWN_DELAY = 7200  # saniye (2 saat)
 WAIT_DROPS_DELAY_MAX = 10  # saniye
 COUNT_MOBS_DELAY = 1.0  # saniye
 
-CARAVAN_SCRIPTS_FOLDER = 'PHBOT Caravan SC'
-
-
-# License System Configuration
-LICENSE_SERVER_URL = 'https://vps.sro-plugins.cloud'
-LICENSE_KEY = '' # Saved in config
-
 GITHUB_REPO = 'sro-plugins/sro-plugins'
 GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_REPO
 GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
 GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
-
-def _get_my_ip():
-    try:
-        req = urllib.request.Request('https://api.ipify.org', headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
-        with urllib.request.urlopen(req, timeout=5) as r:
-            return r.read().decode('utf8')
-    except:
-        return '127.0.0.1'
-
-def _api_get_file(enum_type, filename):
-    try:
-        my_ip = _get_my_ip()
-        url = "%s/api/download?publicId=%s&ip=%s&type=%s&filename=%s" % (
-            LICENSE_SERVER_URL, LICENSE_KEY, my_ip, enum_type, filename
-        )
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            return r.read()
-    except Exception as ex:
-        log('[%s] API Dosya Hatası: %s' % (pName, str(ex)))
-        return None
-
-def _api_get_list(enum_type):
-    try:
-        my_ip = _get_my_ip()
-        url = "%s/api/list?publicId=%s&ip=%s&type=%s" % (
-            LICENSE_SERVER_URL, LICENSE_KEY, my_ip, enum_type
-        )
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            return json.loads(r.read().decode('utf8'))
-    except Exception as ex:
-        log('[%s] API Liste Hatası: %s' % (pName, str(ex)))
-        return []
-
-
+GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
+GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
+GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
+# Oto Kervan: GitHub'daki karavan scriptleri klasörü (API ile liste, raw ile indirme)
+# GitHub'da klasör yoksa veya 404 alırsa yerel "PHBOT Caravan SC" klasörü kullanılır (plugin yanında).
+GITHUB_CARAVAN_FOLDER = 'PHBOT Caravan SC'
+GITHUB_CARAVAN_BRANCH = 'main'
+# API URL _fetch_caravan_script_list içinde quote ile oluşturulur (400 hatası önlemi)
+# Raw template: tek format çağrısında (repo, branch, filename)
+GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE = 'https://raw.githubusercontent.com/%s/%s/%s/%s'
+# Karavan profili (sadece JSON): repoda profile/ServerName_CharName.karavan.json (şablon); indirilince Config'e Server_CharName.karavan.json olarak kaydedilir.
+# JSON = Komut/kasılma alanı (Training, Script, Radius, Skip Town Script).
+GITHUB_CARAVAN_PROFILE_FOLDER = 'profile'
+GITHUB_CARAVAN_PROFILE_JSON_FILENAME = 'ServerName_CharName.karavan.json'
+GITHUB_CARAVAN_PROFILE_DB3_FILENAME = 'caravan_profile.db3'
 # Bu eklenti sürümüyle birlikte gelen script versiyonları (kullanıcı manipüle edemez).
 # Repo'da script + versions.json güncellediğinde burayı da aynı versiyonlara çek ve eklenti sürümünü yayınla.
 EMBEDDED_SCRIPT_VERSIONS = {
@@ -161,7 +133,7 @@ def _download_garden_script(script_type="normal"):
     """GitHub'dan garden-dungeon script dosyasını indirir"""
     try:
         sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
-        
+
         # Script türüne göre dosya adı ve URL belirle
         if script_type == "wizz-cleric":
             script_filename = "garden-dungeon-wizz-cleric.txt"
@@ -169,37 +141,41 @@ def _download_garden_script(script_type="normal"):
         else:
             script_filename = "garden-dungeon.txt"
             download_url = GITHUB_GARDEN_SCRIPT_URL
-        
+
         script_path = os.path.join(sc_folder, script_filename)
-        
+
         log('[%s] [Garden-Auto] GitHub\'dan script indiriliyor... (Tür: %s)' % (pName, script_type))
         log('[%s] [Garden-Auto] URL: %s' % (pName, download_url))
-        
+
         # sc klasörü yoksa oluştur
         if not os.path.exists(sc_folder):
             os.makedirs(sc_folder)
             log('[%s] [Garden-Auto] sc klasörü oluşturuldu: %s' % (pName, sc_folder))
-        
-        log('[%s] [Garden-Auto] API\'den script indiriliyor... (Tür: %s)' % (pName, script_type))
-        
-        script_content = _api_get_file('SC', script_filename)
-        
-        if not script_content:
-            log('[%s] [Garden-Auto] Script API\'den alınamadı!' % pName)
-            return False
 
-        
+        # GitHub'dan indir (cache bypass için timestamp ekle)
+        import time
+        cache_buster = int(time.time())
+        url_with_cache_buster = download_url + '?v=' + str(cache_buster)
+
+        req = urllib.request.Request(
+            url_with_cache_buster,
+            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+        )
+
+        with urllib.request.urlopen(req, timeout=15) as r:
+            script_content = r.read()
+
         content_length = len(script_content) if script_content else 0
         log('[%s] [Garden-Auto] İndirilen boyut: %d byte' % (pName, content_length))
-        
+
         if not script_content or content_length < 10:
             log('[%s] [Garden-Auto] İndirilen script geçersiz (çok kısa: %d byte)' % (pName, content_length))
             return False
-        
+
         # Dosyaya kaydet
         with open(script_path, 'wb') as f:
             f.write(script_content)
-        
+
         log('[%s] [Garden-Auto] Script başarıyla indirildi: %s (%d byte)' % (pName, script_path, content_length))
         return script_path
     except Exception as ex:
@@ -226,14 +202,29 @@ def _caravan_filename_to_display_name(filename):
     return from_name + ' --> ' + to_name
 
 def _fetch_caravan_script_list():
-    """Lisans sunucusu üzerinden Karavan scriptlerini listeler."""
+    """GitHub API veya yerel klasör ile PHBOT Caravan SC .txt listesini döndürür."""
+    # GitHub API: path quote ile encode, ref=main ile branch belirt
+    path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
+    api_url = 'https://api.github.com/repos/%s/contents/%s?ref=%s' % (
+        GITHUB_REPO, path_encoded, GITHUB_CARAVAN_BRANCH
+    )
     try:
-        names = _api_get_list('CARAVAN')
-        if names:
-            return names
+        req = urllib.request.Request(
+            api_url,
+            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0', 'Accept': 'application/vnd.github.v3+json'}
+        )
+        with urllib.request.urlopen(req, timeout=12) as r:
+            data = json.loads(r.read().decode('utf-8'))
+        names = []
+        for item in (data if isinstance(data, list) else []):
+            if isinstance(item, dict) and item.get('type') == 'file':
+                name = item.get('name') or ''
+                if name.endswith('.txt'):
+                    names.append(name)
+        names.sort(key=lambda x: x.lower())
+        return names
     except Exception as ex:
-        log('[%s] [Oto-Kervan] Sunucudan liste alınamadı: %s' % (pName, str(ex)))
-
+        log('[%s] [Oto-Kervan] GitHub listesi alınamadı: %s' % (pName, str(ex)))
     # Fallback: yerel PHBOT Caravan SC klasöründeki .txt dosyaları
     folder = _get_caravan_script_folder()
     if os.path.isdir(folder):
@@ -249,8 +240,7 @@ def _fetch_caravan_script_list():
 
 def _get_caravan_script_folder():
     """Oto Kervan scriptlerinin yerel klasör yolunu döndürür (plugin ile aynı dizinde)."""
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), CARAVAN_SCRIPTS_FOLDER)
-
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), GITHUB_CARAVAN_FOLDER)
 
 def _download_caravan_script(filename):
     """GitHub'dan tek bir karavan scriptini indirir; yerel yol döndürür veya False."""
@@ -259,13 +249,15 @@ def _download_caravan_script(filename):
         if not os.path.exists(folder):
             os.makedirs(folder)
         script_path = os.path.join(folder, filename)
-        script_content = _api_get_file('CARAVAN', filename)
-        if not script_content or len(script_content) < 10:
-
+        path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
+        url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, filename)
+        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            content = r.read()
+        if not content or len(content) < 10:
             return False
         with open(script_path, 'wb') as f:
-            f.write(script_content)
-
+            f.write(content)
         log('[%s] [Oto-Kervan] Script indirildi: %s' % (pName, filename))
         return script_path
     except Exception as ex:
@@ -308,37 +300,48 @@ def _save_local_script_versions(versions):
         return False
 
 def _check_script_updates():
-    """Lisans sunucusu üzerinden script versiyonlarını kontrol eder ve gerekirse günceller"""
+    """GitHub'daki script versiyonlarını kontrol eder ve gerekirse günceller"""
     try:
-        log('[%s] [Script-Update] Script güncellemeleri kontrol ediliyor...' % pName)
-        
-        # Sunucudan versions.json çek
-        versions_content = _api_get_file('SC', 'versions.json')
-        
-        if not versions_content:
-            log('[%s] [Script-Update] Sunucudan versions.json alınamadı' % pName)
-            return False
-        
-        github_versions = json.loads(versions_content.decode('utf-8'))
+        log('[%s] [Script-Update] Garden Script güncellemeleri kontrol ediliyor...' % pName)
 
+        # GitHub'dan versions.json'ı indir (CDN cache bypass: no-cache + benzersiz query)
+        cache_buster = str(int(time.time())) + '_' + str(id(object()))
+        url_with_cache_buster = GITHUB_SCRIPT_VERSIONS_URL + '?v=' + cache_buster
+        req = urllib.request.Request(
+            url_with_cache_buster,
+            headers={
+                'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+            }
+        )
+
+        with urllib.request.urlopen(req, timeout=15) as r:
+            github_versions_data = r.read()
+
+        if not github_versions_data:
+            log('[%s] [Script-Update] GitHub versions.json indirilemedi' % pName)
+            return False
+
+        github_versions = json.loads(github_versions_data.decode('utf-8'))
         local_versions = _get_local_script_versions()
         sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
         updated_count = 0
-        
+
         # Karar: yerleşik veya son indirdiğimiz versiyon vs GitHub (indirdikten sonra kaydediyoruz, tekrar indirme olmasın)
         for script_name, github_info in github_versions.items():
             if isinstance(github_info, dict):
                 github_version = github_info.get("version", "0.0")
             else:
                 github_version = github_info
-            
+
             embedded_version = EMBEDDED_SCRIPT_VERSIONS.get(script_name, "0.0")
             local_info = local_versions.get(script_name, {})
             stored_version = local_info.get("version", "") if isinstance(local_info, dict) else ""
             current_version = stored_version if stored_version else embedded_version
-            
+
             script_path = os.path.join(sc_folder, script_name)
-            
+
             needs_update = False
             update_reason = ""
             if not os.path.exists(script_path):
@@ -347,7 +350,7 @@ def _check_script_updates():
             elif _version_less(_parse_version(current_version), _parse_version(github_version)):
                 needs_update = True
                 update_reason = "yeni versiyon (v%s -> v%s)" % (current_version, github_version)
-            
+
             if needs_update:
                 log('[%s] [Script-Update] %s güncelleniyor... (%s)' % (pName, script_name, update_reason))
                 if os.path.exists(script_path):
@@ -356,7 +359,7 @@ def _check_script_updates():
                         log('[%s] [Script-Update] Eski %s silindi' % (pName, script_name))
                     except Exception as ex:
                         log('[%s] [Script-Update] Eski dosya silinemedi: %s' % (pName, str(ex)))
-                
+
                 script_type = "wizz-cleric" if "wizz-cleric" in script_name else "normal"
                 download_result = _download_garden_script(script_type)
                 if download_result:
@@ -366,14 +369,14 @@ def _check_script_updates():
                     log('[%s] [Script-Update] %s başarıyla güncellendi (v%s)' % (pName, script_name, github_version))
                 else:
                     log('[%s] [Script-Update] %s güncellenemedi!' % (pName, script_name))
-        
+
         if updated_count > 0:
             log('[%s] [Script-Update] %d script güncellendi' % (pName, updated_count))
         else:
             log('[%s] [Script-Update] Tüm scriptler güncel' % pName)
-        
+
         return True
-        
+
     except Exception as ex:
         log('[%s] [Script-Update] Güncelleme kontrolü hatası: %s' % (pName, str(ex)))
         return False
@@ -953,32 +956,32 @@ def _garden_dungeon_loop():
     global _garden_dungeon_running
     try:
         script_path = _garden_dungeon_script_path
-        
+
         log('[%s] [Garden-Auto] Garden Dungeon başlatılıyor...' % pName)
-        
+
         # Script kontrolü
         if not script_path or not os.path.exists(script_path):
             log('[%s] [Garden-Auto] Script bulunamadı: %s' % (pName, script_path))
             _garden_dungeon_running = False
             return
-        
+
         # Her başlatmada mevcut pozisyonu al ve training area'yı güncelle
         pos = get_position()
         if not pos:
             log('[%s] [Garden-Auto] Pozisyon alınamadı!' % pName)
             _garden_dungeon_running = False
             return
-        
+
         # Training position'ı karakterin mevcut konumuna göre ayarla
         region = pos.get('region', 0)
         x = pos.get('x', 0)
         y = pos.get('y', 0)
         z = pos.get('z', 0)
-        
+
         set_training_position(region, x, y, z)
         set_training_radius(50.0)
         log('[%s] [Garden-Auto] Training position ayarlandı: (%d, %.1f, %.1f, %.1f)' % (pName, region, x, y, z))
-        
+
         # Script'i ayarla
         result = set_training_script(script_path)
         if result:
@@ -987,18 +990,18 @@ def _garden_dungeon_loop():
             log('[%s] [Garden-Auto] Training script ayarlanamadı!' % pName)
             _garden_dungeon_running = False
             return
-        
+
         # Kısa bir bekleme süresi (training area'nın hazır olması için)
         time.sleep(0.5)
-        
+
         start_bot()
         _garden_dungeon_running = True
         log('[%s] [Garden-Auto] Bot başlatıldı' % pName)
-        
+
         # Thread çalışırken bot'un durumunu kontrol et
         while not _garden_dungeon_stop_event.is_set():
             time.sleep(1)
-        
+
         log('[%s] [Garden-Auto] Garden Dungeon durduruluyor...' % pName)
         stop_bot()
         _garden_dungeon_running = False
@@ -1020,15 +1023,15 @@ def garden_dungeon_select_wizz_cleric():
 
 def garden_dungeon_start():
     global _garden_dungeon_thread, _garden_dungeon_running, _garden_dungeon_script_path, _garden_dungeon_script_type
-    
+
     # Textbox'tan script yolunu al ve temizle
     script_path_from_ui = QtBind.text(gui, tbxGardenScriptPath).strip()
-    
+
     # Tırnak işaretlerini temizle (baş ve sondaki " ve ' karakterlerini)
     if script_path_from_ui:
         # Başta ve sonda " veya ' varsa kaldır
         script_path_from_ui = script_path_from_ui.strip('"').strip("'").strip()
-    
+
     # Eğer textbox'ta bir şey varsa onu kullan
     if script_path_from_ui:
         _garden_dungeon_script_path = script_path_from_ui
@@ -1041,7 +1044,7 @@ def garden_dungeon_start():
         else:
             _garden_dungeon_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
             log('[%s] [Garden-Auto] Normal script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
-    
+
     # Training area "garden-auto" var mı kontrol et (script olmasa da çalışabilir)
     has_training_area = False
     try:
@@ -1050,17 +1053,17 @@ def garden_dungeon_start():
             has_training_area = True
     except Exception:
         pass
-    
+
     # Script dosyasının var olup olmadığını kontrol et (training area yoksa script şart)
     if not has_training_area and not os.path.exists(_garden_dungeon_script_path):
         # Varsayılan scriptlerden biri mi kontrol et
         default_normal = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
         default_wizz = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon-wizz-cleric.txt")
-        
+
         if _garden_dungeon_script_path in [default_normal, default_wizz]:
             log('[%s] [Garden-Auto] Script bulunamadı, GitHub\'dan indiriliyor...' % pName)
             QtBind.setText(gui, lblGardenScriptStatus, 'Durum: GitHub\'dan indiriliyor...')
-            
+
             downloaded_path = _download_garden_script(_garden_dungeon_script_type)
             if downloaded_path:
                 _garden_dungeon_script_path = downloaded_path
@@ -1075,7 +1078,7 @@ def garden_dungeon_start():
             log('[%s] [Garden-Auto] Özel script bulunamadı: %s' % (pName, _garden_dungeon_script_path))
             QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script bulunamadı! ✗')
             return
-    
+
     with _garden_dungeon_lock:
         if _garden_dungeon_thread and _garden_dungeon_thread.is_alive():
             log('[%s] [Garden-Auto] Garden Dungeon zaten çalışıyor.' % pName)
@@ -1084,7 +1087,7 @@ def garden_dungeon_start():
         _garden_dungeon_stop_event.clear()
         _garden_dungeon_thread = threading.Thread(target=_garden_dungeon_loop, name=pName + '_garden_dungeon', daemon=True)
         _garden_dungeon_thread.start()
-    
+
     QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Çalışıyor... ▶')
     log('[%s] [Garden-Auto] Garden Dungeon başlatıldı.' % pName)
 
@@ -2105,33 +2108,6 @@ def loadDefaultConfig():
     QtBind.setChecked(gui, cbxOnlyCountChampionParty, False)
     QtBind.setChecked(gui, cbxOnlyCountGiantParty, False)
     QtBind.setChecked(gui, cbxAcceptForgottenWorld, False)
-    QtBind.setText(gui, tbxLicenseKey, "")
-
-def btnSaveLicense_clicked():
-    global LICENSE_KEY
-    key = QtBind.text(gui, tbxLicenseKey).strip()
-    if key:
-        LICENSE_KEY = key
-        saveConfigs()
-        log('[%s] Lisans anahtarı kaydedildi. Sistem doğrulanıyor...' % pName)
-        threading.Thread(target=_validate_license_loop, daemon=True).start()
-    else:
-        log('[%s] Geçersiz lisans anahtarı!' % pName)
-
-def _validate_license_loop():
-    while True:
-        try:
-            my_ip = _get_my_ip()
-            url = "%s/api/validate?publicId=%s&ip=%s" % (LICENSE_SERVER_URL, LICENSE_KEY, my_ip)
-            req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
-            with urllib.request.urlopen(req, timeout=10) as r:
-                data = json.loads(r.read().decode('utf8'))
-            log('[%s] Lisans Doğrulama: %s' % (pName, data.get('message', 'Tamam')))
-        except Exception as ex:
-            log('[%s] Lisans Hatası: %s' % (pName, str(ex)))
-            # Optional: Stop features if 401
-        time.sleep(300) # her 5 dakikada bir kontrol
-
 
 def loadConfigs():
     loadDefaultConfig()
@@ -2139,16 +2115,11 @@ def loadConfigs():
         data = {}
         with open(getConfig(), "r") as f:
             data = json.load(f)
-            if "License Key" in data:
-                global LICENSE_KEY
-                LICENSE_KEY = data["License Key"]
-                QtBind.setText(gui, tbxLicenseKey, LICENSE_KEY)
-            if "Ignore Names" in data:
-                global lstMobsData
-                lstMobsData = data["Ignore Names"]
-                for name in lstMobsData:
-                    QtBind.append(gui, lstMobs, name)
-
+        if "Ignore Names" in data:
+            global lstMobsData
+            lstMobsData = data["Ignore Names"]
+            for name in lstMobsData:
+                QtBind.append(gui, lstMobs, name)
         if "Ignore Types" in data:
             global lstIgnore
             for t in data["Ignore Types"]:
@@ -2211,8 +2182,6 @@ def saveConfigs():
         data['Ignore Types'] = lstIgnore
         data['Ignore Names'] = lstMobsData
         data['Accept ForgottenWorld'] = QtBind.isChecked(gui, cbxAcceptForgottenWorld)
-        data['License Key'] = LICENSE_KEY
-
         with open(getConfig(), "w") as f:
             f.write(json.dumps(data, indent=4, sort_keys=True))
 
@@ -2225,7 +2194,6 @@ _tab3_widgets = []
 _tab4_widgets = []
 _tab5_widgets = []
 _tab6_widgets = []
-_tab7_widgets = []
 _current_tab = 1
 
 def _tab_move(widget_list, offscreen):
@@ -2305,23 +2273,19 @@ def _show_tab5():
     except Exception:
         pass
 
-def _show_tab7():
+def _show_tab6():
     global _current_tab
     _tab_move(_tab1_widgets, True)
     _tab_move(_tab2_widgets, True)
     _tab_move(_tab3_widgets, True)
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab5_widgets, True)
-    _tab_move(_tab6_widgets, True)
-    _tab_move(_tab7_widgets, False)
-    _current_tab = 7
+    _tab_move(_tab6_widgets, False)
+    _current_tab = 6
     try:
         QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + _tab_bar_h - 3)
     except Exception:
         pass
-
-def _add_tab7(w, x, y):
-    _tab7_widgets.append((w, x, y))
 
 def _add_tab1(w, x, y):
     _tab1_widgets.append((w, x, y))
@@ -2359,9 +2323,7 @@ QtBind.createButton(gui, '_show_tab2', 'Auto Dungeon', _tab_bar_x + 3 + _tab1_bt
 QtBind.createButton(gui, '_show_tab3', 'Garden Dungeon', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + 2)
 QtBind.createButton(gui, '_show_tab4', 'Auto Hwt', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w, _tab_bar_y + 2)
 QtBind.createButton(gui, '_show_tab5', 'Oto Kervan', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab7', 'Lisans', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab6', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w + _tab6_btn_w, _tab_bar_y + 2)
-
+QtBind.createButton(gui, '_show_tab6', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + 2)
 _tab_indicator = QtBind.createList(gui, _tab_bar_x + 3, _tab_bar_y + _tab_bar_h - 3, _tab1_btn_w - 1, 4)
 
 _content_y = _tab_bar_y + _tab_bar_h - 1
@@ -2683,36 +2645,11 @@ _add_tab6(QtBind.createLabel(gui, '• Auto Hwt sistemi', _t3_x, _features_y + 1
 _add_tab6(QtBind.createLabel(gui, '• Oto Kervan sistemi', _t3_x, _features_y + 122), _t3_x, _features_y + 122)
 _add_tab6(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 142), _t3_x, _features_y + 142)
 
-# Tab 7 - Lisans
-_t7_container_x = _tab_bar_x + 100
-_t7_container_y = _content_y + 40
-_t7_container_w = 500
-_t7_container_h = 180
-
-_t7_container = QtBind.createList(gui, _t7_container_x, _t7_container_y, _t7_container_w, _t7_container_h)
-_add_tab7(_t7_container, _t7_container_x, _t7_container_y)
-
-_t7_x = _t7_container_x + 20
-_t7_y = _t7_container_y + 20
-
-_add_tab7(QtBind.createLabel(gui, '═════════════ Lisans Sistemi ═════════════', _t7_x, _t7_y), _t7_x, _t7_y)
-_add_tab7(QtBind.createLabel(gui, 'Botu kullanmak için size verilen Public ID (Lisans Anahtarı)\'nı girin.', _t7_x, _t7_y + 25), _t7_x, _t7_y + 25)
-
-_t7_input_y = _t7_y + 55
-_add_tab7(QtBind.createLabel(gui, 'Lisans Anahtarı:', _t7_x, _t7_input_y), _t7_x, _t7_input_y)
-tbxLicenseKey = QtBind.createLineEdit(gui, "", _t7_x + 100, _t7_input_y - 2, 350, 22)
-_add_tab7(tbxLicenseKey, _t7_x + 100, _t7_input_y - 2)
-
-_t7_btn_y = _t7_input_y + 40
-_add_tab7(QtBind.createButton(gui, 'btnSaveLicense_clicked', ' Lisansı Kaydet ve Doğrula ', _t7_x + 150, _t7_btn_y), _t7_x + 150, _t7_btn_y)
-
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
 _tab_move(_tab4_widgets, True)
 _tab_move(_tab5_widgets, True)
 _tab_move(_tab6_widgets, True)
-_tab_move(_tab7_widgets, True)
-
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
 threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()
