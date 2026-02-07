@@ -112,14 +112,24 @@ def get_users(db: Session = Depends(get_db), auth: bool = Depends(authenticate_a
 
 @app.delete("/admin/api/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
-
-
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     db.delete(user)
     db.commit()
     return {"message": "User deleted"}
+
+@app.get("/admin/api/files")
+def list_available_files(auth: bool = Depends(authenticate_admin)):
+    """List all files in caravan and sc directories."""
+    files = {
+        "CARAVAN": os.listdir("files/caravan") if os.path.exists("files/caravan") else [],
+        "SC": os.listdir("files/sc") if os.path.exists("files/sc") else []
+    }
+    # Filter only .txt or .json files to keep it clean if needed
+    files["CARAVAN"] = [f for f in files["CARAVAN"] if f.endswith(('.txt', '.json'))]
+    files["SC"] = [f for f in files["SC"] if f.endswith(('.txt', '.json'))]
+    return files
 
 # --- PUBLIC API ROUTES ---
 

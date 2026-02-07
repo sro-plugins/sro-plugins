@@ -20,6 +20,8 @@ const elements = {
 
 // State
 let users = [];
+let availableFiles = { CARAVAN: [], SC: [] };
+
 
 // Fetch Users
 async function fetchUsers() {
@@ -36,6 +38,27 @@ async function fetchUsers() {
         console.error('Error fetching users:', error);
     }
 }
+
+// Fetch Available Files for Tester
+async function fetchFiles() {
+    try {
+        const response = await fetch(`${apiBase}/files`);
+        if (response.status === 401) return;
+        availableFiles = await response.json();
+        updateFileDropdown();
+    } catch (error) {
+        console.error('Error fetching files:', error);
+    }
+}
+
+function updateFileDropdown() {
+    const type = document.getElementById('testType').value;
+    const dropdown = document.getElementById('testFilename');
+    const files = availableFiles[type] || [];
+
+    dropdown.innerHTML = files.map(f => `<option value="${f}">${f}</option>`).join('') || '<option value="">Dosya Yok</option>';
+}
+
 
 
 // Render Users to Table
@@ -146,8 +169,10 @@ function showTab(tabName) {
         elements.usersTab.classList.remove('active');
         elements.usersSection.style.display = 'none';
         elements.testerSection.style.display = 'block';
+        fetchFiles();
     }
 }
+
 
 // Download Tester
 function testDownload() {
@@ -178,7 +203,9 @@ async function doLogout() {
 if (elements.logoutBtn) elements.logoutBtn.addEventListener('click', doLogout);
 if (elements.usersTab) elements.usersTab.addEventListener('click', () => showTab('users'));
 if (elements.testerTab) elements.testerTab.addEventListener('click', () => showTab('tester'));
+if (document.getElementById('testType')) document.getElementById('testType').addEventListener('change', updateFileDropdown);
 elements.createUserBtn.addEventListener('click', openModal);
+
 
 
 elements.closeModal.addEventListener('click', closeModal);
