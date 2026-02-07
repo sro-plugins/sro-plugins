@@ -25,7 +25,7 @@ WAIT_DROPS_DELAY_MAX = 10  # saniye
 COUNT_MOBS_DELAY = 1.0  # saniye
 
 # License System Configuration
-LICENSE_SERVER_URL = 'http://76.13.141.75:8000' # Change this to your server IP
+LICENSE_SERVER_URL = 'https://vps.sro-plugins.cloud'
 LICENSE_KEY = '' # Saved in config
 
 GITHUB_REPO = 'sro-plugins/sro-plugins'
