@@ -19,12 +19,21 @@ from database import SessionLocal, engine, Base
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="SRO License & User Manager",
-    description="Admin panel ve Bot API'leri için merkezi yönetim sistemi.",
+    title="SRO Bot API Documentation",
+    description="""
+    ## SRO Plugins Lisans ve Dosya Yönetim Sistemi
+    Bu API dokümantasyonu botun (client) sunucu ile kuracağı iletişimi simüle etmenizi ve test etmenizi sağlar.
+    
+    ### Temel Özellikler:
+    * **Lisans Doğrulama:** Public ID kontrolü.
+    * **Dosya İndirme:** Bot için kervan ve SC scriptlerini sunar.
+    * **Oturum Yönetimi:** 2 karakter limiti kontrolü.
+    """,
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
 
 # Simple In-Memory Session Storage (For production, use Redis or DB)
 active_admin_sessions = set()
@@ -46,14 +55,15 @@ def authenticate_admin(request: Request):
         )
     return True
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 async def root_redirect(request: Request):
     session_id = request.cookies.get("admin_session")
     if session_id and session_id in active_admin_sessions:
         return RedirectResponse(url="/admin")
     return FileResponse("public/login.html")
 
-@app.post("/auth/login")
+
+@app.post("/auth/login", include_in_schema=False)
 async def login(response: Response, login_data: LoginRequest):
     if login_data.username == ADMIN_USERNAME and login_data.password == ADMIN_PASSWORD:
         session_id = str(uuid.uuid4())
@@ -68,13 +78,14 @@ async def login(response: Response, login_data: LoginRequest):
         return {"message": "Logged in"}
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
-@app.post("/auth/logout")
+@app.post("/auth/logout", include_in_schema=False)
 async def logout(request: Request, response: Response):
     session_id = request.cookies.get("admin_session")
     if session_id in active_admin_sessions:
         active_admin_sessions.remove(session_id)
     response.delete_cookie("admin_session")
     return {"message": "Logged out"}
+
 
 # Dependency
 
@@ -104,7 +115,7 @@ class UserResponse(BaseModel):
 
 # --- ADMIN ROUTES ---
 
-@app.post("/admin/api/users", response_model=UserResponse)
+@app.post("/admin/api/users", response_model=UserResponse, include_in_schema=False)
 def create_user(user: UserCreate, db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
     db_user = models.User(username=user.username)
     db.add(db_user)
@@ -112,11 +123,13 @@ def create_user(user: UserCreate, db: Session = Depends(get_db), auth: bool = De
     db.refresh(db_user)
     return db_user
 
-@app.get("/admin/api/users", response_model=List[UserResponse])
+
+@app.get("/admin/api/users", response_model=List[UserResponse], include_in_schema=False)
 def get_users(db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
     return db.query(models.User).all()
 
-@app.delete("/admin/api/users/{user_id}")
+
+@app.delete("/admin/api/users/{user_id}", include_in_schema=False)
 def delete_user(user_id: int, db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
@@ -125,7 +138,8 @@ def delete_user(user_id: int, db: Session = Depends(get_db), auth: bool = Depend
     db.commit()
     return {"message": "User deleted"}
 
-@app.get("/admin/api/files")
+
+@app.get("/admin/api/files", include_in_schema=False)
 def list_available_files(auth: bool = Depends(authenticate_admin)):
     """List all files in caravan and sc directories."""
     files = {
@@ -137,6 +151,7 @@ def list_available_files(auth: bool = Depends(authenticate_admin)):
     files["SC"] = [f for f in files["SC"] if f.endswith(('.txt', '.json'))]
     return files
 
+
 # --- PUBLIC API ROUTES ---
 
 enum_files = {
@@ -144,14 +159,15 @@ enum_files = {
     "SC": "files/sc"
 }
 
-@app.get("/api/download")
+@app.get("/api/download", tags=["Bot API"], summary="Dosya İndirme", description="Botun script ve ayar dosyalarını indirmesini sağlar. Lisans kontrolü ve IP sınırlaması içerir.")
 async def download_file(
-    publicId: str, 
-    ip: str, 
-    type: str, 
-    filename: str,
+    publicId: str = Query(..., description="Kullanıcının lisans anahtarı (Public ID)"), 
+    ip: str = Query(..., description="Botun çalıştığı karakterin IP adresi"), 
+    type: str = Query(..., description="Dosya türü (CARAVAN veya SC)"), 
+    filename: str = Query(..., description="İndirilmek istenen dosya adı"),
     db: Session = Depends(get_db)
 ):
+
     # 1. Validate User
     user = db.query(models.User).filter(models.User.public_id == publicId, models.User.is_active == True).first()
     if not user:
@@ -197,9 +213,13 @@ async def download_file(
 
     return FileResponse(file_path)
 
-@app.get("/api/validate")
-async def validate_connection(publicId: str, ip: str, db: Session = Depends(get_db)):
-    """Used by the client to check if they are still authorized."""
+@app.get("/api/validate", tags=["Bot API"], summary="Bağlantı Doğrulama", description="Botun hala aktif bir oturuma sahip olup olmadığını kontrol eder. 2 karakter limiti aşıldığında burası hata döner.")
+async def validate_connection(
+    publicId: str = Query(..., description="Kullanıcının lisans anahtarı"), 
+    ip: str = Query(..., description="Karakter IP adresi"), 
+    db: Session = Depends(get_db)
+):
+
     user = db.query(models.User).filter(models.User.public_id == publicId, models.User.is_active == True).first()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid Public ID")
@@ -216,13 +236,14 @@ async def validate_connection(publicId: str, ip: str, db: Session = Depends(get_
     db.commit()
     return {"status": "ok", "message": "Authorized"}
 
-@app.get("/api/list")
+@app.get("/api/list", tags=["Bot API"], summary="Dosya Listesi", description="Sunucuda bulunan güncel script ve ayar dosyalarının listesini döndürür.")
 async def list_files_public(
-    publicId: str, 
-    ip: str, 
-    type: str, 
+    publicId: str = Query(..., description="Lisans anahtarı"), 
+    ip: str = Query(..., description="IP adresi"), 
+    type: str = Query(..., description="İndirilebilir dosya türü"), 
     db: Session = Depends(get_db)
 ):
+
     """Public endpoint for the bot to list files of a certain type."""
     # Validate License
     user = db.query(models.User).filter(models.User.public_id == publicId, models.User.is_active == True).first()

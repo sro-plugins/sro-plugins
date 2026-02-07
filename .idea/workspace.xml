@@ -42,6 +42,9 @@
   &quot;associatedIndex&quot;: 8
 }</component>
   <component name="ProjectId" id="39CgP7qs1H0hnvlya1XbR3XbRwq" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -91,7 +94,7 @@
       <updated>1770205439669</updated>
       <workItem from="1770205440701" duration="8835000" />
       <workItem from="1770408206819" duration="7973000" />
-      <workItem from="1770469985394" duration="1515000" />
+      <workItem from="1770469985394" duration="1916000" />
     </task>
     <task id="LOCAL-00001" summary="vps test">
       <option name="closed" value="true" />
@@ -341,7 +344,23 @@
       <option name="project" value="LOCAL" />
       <updated>1770471424817</updated>
     </task>
-    <option name="localTasksCounter" value="32" />
+    <task id="LOCAL-00032" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770471787414</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1770471787414</updated>
+    </task>
+    <task id="LOCAL-00033" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770471873961</created>
+      <option name="number" value="00033" />
+      <option name="presentableId" value="LOCAL-00033" />
+      <option name="project" value="LOCAL" />
+      <updated>1770471873961</updated>
+    </task>
+    <option name="localTasksCounter" value="34" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
