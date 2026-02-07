@@ -8,11 +8,10 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements if we had a requirements.txt, 
-# but since it's a small app we'll install directly to keep it simple or create one
+# Install python dependencies
 RUN pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic python-multipart python-dotenv
 
-# Copy application code
+# Copy application code (now in root)
 COPY . .
 
 # Create directory for files if they don't exist

@@ -4,14 +4,80 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="vps test" />
+    <list default="true" id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="vps test">
+      <change afterPath="$PROJECT_DIR$/.env" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/database.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/(SRO-R)Jangan_Hotan_Hunter.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/1a_Downhang_to_Hotan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/1a_Downhang_to_Hotan_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/1b_Hotan_to_Downhang.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/1b_Hotan_to_Downhang_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/2a_Downhang_to_Jangan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/2a_Downhang_to_Jangan_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/2b_Jangan_to_Downhang.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/2b_Jangan_to_Downhang_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/3a_Downhang_to_Hotan_Oasis_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/3b_Hotan_to_Downhang_Oasis_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/4a_Alexandria_to_Jangan_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/4b_Jangan_To_Alexandria_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/5a_Hotan_Samarkand_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/5b_Samarkand_Hotan_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/6a_Alex_to_Samarkand_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/6b_Samarkand_to_Alex_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/7a_Special_Togui_Beginning_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/7a_Special_Tougue_Beginning_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/7b_Special_Togui_Ending_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/7b_Special_Tougue_Ending_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/8a_Hontan_to_Jangan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/8a_Hontan_to_Jangan_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/8a_Hotan_to_Jangan_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/8b_Jangan_to_Hotan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/8b_Jangan_to_Hotan_PHBOT.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Alex_to_Jangan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Alex_to_Samar.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Bandit_To_Cons_NOSTUCk.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Bandit_To_Cons_special_trade_underworld.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Bandit_to_Alex.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Cons_to_Samar.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Donwhang_to_Hotan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Donwhang_to_Hotan_Oasis.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Donwhang_to_Jangan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Hotan_to_Donwhang.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Hotan_to_Donwhang_Oasis.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Hotan_to_Jangan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Hotan_to_Samar.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Jangan_to_Donwhang.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Jangan_to_Hotan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Samar_To_Hotan.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/caravan/Samar_to_Alex.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/sc/garden-dungeon-wizz-cleric.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/sc/garden-dungeon.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/files/sc/versions.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/models.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/app.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/index.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/public/style.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/.env" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/Dockerfile" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/database.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/docker-compose.yml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/files/sc/garden-dungeon.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/main.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/models.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/public/app.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/public/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/user-manager-system/public/style.css" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="2353" />
+    <option name="cachedIndexableFilesCount" value="65" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="Git.Settings">
@@ -55,6 +121,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "vps",
     "javascript.preferred.runtime.type.id": "node",
     "junie.onboarding.icon.badge.shown": "true",
     "last_opened_file_path": "/Users/hamurcuabi/Documents/SroBot",
@@ -90,6 +157,7 @@
       <updated>1770205439669</updated>
       <workItem from="1770205440701" duration="8835000" />
       <workItem from="1770408206819" duration="7973000" />
+      <workItem from="1770469985394" duration="542000" />
     </task>
     <task id="LOCAL-00001" summary="vps test">
       <option name="closed" value="true" />
@@ -283,7 +351,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770409404053</updated>
     </task>
-    <option name="localTasksCounter" value="25" />
+    <task id="LOCAL-00025" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770470203263</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1770470203263</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
