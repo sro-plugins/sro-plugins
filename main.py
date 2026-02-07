@@ -196,7 +196,7 @@ async def validate_connection(publicId: str, ip: str, db: Session = Depends(get_
     """Used by the client to check if they are still authorized."""
     user = db.query(models.User).filter(models.User.public_id == publicId, models.User.is_active == True).first()
     if not user:
-        return JSONResponse(status_code=401, content={"detail": "Invalid Public ID"})
+        raise HTTPException(status_code=401, detail="Invalid Public ID")
 
     session = db.query(models.ActiveSession).filter(
         models.ActiveSession.user_id == user.id,
@@ -204,13 +204,48 @@ async def validate_connection(publicId: str, ip: str, db: Session = Depends(get_
     ).first()
 
     if not session:
-        return JSONResponse(status_code=401, content={"detail": "Session terminated (Max 2 connections exceeded elsewhere)"})
+        raise HTTPException(status_code=401, detail="Session terminated")
 
     session.last_active = datetime.utcnow()
     db.commit()
     return {"status": "ok", "message": "Authorized"}
 
+@app.get("/api/list")
+async def list_files_public(
+    publicId: str, 
+    ip: str, 
+    type: str, 
+    db: Session = Depends(get_db)
+):
+    """Public endpoint for the bot to list files of a certain type."""
+    # Validate License
+    user = db.query(models.User).filter(models.User.public_id == publicId, models.User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    # Check session
+    session = db.query(models.ActiveSession).filter(
+        models.ActiveSession.user_id == user.id,
+        models.ActiveSession.ip_address == ip
+    ).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="No active session")
+
+    # List files
+    if type.upper() not in enum_files:
+        raise HTTPException(status_code=400, detail="Invalid type")
+    
+    file_dir = enum_files[type.upper()]
+    if not os.path.exists(file_dir):
+        return []
+    
+    files = os.listdir(file_dir)
+    # Filter for scripts/jsons
+    files = [f for f in files if f.endswith(('.txt', '.json'))]
+    return sorted(files)
+
 # Serve static files (Mounting at the end to avoid capturing API routes)
+
 app.mount("/static", StaticFiles(directory="public"), name="static")
 app.mount("/admin", StaticFiles(directory="public", html=True), name="admin")
 

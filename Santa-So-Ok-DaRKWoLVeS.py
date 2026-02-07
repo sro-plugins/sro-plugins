@@ -24,6 +24,9 @@ DIMENSIONAL_COOLDOWN_DELAY = 7200  # saniye (2 saat)
 WAIT_DROPS_DELAY_MAX = 10  # saniye
 COUNT_MOBS_DELAY = 1.0  # saniye
 
+CARAVAN_SCRIPTS_FOLDER = 'PHBOT Caravan SC'
+
+
 # License System Configuration
 LICENSE_SERVER_URL = 'https://vps.sro-plugins.cloud'
 LICENSE_KEY = '' # Saved in config
@@ -51,8 +54,22 @@ def _api_get_file(enum_type, filename):
         with urllib.request.urlopen(req, timeout=15) as r:
             return r.read()
     except Exception as ex:
-        log('[%s] API Hatası: %s' % (pName, str(ex)))
+        log('[%s] API Dosya Hatası: %s' % (pName, str(ex)))
         return None
+
+def _api_get_list(enum_type):
+    try:
+        my_ip = _get_my_ip()
+        url = "%s/api/list?publicId=%s&ip=%s&type=%s" % (
+            LICENSE_SERVER_URL, LICENSE_KEY, my_ip, enum_type
+        )
+        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read().decode('utf8'))
+    except Exception as ex:
+        log('[%s] API Liste Hatası: %s' % (pName, str(ex)))
+        return []
+
 
 # Bu eklenti sürümüyle birlikte gelen script versiyonları (kullanıcı manipüle edemez).
 # Repo'da script + versions.json güncellediğinde burayı da aynı versiyonlara çek ve eklenti sürümünü yayınla.
@@ -209,29 +226,14 @@ def _caravan_filename_to_display_name(filename):
     return from_name + ' --> ' + to_name
 
 def _fetch_caravan_script_list():
-    """GitHub API veya yerel klasör ile PHBOT Caravan SC .txt listesini döndürür."""
-    # GitHub API: path quote ile encode, ref=main ile branch belirt
-    path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
-    api_url = 'https://api.github.com/repos/%s/contents/%s?ref=%s' % (
-        GITHUB_REPO, path_encoded, GITHUB_CARAVAN_BRANCH
-    )
+    """Lisans sunucusu üzerinden Karavan scriptlerini listeler."""
     try:
-        req = urllib.request.Request(
-            api_url,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0', 'Accept': 'application/vnd.github.v3+json'}
-        )
-        with urllib.request.urlopen(req, timeout=12) as r:
-            data = json.loads(r.read().decode('utf-8'))
-        names = []
-        for item in (data if isinstance(data, list) else []):
-            if isinstance(item, dict) and item.get('type') == 'file':
-                name = item.get('name') or ''
-                if name.endswith('.txt'):
-                    names.append(name)
-        names.sort(key=lambda x: x.lower())
-        return names
+        names = _api_get_list('CARAVAN')
+        if names:
+            return names
     except Exception as ex:
-        log('[%s] [Oto-Kervan] GitHub listesi alınamadı: %s' % (pName, str(ex)))
+        log('[%s] [Oto-Kervan] Sunucudan liste alınamadı: %s' % (pName, str(ex)))
+
     # Fallback: yerel PHBOT Caravan SC klasöründeki .txt dosyaları
     folder = _get_caravan_script_folder()
     if os.path.isdir(folder):
@@ -247,7 +249,8 @@ def _fetch_caravan_script_list():
 
 def _get_caravan_script_folder():
     """Oto Kervan scriptlerinin yerel klasör yolunu döndürür (plugin ile aynı dizinde)."""
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), GITHUB_CARAVAN_FOLDER)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), CARAVAN_SCRIPTS_FOLDER)
+
 
 def _download_caravan_script(filename):
     """GitHub'dan tek bir karavan scriptini indirir; yerel yol döndürür veya False."""
@@ -256,9 +259,9 @@ def _download_caravan_script(filename):
         if not os.path.exists(folder):
             os.makedirs(folder)
         script_path = os.path.join(folder, filename)
-        path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
         script_content = _api_get_file('CARAVAN', filename)
         if not script_content or len(script_content) < 10:
+
             return False
         with open(script_path, 'wb') as f:
             f.write(script_content)
@@ -305,30 +308,19 @@ def _save_local_script_versions(versions):
         return False
 
 def _check_script_updates():
-    """GitHub'daki script versiyonlarını kontrol eder ve gerekirse günceller"""
+    """Lisans sunucusu üzerinden script versiyonlarını kontrol eder ve gerekirse günceller"""
     try:
-        log('[%s] [Script-Update] Garden Script güncellemeleri kontrol ediliyor...' % pName)
+        log('[%s] [Script-Update] Script güncellemeleri kontrol ediliyor...' % pName)
         
-        # GitHub'dan versions.json'ı indir (CDN cache bypass: no-cache + benzersiz query)
-        cache_buster = str(int(time.time())) + '_' + str(id(object()))
-        url_with_cache_buster = GITHUB_SCRIPT_VERSIONS_URL + '?v=' + cache_buster
-        req = urllib.request.Request(
-            url_with_cache_buster,
-            headers={
-                'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-            }
-        )
+        # Sunucudan versions.json çek
+        versions_content = _api_get_file('SC', 'versions.json')
         
-        with urllib.request.urlopen(req, timeout=15) as r:
-            github_versions_data = r.read()
-        
-        if not github_versions_data:
-            log('[%s] [Script-Update] GitHub versions.json indirilemedi' % pName)
+        if not versions_content:
+            log('[%s] [Script-Update] Sunucudan versions.json alınamadı' % pName)
             return False
         
-        github_versions = json.loads(github_versions_data.decode('utf-8'))
+        github_versions = json.loads(versions_content.decode('utf-8'))
+
         local_versions = _get_local_script_versions()
         sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
         updated_count = 0
