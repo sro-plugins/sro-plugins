@@ -4,7 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="vps test" />
+    <list default="true" id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="vps test">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/public/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/public/index.html" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -94,7 +98,7 @@
       <updated>1770205439669</updated>
       <workItem from="1770205440701" duration="8835000" />
       <workItem from="1770408206819" duration="7973000" />
-      <workItem from="1770469985394" duration="1916000" />
+      <workItem from="1770469985394" duration="2376000" />
     </task>
     <task id="LOCAL-00001" summary="vps test">
       <option name="closed" value="true" />
@@ -360,7 +364,31 @@
       <option name="project" value="LOCAL" />
       <updated>1770471873961</updated>
     </task>
-    <option name="localTasksCounter" value="34" />
+    <task id="LOCAL-00034" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770471986168</created>
+      <option name="number" value="00034" />
+      <option name="presentableId" value="LOCAL-00034" />
+      <option name="project" value="LOCAL" />
+      <updated>1770471986168</updated>
+    </task>
+    <task id="LOCAL-00035" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770472001467</created>
+      <option name="number" value="00035" />
+      <option name="presentableId" value="LOCAL-00035" />
+      <option name="project" value="LOCAL" />
+      <updated>1770472001467</updated>
+    </task>
+    <task id="LOCAL-00036" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770472130391</created>
+      <option name="number" value="00036" />
+      <option name="presentableId" value="LOCAL-00036" />
+      <option name="project" value="LOCAL" />
+      <updated>1770472130391</updated>
+    </task>
+    <option name="localTasksCounter" value="37" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
