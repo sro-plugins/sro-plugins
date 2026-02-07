@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,9 +11,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
     <div class="background-animation"></div>
-    
+
     <div class="dashboard-container">
         <aside class="sidebar">
             <div class="logo">
@@ -20,14 +22,18 @@
                 <span>SRO Manager</span>
             </div>
             <nav>
-                <div class="nav-item active">
+                <div class="nav-item active" id="usersTab">
                     <i class="fas fa-users"></i>
                     <span>User Management</span>
                 </div>
-                <!-- <div class="nav-item">
-                    <i class="fas fa-file-export"></i>
-                    <span>File Config</span>
-                </div> -->
+                <div class="nav-item" id="testerTab">
+                    <i class="fas fa-flask"></i>
+                    <span>Download Tester</span>
+                </div>
+                <div class="nav-item" id="logoutBtn" style="color: #ff006e;">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </div>
             </nav>
             <div class="sidebar-footer">
                 <div class="status-indicator">
@@ -49,44 +55,97 @@
                 </div>
             </header>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon purple"><i class="fas fa-user-check"></i></div>
-                    <div class="stat-info">
-                        <h3>Total Users</h3>
-                        <p id="totalUsers">0</p>
+            <div id="usersSection">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon purple"><i class="fas fa-user-check"></i></div>
+                        <div class="stat-info">
+                            <h3>Total Users</h3>
+                            <p id="totalUsers">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon blue"><i class="fas fa-tower-broadcast"></i></div>
+                        <div class="stat-info">
+                            <h3>Active Sessions</h3>
+                            <p id="activeSessions">Online</p>
+                        </div>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon blue"><i class="fas fa-tower-broadcast"></i></div>
-                    <div class="stat-info">
-                        <h3>Active Sessions</h3>
-                        <p id="activeSessions">0</p>
-                    </div>
+
+                <div class="table-container glass">
+                    <table id="userTable">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Public ID / Key</th>
+                                <th>Created Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userList">
+                            <tr id="loadingRow">
+                                <td colspan="5" style="text-align: center; padding: 40px;">
+                                    <div class="spinner"></div>
+                                    Loading users...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <div class="table-container glass">
-                <table id="userTable">
-                    <thead>
-                        <tr>
-                            <th>Username</th>
-                            <th>Public ID / Key</th>
-                            <th>Created Date</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="userList">
-                        <!-- Users will be injected here -->
-                        <tr id="loadingRow">
-                            <td colspan="5" style="text-align: center; padding: 40px;">
-                                <div class="spinner"></div>
-                                Loading users...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- Tester Section -->
+            <div id="testerSection" style="display: none;">
+                <div class="glass" style="padding: 40px; border-radius: 24px; max-width: 600px; margin: 0 auto;">
+                    <h2 style="margin-bottom: 25px;"><i class="fas fa-flask"></i> API Download Tester</h2>
+                    <p style="color: var(--text-dim); margin-bottom: 30px;">
+                        Buradan botun dosya çekme isteğini simüle edebilirsiniz. Linki test etmek için bilgileri
+                        doldurun.
+                    </p>
+
+                    <div class="input-group">
+                        <label>Public ID (User License Key)</label>
+                        <input type="text" id="testPublicId" placeholder="User Public ID girin...">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Client IP Address</label>
+                        <input type="text" id="testIp" value="127.0.0.1">
+                    </div>
+
+                    <div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 20px;">
+                        <div class="input-group" style="margin-bottom:0">
+                            <label>File Type</label>
+                            <select id="testType"
+                                style="width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; color: #fff; outline: none;">
+                                <option value="CARAVAN">CARAVAN</option>
+                                <option value="SC">SC</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin-bottom:0">
+                            <label>Filename</label>
+                            <input type="text" id="testFilename" placeholder="örn: garden-dungeon.txt">
+                        </div>
+                    </div>
+
+                    <button class="btn primary" style="width: 100%; justify-content: center; height: 55px;"
+                        onclick="testDownload()">
+                        <i class="fas fa-download"></i> Download Linkini Test Et
+                    </button>
+
+                    <div id="testResult" style="margin-top: 25px; display: none;">
+                        <label style="display: block; margin-bottom: 10px; color: var(--text-dim);">Oluşturulan API
+                            URL:</label>
+                        <div class="key-badge" id="testUrlResult"
+                            style="word-break: break-all; font-size: 13px; margin-bottom: 15px;"></div>
+                        <a id="testDownloadLink" href="#" target="_blank" class="btn secondary"
+                            style="justify-content: center;">
+                            Dosyayı Yeni Sekmede Aç
+                        </a>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -108,4 +167,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>

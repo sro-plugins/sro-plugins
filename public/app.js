@@ -8,8 +8,15 @@ const elements = {
     userModal: document.getElementById('userModal'),
     closeModal: document.getElementById('closeModal'),
     saveUser: document.getElementById('saveUser'),
-    usernameInput: document.getElementById('usernameInput')
+    usernameInput: document.getElementById('usernameInput'),
+    logoutBtn: document.getElementById('logoutBtn'),
+    usersTab: document.getElementById('usersTab'),
+    testerTab: document.getElementById('testerTab'),
+    usersSection: document.getElementById('usersSection'),
+    testerSection: document.getElementById('testerSection')
 };
+
+
 
 // State
 let users = [];
@@ -18,6 +25,10 @@ let users = [];
 async function fetchUsers() {
     try {
         const response = await fetch(`${apiBase}/users`);
+        if (response.status === 401) {
+            window.location.href = '/';
+            return;
+        }
         users = await response.json();
         renderUsers();
         updateStats();
@@ -25,6 +36,7 @@ async function fetchUsers() {
         console.error('Error fetching users:', error);
     }
 }
+
 
 // Render Users to Table
 function renderUsers() {
@@ -121,8 +133,54 @@ function closeModal() {
     elements.userModal.style.display = 'none';
 }
 
+// Tab Switching
+function showTab(tabName) {
+    if (tabName === 'users') {
+        elements.usersTab.classList.add('active');
+        elements.testerTab.classList.remove('active');
+        elements.usersSection.style.display = 'block';
+        elements.testerSection.style.display = 'none';
+        fetchUsers();
+    } else {
+        elements.testerTab.classList.add('active');
+        elements.usersTab.classList.remove('active');
+        elements.usersSection.style.display = 'none';
+        elements.testerSection.style.display = 'block';
+    }
+}
+
+// Download Tester
+function testDownload() {
+    const publicId = document.getElementById('testPublicId').value;
+    const ip = document.getElementById('testIp').value;
+    const type = document.getElementById('testType').value;
+    const filename = document.getElementById('testFilename').value;
+
+    if (!publicId || !filename) {
+        alert('Lütfen Public ID ve Filename alanlarını doldurun!');
+        return;
+    }
+
+    const testUrl = `${window.location.origin}/api/download?publicId=${publicId}&ip=${ip}&type=${type}&filename=${filename}`;
+
+    document.getElementById('testUrlResult').textContent = testUrl;
+    document.getElementById('testDownloadLink').href = testUrl;
+    document.getElementById('testResult').style.display = 'block';
+}
+
+// Logout
+async function doLogout() {
+    await fetch('/auth/logout', { method: 'POST' });
+    window.location.href = '/';
+}
+
 // Event Listeners
+if (elements.logoutBtn) elements.logoutBtn.addEventListener('click', doLogout);
+if (elements.usersTab) elements.usersTab.addEventListener('click', () => showTab('users'));
+if (elements.testerTab) elements.testerTab.addEventListener('click', () => showTab('tester'));
 elements.createUserBtn.addEventListener('click', openModal);
+
+
 elements.closeModal.addEventListener('click', closeModal);
 elements.saveUser.addEventListener('click', saveUser);
 

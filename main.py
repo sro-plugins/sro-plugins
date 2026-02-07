@@ -1,7 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException, Query, Request, status
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, status, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
 import os
 import uuid
@@ -12,6 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 import models
 from database import SessionLocal, engine, Base
 
@@ -20,23 +20,57 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="SRO User Manager System")
 
-security = HTTPBasic()
+# Simple In-Memory Session Storage (For production, use Redis or DB)
+active_admin_sessions = set()
 
 # Admin Credentials from .env
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "sro123456")
 
-def authenticate_admin(credentials: HTTPBasicCredentials = Depends(security)):
-    if credentials.username != ADMIN_USERNAME or credentials.password != ADMIN_PASSWORD:
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+def authenticate_admin(request: Request):
+    session_id = request.cookies.get("admin_session")
+    if not session_id or session_id not in active_admin_sessions:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Basic"},
+            detail="Not authenticated",
         )
-    return credentials.username
+    return True
+
+@app.get("/")
+async def root_redirect(request: Request):
+    session_id = request.cookies.get("admin_session")
+    if session_id and session_id in active_admin_sessions:
+        return RedirectResponse(url="/admin")
+    return FileResponse("public/login.html")
+
+@app.post("/auth/login")
+async def login(response: Response, login_data: LoginRequest):
+    if login_data.username == ADMIN_USERNAME and login_data.password == ADMIN_PASSWORD:
+        session_id = str(uuid.uuid4())
+        active_admin_sessions.add(session_id)
+        response.set_cookie(
+            key="admin_session", 
+            value=session_id, 
+            httponly=True, 
+            samesite="lax",
+            max_age=3600 * 24 # 24 hours
+        )
+        return {"message": "Logged in"}
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+@app.post("/auth/logout")
+async def logout(request: Request, response: Response):
+    session_id = request.cookies.get("admin_session")
+    if session_id in active_admin_sessions:
+        active_admin_sessions.remove(session_id)
+    response.delete_cookie("admin_session")
+    return {"message": "Logged out"}
 
 # Serve static files for admin dashboard
-# We mount this AFTER the api routes to avoid overlap issues if needed
 app.mount("/admin", StaticFiles(directory="public", html=True), name="admin")
 
 
@@ -65,7 +99,7 @@ class UserResponse(BaseModel):
 # --- ADMIN ROUTES ---
 
 @app.post("/admin/api/users", response_model=UserResponse)
-def create_user(user: UserCreate, db: Session = Depends(get_db), admin: str = Depends(authenticate_admin)):
+def create_user(user: UserCreate, db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
     db_user = models.User(username=user.username)
     db.add(db_user)
     db.commit()
@@ -73,11 +107,12 @@ def create_user(user: UserCreate, db: Session = Depends(get_db), admin: str = De
     return db_user
 
 @app.get("/admin/api/users", response_model=List[UserResponse])
-def get_users(db: Session = Depends(get_db), admin: str = Depends(authenticate_admin)):
+def get_users(db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
     return db.query(models.User).all()
 
 @app.delete("/admin/api/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db), admin: str = Depends(authenticate_admin)):
+def delete_user(user_id: int, db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
+
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
