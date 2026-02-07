@@ -70,8 +70,8 @@ async def logout(request: Request, response: Response):
     response.delete_cookie("admin_session")
     return {"message": "Logged out"}
 
-# Serve static files for admin dashboard
-app.mount("/admin", StaticFiles(directory="public", html=True), name="admin")
+# Dependency
+
 
 
 # Dependency
@@ -199,6 +199,10 @@ async def validate_connection(publicId: str, ip: str, db: Session = Depends(get_
     session.last_active = datetime.utcnow()
     db.commit()
     return {"status": "ok", "message": "Authorized"}
+
+# Serve static files (Mounting at the end to avoid capturing API routes)
+app.mount("/static", StaticFiles(directory="public"), name="static")
+app.mount("/admin", StaticFiles(directory="public", html=True), name="admin")
 
 if __name__ == "__main__":
     import uvicorn
