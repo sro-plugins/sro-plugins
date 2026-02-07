@@ -18,7 +18,13 @@ from database import SessionLocal, engine, Base
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="SRO User Manager System")
+app = FastAPI(
+    title="SRO License & User Manager",
+    description="Admin panel ve Bot API'leri için merkezi yönetim sistemi.",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
 
 # Simple In-Memory Session Storage (For production, use Redis or DB)
 active_admin_sessions = set()
