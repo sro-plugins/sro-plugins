@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="vps test" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="2353" />
+    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="main" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;hamurcuabi&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/sro-plugins/sro-plugins.git&quot;,
+    &quot;accountId&quot;: &quot;27f8e8ac-5ed0-479f-8d64-bfdbbf869d14&quot;
+  }
+}</component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 8
+}</component>
+  <component name="ProjectId" id="39CgP7qs1H0hnvlya1XbR3XbRwq" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "javascript.preferred.runtime.type.id": "node",
+    "junie.onboarding.icon.badge.shown": "true",
+    "last_opened_file_path": "/Users/hamurcuabi/Documents/SroBot",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecapSpentCounter">
+    <option name="endsOfQuotaMs" value="1770724894184" />
+    <option name="spentUsd" value="0.034430098" />
+  </component>
+  <component name="RecapUselessUpdatesCounter">
+    <option name="suspendCountdown" value="0" />
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-WS-253.29346.143" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="" />
+      <created>1770205439669</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1770205439669</updated>
+      <workItem from="1770205440701" duration="8835000" />
+      <workItem from="1770408206819" duration="7973000" />
+    </task>
+    <task id="LOCAL-00001" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770206162357</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1770206162357</updated>
+    </task>
+    <task id="LOCAL-00002" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770206474499</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1770206474499</updated>
+    </task>
+    <task id="LOCAL-00003" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770207651664</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1770207651664</updated>
+    </task>
+    <task id="LOCAL-00004" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770207714688</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1770207714688</updated>
+    </task>
+    <task id="LOCAL-00005" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770207916879</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1770207916879</updated>
+    </task>
+    <task id="LOCAL-00006" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770207995173</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1770207995173</updated>
+    </task>
+    <task id="LOCAL-00007" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770208255083</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1770208255083</updated>
+    </task>
+    <task id="LOCAL-00008" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770228477436</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1770228477436</updated>
+    </task>
+    <task id="LOCAL-00009" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770229054368</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1770229054368</updated>
+    </task>
+    <task id="LOCAL-00010" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770229413564</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1770229413564</updated>
+    </task>
+    <task id="LOCAL-00011" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770229825639</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1770229825639</updated>
+    </task>
+    <task id="LOCAL-00012" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770229980691</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1770229980691</updated>
+    </task>
+    <task id="LOCAL-00013" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770230096914</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1770230096914</updated>
+    </task>
+    <task id="LOCAL-00014" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770230166736</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1770230166736</updated>
+    </task>
+    <task id="LOCAL-00015" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770230607587</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1770230607587</updated>
+    </task>
+    <task id="LOCAL-00016" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770231109362</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1770231109362</updated>
+    </task>
+    <task id="LOCAL-00017" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770232268907</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1770232268907</updated>
+    </task>
+    <task id="LOCAL-00018" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770232464345</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1770232464345</updated>
+    </task>
+    <task id="LOCAL-00019" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770232824054</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1770232824054</updated>
+    </task>
+    <task id="LOCAL-00020" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770233091322</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1770233091322</updated>
+    </task>
+    <task id="LOCAL-00021" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770233247431</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1770233247431</updated>
+    </task>
+    <task id="LOCAL-00022" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770408277799</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1770408277799</updated>
+    </task>
+    <task id="LOCAL-00023" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770408905130</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1770408905130</updated>
+    </task>
+    <task id="LOCAL-00024" summary="vps test">
+      <option name="closed" value="true" />
+      <created>1770409404053</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1770409404053</updated>
+    </task>
+    <option name="localTasksCounter" value="25" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
+    <option name="CHECK_NEW_TODO" value="false" />
+    <MESSAGE value="vps test" />
+    <option name="LAST_COMMIT_MESSAGE" value="vps test" />
+  </component>
+</project>

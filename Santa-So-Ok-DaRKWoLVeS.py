@@ -24,25 +24,36 @@ DIMENSIONAL_COOLDOWN_DELAY = 7200  # saniye (2 saat)
 WAIT_DROPS_DELAY_MAX = 10  # saniye
 COUNT_MOBS_DELAY = 1.0  # saniye
 
+# License System Configuration
+LICENSE_SERVER_URL = 'http://76.13.141.75:8000' # Change this to your server IP
+LICENSE_KEY = '' # Saved in config
+
 GITHUB_REPO = 'sro-plugins/sro-plugins'
 GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_REPO
 GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
 GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
-GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
-GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
-GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
-# Oto Kervan: GitHub'daki karavan scriptleri klasörü (API ile liste, raw ile indirme)
-# GitHub'da klasör yoksa veya 404 alırsa yerel "PHBOT Caravan SC" klasörü kullanılır (plugin yanında).
-GITHUB_CARAVAN_FOLDER = 'PHBOT Caravan SC'
-GITHUB_CARAVAN_BRANCH = 'main'
-# API URL _fetch_caravan_script_list içinde quote ile oluşturulur (400 hatası önlemi)
-# Raw template: tek format çağrısında (repo, branch, filename)
-GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE = 'https://raw.githubusercontent.com/%s/%s/%s/%s'
-# Karavan profili (sadece JSON): repoda profile/ServerName_CharName.karavan.json (şablon); indirilince Config'e Server_CharName.karavan.json olarak kaydedilir.
-# JSON = Komut/kasılma alanı (Training, Script, Radius, Skip Town Script).
-GITHUB_CARAVAN_PROFILE_FOLDER = 'profile'
-GITHUB_CARAVAN_PROFILE_JSON_FILENAME = 'ServerName_CharName.karavan.json'
-GITHUB_CARAVAN_PROFILE_DB3_FILENAME = 'caravan_profile.db3'
+
+def _get_my_ip():
+    try:
+        req = urllib.request.Request('https://api.ipify.org', headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.read().decode('utf8')
+    except:
+        return '127.0.0.1'
+
+def _api_get_file(enum_type, filename):
+    try:
+        my_ip = _get_my_ip()
+        url = "%s/api/download?publicId=%s&ip=%s&type=%s&filename=%s" % (
+            LICENSE_SERVER_URL, LICENSE_KEY, my_ip, enum_type, filename
+        )
+        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return r.read()
+    except Exception as ex:
+        log('[%s] API Hatası: %s' % (pName, str(ex)))
+        return None
+
 # Bu eklenti sürümüyle birlikte gelen script versiyonları (kullanıcı manipüle edemez).
 # Repo'da script + versions.json güncellediğinde burayı da aynı versiyonlara çek ve eklenti sürümünü yayınla.
 EMBEDDED_SCRIPT_VERSIONS = {
@@ -152,18 +163,14 @@ def _download_garden_script(script_type="normal"):
             os.makedirs(sc_folder)
             log('[%s] [Garden-Auto] sc klasörü oluşturuldu: %s' % (pName, sc_folder))
         
-        # GitHub'dan indir (cache bypass için timestamp ekle)
-        import time
-        cache_buster = int(time.time())
-        url_with_cache_buster = download_url + '?v=' + str(cache_buster)
+        log('[%s] [Garden-Auto] API\'den script indiriliyor... (Tür: %s)' % (pName, script_type))
         
-        req = urllib.request.Request(
-            url_with_cache_buster,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
-        )
+        script_content = _api_get_file('SC', script_filename)
         
-        with urllib.request.urlopen(req, timeout=15) as r:
-            script_content = r.read()
+        if not script_content:
+            log('[%s] [Garden-Auto] Script API\'den alınamadı!' % pName)
+            return False
+
         
         content_length = len(script_content) if script_content else 0
         log('[%s] [Garden-Auto] İndirilen boyut: %d byte' % (pName, content_length))
@@ -250,14 +257,12 @@ def _download_caravan_script(filename):
             os.makedirs(folder)
         script_path = os.path.join(folder, filename)
         path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
-        url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, filename)
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            content = r.read()
-        if not content or len(content) < 10:
+        script_content = _api_get_file('CARAVAN', filename)
+        if not script_content or len(script_content) < 10:
             return False
         with open(script_path, 'wb') as f:
-            f.write(content)
+            f.write(script_content)
+
         log('[%s] [Oto-Kervan] Script indirildi: %s' % (pName, filename))
         return script_path
     except Exception as ex:
@@ -2108,6 +2113,33 @@ def loadDefaultConfig():
     QtBind.setChecked(gui, cbxOnlyCountChampionParty, False)
     QtBind.setChecked(gui, cbxOnlyCountGiantParty, False)
     QtBind.setChecked(gui, cbxAcceptForgottenWorld, False)
+    QtBind.setText(gui, tbxLicenseKey, "")
+
+def btnSaveLicense_clicked():
+    global LICENSE_KEY
+    key = QtBind.text(gui, tbxLicenseKey).strip()
+    if key:
+        LICENSE_KEY = key
+        saveConfigs()
+        log('[%s] Lisans anahtarı kaydedildi. Sistem doğrulanıyor...' % pName)
+        threading.Thread(target=_validate_license_loop, daemon=True).start()
+    else:
+        log('[%s] Geçersiz lisans anahtarı!' % pName)
+
+def _validate_license_loop():
+    while True:
+        try:
+            my_ip = _get_my_ip()
+            url = "%s/api/validate?publicId=%s&ip=%s" % (LICENSE_SERVER_URL, LICENSE_KEY, my_ip)
+            req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.loads(r.read().decode('utf8'))
+            log('[%s] Lisans Doğrulama: %s' % (pName, data.get('message', 'Tamam')))
+        except Exception as ex:
+            log('[%s] Lisans Hatası: %s' % (pName, str(ex)))
+            # Optional: Stop features if 401
+        time.sleep(300) # her 5 dakikada bir kontrol
+
 
 def loadConfigs():
     loadDefaultConfig()
@@ -2115,11 +2147,16 @@ def loadConfigs():
         data = {}
         with open(getConfig(), "r") as f:
             data = json.load(f)
-        if "Ignore Names" in data:
-            global lstMobsData
-            lstMobsData = data["Ignore Names"]
-            for name in lstMobsData:
-                QtBind.append(gui, lstMobs, name)
+            if "License Key" in data:
+                global LICENSE_KEY
+                LICENSE_KEY = data["License Key"]
+                QtBind.setText(gui, tbxLicenseKey, LICENSE_KEY)
+            if "Ignore Names" in data:
+                global lstMobsData
+                lstMobsData = data["Ignore Names"]
+                for name in lstMobsData:
+                    QtBind.append(gui, lstMobs, name)
+
         if "Ignore Types" in data:
             global lstIgnore
             for t in data["Ignore Types"]:
@@ -2182,6 +2219,8 @@ def saveConfigs():
         data['Ignore Types'] = lstIgnore
         data['Ignore Names'] = lstMobsData
         data['Accept ForgottenWorld'] = QtBind.isChecked(gui, cbxAcceptForgottenWorld)
+        data['License Key'] = LICENSE_KEY
+
         with open(getConfig(), "w") as f:
             f.write(json.dumps(data, indent=4, sort_keys=True))
 
@@ -2194,6 +2233,7 @@ _tab3_widgets = []
 _tab4_widgets = []
 _tab5_widgets = []
 _tab6_widgets = []
+_tab7_widgets = []
 _current_tab = 1
 
 def _tab_move(widget_list, offscreen):
@@ -2273,19 +2313,23 @@ def _show_tab5():
     except Exception:
         pass
 
-def _show_tab6():
+def _show_tab7():
     global _current_tab
     _tab_move(_tab1_widgets, True)
     _tab_move(_tab2_widgets, True)
     _tab_move(_tab3_widgets, True)
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab5_widgets, True)
-    _tab_move(_tab6_widgets, False)
-    _current_tab = 6
+    _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, False)
+    _current_tab = 7
     try:
         QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + _tab_bar_h - 3)
     except Exception:
         pass
+
+def _add_tab7(w, x, y):
+    _tab7_widgets.append((w, x, y))
 
 def _add_tab1(w, x, y):
     _tab1_widgets.append((w, x, y))
@@ -2323,7 +2367,9 @@ QtBind.createButton(gui, '_show_tab2', 'Auto Dungeon', _tab_bar_x + 3 + _tab1_bt
 QtBind.createButton(gui, '_show_tab3', 'Garden Dungeon', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + 2)
 QtBind.createButton(gui, '_show_tab4', 'Auto Hwt', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w, _tab_bar_y + 2)
 QtBind.createButton(gui, '_show_tab5', 'Oto Kervan', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab6', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + 2)
+QtBind.createButton(gui, '_show_tab7', 'Lisans', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + 2)
+QtBind.createButton(gui, '_show_tab6', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w + _tab6_btn_w, _tab_bar_y + 2)
+
 _tab_indicator = QtBind.createList(gui, _tab_bar_x + 3, _tab_bar_y + _tab_bar_h - 3, _tab1_btn_w - 1, 4)
 
 _content_y = _tab_bar_y + _tab_bar_h - 1
@@ -2645,11 +2691,36 @@ _add_tab6(QtBind.createLabel(gui, '• Auto Hwt sistemi', _t3_x, _features_y + 1
 _add_tab6(QtBind.createLabel(gui, '• Oto Kervan sistemi', _t3_x, _features_y + 122), _t3_x, _features_y + 122)
 _add_tab6(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 142), _t3_x, _features_y + 142)
 
+# Tab 7 - Lisans
+_t7_container_x = _tab_bar_x + 100
+_t7_container_y = _content_y + 40
+_t7_container_w = 500
+_t7_container_h = 180
+
+_t7_container = QtBind.createList(gui, _t7_container_x, _t7_container_y, _t7_container_w, _t7_container_h)
+_add_tab7(_t7_container, _t7_container_x, _t7_container_y)
+
+_t7_x = _t7_container_x + 20
+_t7_y = _t7_container_y + 20
+
+_add_tab7(QtBind.createLabel(gui, '═════════════ Lisans Sistemi ═════════════', _t7_x, _t7_y), _t7_x, _t7_y)
+_add_tab7(QtBind.createLabel(gui, 'Botu kullanmak için size verilen Public ID (Lisans Anahtarı)\'nı girin.', _t7_x, _t7_y + 25), _t7_x, _t7_y + 25)
+
+_t7_input_y = _t7_y + 55
+_add_tab7(QtBind.createLabel(gui, 'Lisans Anahtarı:', _t7_x, _t7_input_y), _t7_x, _t7_input_y)
+tbxLicenseKey = QtBind.createLineEdit(gui, "", _t7_x + 100, _t7_input_y - 2, 350, 22)
+_add_tab7(tbxLicenseKey, _t7_x + 100, _t7_input_y - 2)
+
+_t7_btn_y = _t7_input_y + 40
+_add_tab7(QtBind.createButton(gui, 'btnSaveLicense_clicked', ' Lisansı Kaydet ve Doğrula ', _t7_x + 150, _t7_btn_y), _t7_x + 150, _t7_btn_y)
+
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
 _tab_move(_tab4_widgets, True)
 _tab_move(_tab5_widgets, True)
 _tab_move(_tab6_widgets, True)
+_tab_move(_tab7_widgets, True)
+
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
 threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()

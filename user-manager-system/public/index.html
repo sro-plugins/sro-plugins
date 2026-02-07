@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRO Bot | Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="background-animation"></div>
+    
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-shield-halved"></i>
+                <span>SRO Manager</span>
+            </div>
+            <nav>
+                <div class="nav-item active">
+                    <i class="fas fa-users"></i>
+                    <span>User Management</span>
+                </div>
+                <!-- <div class="nav-item">
+                    <i class="fas fa-file-export"></i>
+                    <span>File Config</span>
+                </div> -->
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="dot"></span> System Online
+                </div>
+            </div>
+        </aside>
+
+        <main class="content">
+            <header>
+                <div class="header-left">
+                    <h1>User Management</h1>
+                    <p>Generate and manage license keys for SRO Bot users.</p>
+                </div>
+                <div class="header-right">
+                    <button id="createUserBtn" class="btn primary">
+                        <i class="fas fa-plus"></i> Generate New User
+                    </button>
+                </div>
+            </header>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon purple"><i class="fas fa-user-check"></i></div>
+                    <div class="stat-info">
+                        <h3>Total Users</h3>
+                        <p id="totalUsers">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fas fa-tower-broadcast"></i></div>
+                    <div class="stat-info">
+                        <h3>Active Sessions</h3>
+                        <p id="activeSessions">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container glass">
+                <table id="userTable">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Public ID / Key</th>
+                            <th>Created Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userList">
+                        <!-- Users will be injected here -->
+                        <tr id="loadingRow">
+                            <td colspan="5" style="text-align: center; padding: 40px;">
+                                <div class="spinner"></div>
+                                Loading users...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create User Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content glass">
+            <h2>Add New User</h2>
+            <div class="input-group">
+                <label for="usernameInput">Username</label>
+                <input type="text" id="usernameInput" placeholder="Enter username...">
+            </div>
+            <div class="modal-actions">
+                <button class="btn secondary" id="closeModal">Cancel</button>
+                <button class="btn primary" id="saveUser">Generate Key</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
