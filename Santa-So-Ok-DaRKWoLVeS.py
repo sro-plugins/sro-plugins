@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from phBot import *
 import phBot
+import phBotChat
 import QtBind
 import math
 import threading
@@ -12,10 +13,14 @@ import shutil
 import urllib.request
 import urllib.parse
 import sqlite3
+import struct
+import signal
+import subprocess
+from datetime import datetime, timedelta
 
 pName = 'Santa-So-Ok-DaRKWoLVeS'
 PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
-pVersion = '1.4.0'
+pVersion = '1.5.0'
 
 MOVE_DELAY = 0.25
 
@@ -128,6 +133,22 @@ _caravan_script_path = ""
 _caravan_thread = None
 _caravan_stop_event = threading.Event()
 _caravan_lock = threading.Lock()
+
+# Script Komutları (TR_ScriptCommands) global değişkenleri
+_script_cmds_path = get_config_dir()[:-7]  # phBot ana klasör yolu
+_script_cmds_StartBotAt = 0
+_script_cmds_CloseBotAt = 0
+_script_cmds_CheckStartTime = False
+_script_cmds_CheckCloseTime = False
+_script_cmds_SkipCommand = False
+_script_cmds_delay_counter = 0
+_script_cmds_BtnStart = False
+_script_cmds_Recording = False
+_script_cmds_RecordedPackets = []
+_script_cmds_ExecutedPackets = []
+_script_cmds_Index = 0
+_script_cmds_StopBot = True
+_script_cmds_cbxShowPackets = None  # Tab 7'de oluşturulacak
 
 def _download_garden_script(script_type="normal"):
     """GitHub'dan garden-dungeon script dosyasını indirir"""
@@ -2185,6 +2206,383 @@ def saveConfigs():
         with open(getConfig(), "w") as f:
             f.write(json.dumps(data, indent=4, sort_keys=True))
 
+# ______________________________ Script Komutları (TR_ScriptCommands) ______________________________ #
+
+def _script_cmds_ResetSkip():
+    global _script_cmds_SkipCommand
+    _script_cmds_SkipCommand = False
+
+def LeaveParty(args):
+    if get_party():
+        inject_joymax(0x7061, b'', False)
+        log('[%s] Partiden çıkılıyor' % pName)
+    return 0
+
+def Notification(args):
+    if len(args) == 3:
+        title, message = args[1], args[2]
+        show_notification(title, message)
+        return 0
+    log('[%s] Hatalı Bildirim komutu' % pName)
+    return 0
+
+def NotifyList(args):
+    if len(args) == 2:
+        create_notification(args[1])
+        return 0
+    log('[%s] Hatalı NotifyList komutu' % pName)
+    return 0
+
+def PlaySound(args):
+    if len(args) < 2:
+        return 0
+    fname = args[1]
+    if os.path.exists(_script_cmds_path + fname):
+        play_wav(_script_cmds_path + fname)
+        log('[%s] [%s] oynatılıyor' % (pName, fname))
+        return 0
+    log('[%s] [%s] ses dosyası mevcut değil' % (pName, fname))
+    return 0
+
+def SetScript(args):
+    if len(args) < 2:
+        return 0
+    name = args[1]
+    if os.path.exists(_script_cmds_path + name):
+        set_training_script(_script_cmds_path + name)
+        log('[%s] Komut [%s] olarak değiştirildi' % (pName, name))
+        return 0
+    log('[%s] [%s] komutu mevcut değil' % (pName, name))
+    return 0
+
+def CloseBot(args):
+    global _script_cmds_CloseBotAt, _script_cmds_CheckCloseTime
+    _script_cmds_CheckCloseTime = True
+    if len(args) == 1:
+        _script_cmds_Terminate()
+        return 0
+    if len(args) < 3:
+        return 0
+    typ, tm = args[1], args[2]
+    if typ == 'in':
+        _script_cmds_CloseBotAt = str(datetime.now() + timedelta(minutes=int(tm)))[11:16]
+        log('[%s] Bot [%s] da kapatılacak' % (pName, _script_cmds_CloseBotAt))
+    elif typ == 'at':
+        _script_cmds_CloseBotAt = tm
+        log('[%s] Bot [%s] da kapatılacak' % (pName, _script_cmds_CloseBotAt))
+    return 0
+
+def _script_cmds_Terminate():
+    log('[%s] Bot kapatılıyor...' % pName)
+    os.kill(os.getpid(), 9)
+
+def GoClientless(args):
+    pid = (get_client() or {}).get('pid')
+    if pid:
+        os.kill(pid, signal.SIGTERM)
+        return 0
+    log('[%s] İstemci açık değil!' % pName)
+    return 0
+
+def StartBot(args):
+    global _script_cmds_StartBotAt, _script_cmds_CheckStartTime, _script_cmds_SkipCommand
+    if _script_cmds_SkipCommand:
+        _script_cmds_SkipCommand = False
+        return 0
+    stop_bot()
+    if len(args) < 3:
+        return 0
+    typ, tm = args[1], args[2]
+    _script_cmds_CheckStartTime = True
+    if typ == 'in':
+        _script_cmds_StartBotAt = str(datetime.now() + timedelta(minutes=int(tm)))[11:16]
+        log('[%s] Bot [%s] da başlatılacak' % (pName, _script_cmds_StartBotAt))
+    elif typ == 'at':
+        _script_cmds_StartBotAt = tm
+        log('[%s] Bot [%s] da başlatılacak' % (pName, _script_cmds_StartBotAt))
+    return 0
+
+def StopStart(args):
+    global _script_cmds_SkipCommand
+    if _script_cmds_SkipCommand:
+        _script_cmds_SkipCommand = False
+        return 0
+    stop_bot()
+    threading.Timer(1.0, start_bot, ()).start()
+    threading.Timer(30.0, _script_cmds_ResetSkip, ()).start()
+    _script_cmds_SkipCommand = True
+    return 0
+
+def StartTrace(args):
+    global _script_cmds_SkipCommand
+    if _script_cmds_SkipCommand:
+        _script_cmds_SkipCommand = False
+        return 0
+    if len(args) == 2:
+        stop_bot()
+        player = args[1]
+        if start_trace(player):
+            log('[%s] [%s] takip ediliyor' % (pName, player))
+            return 0
+        log('[%s] Oyuncu [%s] yakın değil.. Devam ediyor' % (pName, player))
+        _script_cmds_SkipCommand = True
+        threading.Timer(1.0, start_bot, ()).start()
+        threading.Timer(30.0, _script_cmds_ResetSkip, ()).start()
+        return 0
+    log('[%s] Hatalı StartTrace formatı' % pName)
+    return 0
+
+def RemoveSkill(args):
+    if len(args) < 2:
+        return 0
+    rem_skill = args[1]
+    skills = get_active_skills()
+    if skills:
+        for sid, skill in skills.items():
+            if skill.get('name') == rem_skill:
+                packet = b'\x01\x05' + struct.pack('<I', sid) + b'\x00'
+                inject_joymax(0x7074, packet, False)
+                log('[%s] [%s] yeteneği kaldırılıyor' % (pName, rem_skill))
+                return 0
+    log('[%s] Yetenek aktif değil' % pName)
+    return 0
+
+def Drop(args):
+    if len(args) < 2:
+        return 0
+    drop_item = args[1]
+    inv = get_inventory()
+    if not inv or 'items' not in inv:
+        return 0
+    for slot, item in enumerate(inv['items']):
+        if item and item.get('name') == drop_item:
+            p = b'\x07' + struct.pack('B', slot)
+            log('[%s] [%s][%s] eşyası bırakılıyor' % (pName, item.get('quantity', 1), drop_item))
+            inject_joymax(0x7034, p, True)
+            return 0
+    log('[%s] Bırakılacak eşya yok' % pName)
+    return 0
+
+def OpenphBot(args):
+    if len(args) < 2:
+        return 0
+    cmdargs = args[1]
+    if os.path.exists(_script_cmds_path + "phBot.exe"):
+        subprocess.Popen(_script_cmds_path + "phBot.exe " + cmdargs)
+        log('[%s] Yeni bir bot açılıyor' % pName)
+        return 0
+    log('[%s] Geçersiz bot yolu' % pName)
+    return 0
+
+def DismountPet(args):
+    if len(args) < 2:
+        return 0
+    pet_type = args[1].lower()
+    if pet_type == 'pick':
+        log('[%s] Pick pet inemez' % pName)
+        return 0
+    pets = get_pets()
+    if pets:
+        for pid, pet in pets.items():
+            if pet.get('type') == pet_type:
+                p = b'\x00' + struct.pack('I', pid)
+                inject_joymax(0x70CB, p, False)
+                return 0
+    return 0
+
+def UnsummonPet(args):
+    if len(args) < 2:
+        return 0
+    pet_type = args[1].lower()
+    pets = get_pets()
+    if pets:
+        for pid, pet in pets.items():
+            if pet.get('type') == pet_type:
+                p = struct.pack('I', pid)
+                if pet_type in ('transport', 'horse'):
+                    inject_joymax(0x70C6, p, False)
+                else:
+                    inject_joymax(0x7116, p, False)
+                log('[%s] [%s] pet geri çağrılıyor' % (pName, pet_type))
+                return 0
+    return 0
+
+def ResetWeapons(args):
+    items = 'all'
+    if len(args) == 2:
+        items = args[1].lower()
+    cfg_path = get_config_dir()
+    char_data = get_character_data()
+    if not char_data:
+        return 0
+    profile = get_profile()
+    cfg_file = "%s_%s.%s.json" % (char_data['server'], char_data['name'], profile) if profile else "%s_%s.json" % (char_data['server'], char_data['name'])
+    cfg_path = os.path.join(cfg_path, cfg_file)
+    if not os.path.exists(cfg_path):
+        return 0
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        if 'Inventory' not in cfg:
+            cfg['Inventory'] = {"Primary": 0, "Secondary": 0, "Shield": 0}
+        if items == 'all':
+            cfg['Inventory'] = {"Primary": 0, "Secondary": 0, "Shield": 0}
+        elif items == 'primary':
+            cfg['Inventory']['Primary'] = 0
+        elif items == 'secondary':
+            cfg['Inventory']['Secondary'] = 0
+        elif items == 'shield':
+            cfg['Inventory']['Shield'] = 0
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(cfg, indent=4, ensure_ascii=False))
+        log('[%s] Silahlar sıfırlandı' % pName)
+        set_profile(profile)
+    except Exception:
+        pass
+    return 0
+
+def SetArea(args):
+    if len(args) == 2:
+        set_training_area(args[1])
+        log('[%s] Eğitim alanı [%s] olarak değiştirildi' % (pName, args[1]))
+        return 0
+    log('[%s] Lütfen bir eğitim alanı ismi belirtin' % pName)
+    return 0
+
+def _script_cmds_CalcRadiusFromME(px, py):
+    my = get_position()
+    if not my:
+        return 999
+    return ((my['x'] - px) ** 2 + (my['y'] - py) ** 2) ** 0.5
+
+def ExchangePlayer(args):
+    if len(args) != 2:
+        log('[%s] Lütfen takas yapılacak bir oyuncu belirtin' % pName)
+        return 0
+    player_name = args[1]
+    party = get_party()
+    if not party:
+        log('[%s] Partide değilsiniz, takas yapılamaz' % pName)
+        return 0
+    for key, player in party.items():
+        if player.get('name') == player_name:
+            radius = _script_cmds_CalcRadiusFromME(player['x'], player['y'])
+            if player.get('player_id', 0) <= 0 or radius > 20:
+                log('[%s] Oyuncu [%s] menzil dışında! Takas yapılamaz' % (pName, player['name']))
+                return 0
+            log('[%s] [%s] ile takas başlatılıyor' % (pName, player['name']))
+            p = struct.pack('<I', player['player_id'])
+            inject_joymax(0x7081, p, True)
+            return 0
+    log('[%s] Oyuncu [%s] partide değil! Takas yapılamaz' % (pName, player_name))
+    return 0
+
+def ChangeBotOption(args):
+    if len(args) < 4 or len(args) > 6:
+        log('[%s] Hatalı format, ayar değiştirilemiyor.' % pName)
+        return 0
+    value = args[1]
+    cfg_path = get_config_dir()
+    char_data = get_character_data()
+    if not char_data:
+        return 0
+    profile = get_profile()
+    cfg_file = "%s_%s.%s.json" % (char_data['server'], char_data['name'], profile) if profile else "%s_%s.json" % (char_data['server'], char_data['name'])
+    cfg_path = os.path.join(cfg_path, cfg_file)
+    if not os.path.exists(cfg_path):
+        return 0
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        keys = args[2:]
+        try:
+            cur = cfg
+            for k in keys[:-1]:
+                cur = cur[k]
+            if isinstance(cur.get(keys[-1]), list):
+                cur[keys[-1]].append(value)
+            else:
+                cur[keys[-1]] = value
+        except (KeyError, TypeError):
+            log('[%s] Hatalı json anahtarı, ayar değiştirilemiyor' % pName)
+            return 0
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(cfg, indent=4, ensure_ascii=False))
+        log('[%s] Ayarlar başarıyla değiştirildi' % pName)
+        set_profile(profile)
+    except Exception:
+        pass
+    return 0
+
+def _script_cmds_GetPackets(name):
+    global _script_cmds_ExecutedPackets
+    custom_path = _script_cmds_path + "CustomNPC.json"
+    if not os.path.exists(custom_path):
+        return
+    with open(custom_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if name in data:
+        _script_cmds_ExecutedPackets = data[name].get('Packets', [])
+
+def _script_cmds_SaveNPCPackets(name, packets=None):
+    if packets is None:
+        packets = []
+    custom_path = _script_cmds_path + "CustomNPC.json"
+    data = {}
+    if os.path.exists(custom_path):
+        with open(custom_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    data[name] = {"Packets": packets}
+    with open(custom_path, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, indent=4, ensure_ascii=False))
+    log('[%s] Özel NPC Komutu Kaydedildi' % pName)
+
+def CustomNPC(args):
+    global _script_cmds_SkipCommand, _script_cmds_StopBot
+    if _script_cmds_SkipCommand:
+        _script_cmds_SkipCommand = False
+        return 0
+    if len(args) < 2:
+        log('[%s] Geçersiz komut, CustomNPC,savedname,state kullanın' % pName)
+        return 0
+    _script_cmds_StopBot = True
+    if len(args) == 3:
+        state = args[2].lower()
+        _script_cmds_StopBot = (state == 'true')
+    if _script_cmds_StopBot:
+        stop_bot()
+    name = args[1]
+    _script_cmds_GetPackets(name)
+    threading.Timer(0.5, _script_cmds_InjectPackets, ()).start()
+    return 0
+
+def _script_cmds_InjectPackets():
+    global _script_cmds_Index, _script_cmds_ExecutedPackets
+    if not _script_cmds_ExecutedPackets:
+        return
+    parts = _script_cmds_ExecutedPackets[_script_cmds_Index].split(':')
+    opcode = int(parts[0], 16)
+    data_str = parts[1].replace(' ', '') if len(parts) > 1 else ''
+    data = bytearray()
+    for i in range(0, len(data_str), 2):
+        data.append(int(data_str[i:i+2], 16))
+    inject_joymax(opcode, bytes(data), False)
+    if _script_cmds_cbxShowPackets is not None and QtBind.isChecked(gui, _script_cmds_cbxShowPackets):
+        log('[%s] Enjekte Edildi (Opcode) 0x%02X (Veri) %s' % (pName, opcode, 'None' if not data else ' '.join('%02X' % x for x in data)))
+    num_packets = len(_script_cmds_ExecutedPackets) - 1
+    if _script_cmds_Index < num_packets:
+        _script_cmds_Index += 1
+        threading.Timer(2.0, _script_cmds_InjectPackets, ()).start()
+    else:
+        global _script_cmds_SkipCommand
+        log('[%s] Özel NPC Komutu Tamamlandı' % pName)
+        _script_cmds_Index = 0
+        _script_cmds_ExecutedPackets = []
+        threading.Timer(30.0, _script_cmds_ResetSkip, ()).start()
+        _script_cmds_SkipCommand = True
+        if _script_cmds_StopBot:
+            start_bot()
+
 gui = QtBind.init(__name__, pName)
 
 TAB_OFFSCREEN = -3000
@@ -2194,7 +2592,10 @@ _tab3_widgets = []
 _tab4_widgets = []
 _tab5_widgets = []
 _tab6_widgets = []
+_tab7_widgets = []
+_tab8_widgets = []
 _current_tab = 1
+_tab_scroll_offset = 0
 
 def _tab_move(widget_list, offscreen):
     for w, x, y in widget_list:
@@ -2210,12 +2611,11 @@ def _show_tab1():
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
     _tab_move(_tab1_widgets, False)
     _current_tab = 1
-    try:
-        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3, _tab_bar_y + _tab_bar_h - 3)
-    except Exception:
-        pass
+    _tab_apply_scroll()
 
 def _show_tab2():
     global _current_tab
@@ -2224,12 +2624,11 @@ def _show_tab2():
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
     _tab_move(_tab2_widgets, False)
     _current_tab = 2
-    try:
-        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w, _tab_bar_y + _tab_bar_h - 3)
-    except Exception:
-        pass
+    _tab_apply_scroll()
 
 def _show_tab3():
     global _current_tab
@@ -2238,12 +2637,11 @@ def _show_tab3():
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
     _tab_move(_tab3_widgets, False)
     _current_tab = 3
-    try:
-        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + _tab_bar_h - 3)
-    except Exception:
-        pass
+    _tab_apply_scroll()
 
 def _show_tab4():
     global _current_tab
@@ -2252,12 +2650,11 @@ def _show_tab4():
     _tab_move(_tab3_widgets, True)
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
     _tab_move(_tab4_widgets, False)
     _current_tab = 4
-    try:
-        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w, _tab_bar_y + _tab_bar_h - 3)
-    except Exception:
-        pass
+    _tab_apply_scroll()
 
 def _show_tab5():
     global _current_tab
@@ -2266,12 +2663,11 @@ def _show_tab5():
     _tab_move(_tab3_widgets, True)
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
     _tab_move(_tab5_widgets, False)
     _current_tab = 5
-    try:
-        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w, _tab_bar_y + _tab_bar_h - 3)
-    except Exception:
-        pass
+    _tab_apply_scroll()
 
 def _show_tab6():
     global _current_tab
@@ -2280,12 +2676,11 @@ def _show_tab6():
     _tab_move(_tab3_widgets, True)
     _tab_move(_tab4_widgets, True)
     _tab_move(_tab5_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
     _tab_move(_tab6_widgets, False)
     _current_tab = 6
-    try:
-        QtBind.move(gui, _tab_indicator, _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + _tab_bar_h - 3)
-    except Exception:
-        pass
+    _tab_apply_scroll()
 
 def _add_tab1(w, x, y):
     _tab1_widgets.append((w, x, y))
@@ -2305,29 +2700,102 @@ def _add_tab5(w, x, y):
 def _add_tab6(w, x, y):
     _tab6_widgets.append((w, x, y))
 
-_tab_bar_y = 8
+def _show_tab7():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
+    _tab_move(_tab8_widgets, True)
+    _tab_move(_tab7_widgets, False)
+    _current_tab = 7
+    _tab_apply_scroll()
+
+def _show_tab8():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, False)
+    _current_tab = 8
+    _tab_apply_scroll()
+
+def _add_tab7(w, x, y):
+    _tab7_widgets.append((w, x, y))
+
+def _add_tab8(w, x, y):
+    _tab8_widgets.append((w, x, y))
+
+# Tab bar yapılandırması
+_tab_bar_y = 10
 _tab_bar_x = 10
-_tab_bar_w = 700
-_tab_bar_h = 26
-_tab1_btn_w = 114
-_tab2_btn_w = 83
-_tab3_btn_w = 95
-_tab4_btn_w = 80
-_tab5_btn_w = 75
-_tab6_btn_w = 63
-_tab_spacing = 0
+_tab_visible_width = 552
+_tab_scroll_offset = 0
 
-QtBind.createList(gui, _tab_bar_x, _tab_bar_y, _tab_bar_w, _tab_bar_h)
-QtBind.createButton(gui, '_show_tab1', 'Banka/Çanta Birleştir', _tab_bar_x + 3, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab2', 'Auto Dungeon', _tab_bar_x + 3 + _tab1_btn_w, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab3', 'Garden Dungeon', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab4', 'Auto Hwt', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab5', 'Oto Kervan', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w, _tab_bar_y + 2)
-QtBind.createButton(gui, '_show_tab6', 'Hakkımda', _tab_bar_x + 3 + _tab1_btn_w + _tab2_btn_w + _tab3_btn_w + _tab4_btn_w + _tab5_btn_w, _tab_bar_y + 2)
-_tab_indicator = QtBind.createList(gui, _tab_bar_x + 3, _tab_bar_y + _tab_bar_h - 3, _tab1_btn_w - 1, 4)
+_tab_original_positions = [10, 125, 208, 303, 383, 463, 551, 643]
+_tab_widths = [115, 83, 95, 80, 80, 88, 92, 60]
 
-_content_y = _tab_bar_y + _tab_bar_h - 1
+_tab_btn1 = QtBind.createButton(gui, '_show_tab1', 'Banka/Çanta Birleştir', 10, _tab_bar_y)
+_tab_btn2 = QtBind.createButton(gui, '_show_tab2', 'Auto Dungeon', 125, _tab_bar_y)
+_tab_btn3 = QtBind.createButton(gui, '_show_tab3', 'Garden Dungeon', 208, _tab_bar_y)
+_tab_btn4 = QtBind.createButton(gui, '_show_tab4', 'Auto Hwt', 303, _tab_bar_y)
+_tab_btn5 = QtBind.createButton(gui, '_show_tab5', 'Oto Kervan', 383, _tab_bar_y)
+_tab_btn6 = QtBind.createButton(gui, '_show_tab6', 'Script Komutları', 463, _tab_bar_y)
+_tab_btn7 = QtBind.createButton(gui, '_show_tab7', 'Envanter Sayacı', 551, _tab_bar_y)
+_tab_btn8 = QtBind.createButton(gui, '_show_tab8', 'Hakkımda', 643, _tab_bar_y)
+
+_tab_buttons = [_tab_btn1, _tab_btn2, _tab_btn3, _tab_btn4, _tab_btn5, _tab_btn6, _tab_btn7, _tab_btn8]
+
+def _tab_apply_scroll():
+    for i in range(len(_tab_buttons)):
+        new_x = _tab_original_positions[i] - _tab_scroll_offset
+        if new_x > _tab_visible_width:
+            new_x = TAB_OFFSCREEN
+        try:
+            QtBind.move(gui, _tab_buttons[i], new_x, _tab_bar_y)
+        except Exception:
+            pass
+
+def _tab_scroll_left():
+    global _tab_scroll_offset
+    for i in range(len(_tab_buttons) - 1, -1, -1):
+        btn_x = _tab_original_positions[i] - _tab_scroll_offset
+        if btn_x < 0:
+            _tab_scroll_offset = _tab_original_positions[i]
+            _tab_apply_scroll()
+            return
+    _tab_scroll_offset = 0
+    _tab_apply_scroll()
+
+def _tab_scroll_right():
+    global _tab_scroll_offset
+    for i in range(len(_tab_buttons)):
+        btn_x = _tab_original_positions[i] - _tab_scroll_offset
+        btn_end = btn_x + _tab_widths[i]
+        if btn_end > _tab_visible_width:
+            _tab_scroll_offset = _tab_original_positions[i] + _tab_widths[i] - _tab_visible_width
+            _tab_apply_scroll()
+            return
+    total_width = _tab_original_positions[-1] + _tab_widths[-1]
+    max_scroll = max(0, total_width - _tab_visible_width)
+    _tab_scroll_offset = max_scroll
+    _tab_apply_scroll()
+
+_scroll_bg = QtBind.createList(gui, 552, _tab_bar_y, 148, 22)
+_scroll_btn_left = QtBind.createButton(gui, '_tab_scroll_left', 'Geri', 552, _tab_bar_y)
+_scroll_btn_right = QtBind.createButton(gui, '_tab_scroll_right', 'İleri', 630, _tab_bar_y)
+
+_tab_apply_scroll()
+
+_content_y = _tab_bar_y + 28
 _content_container_h = 270
+_tab_bar_w = 700
 QtBind.createList(gui, _tab_bar_x, _content_y, _tab_bar_w, _content_container_h)
 
 _jewel_y = _content_y + 12
@@ -2608,50 +3076,661 @@ def _caravan_init_load():
         pass
 threading.Thread(target=_caravan_init_load, name=pName + '_caravan_init', daemon=True).start()
 
-# Tab 6 - Hakkımda
+# Tab 6 - Script Komutları (TR_ScriptCommands)
+_sc_x = _tab_bar_x + 20
+_sc_y = _content_y + 10
+_sc_display_w = 310
+_sc_display_h = 180
+_sc_btn_row_y = _sc_y + 220
+# Liste genişliğinde 3 buton eşit aralıklı: her slot = _sc_display_w / 3
+_sc_btn_slot = _sc_display_w // 3
+_add_tab6(QtBind.createLabel(gui, 'Kayıt İsmi', _sc_x, _sc_y), _sc_x, _sc_y)
+_script_cmds_SaveName = QtBind.createLineEdit(gui, "", _sc_x + 70, _sc_y - 2, 120, 20)
+_add_tab6(_script_cmds_SaveName, _sc_x + 70, _sc_y - 2)
+_script_cmds_RecordBtn = QtBind.createButton(gui, 'script_cmds_button_start', ' Kaydı Başlat ', _sc_x + 210, _sc_y - 2)
+_add_tab6(_script_cmds_RecordBtn, _sc_x + 210, _sc_y - 2)
+_script_cmds_Display = QtBind.createList(gui, _sc_x, _sc_y + 30, _sc_display_w, _sc_display_h)
+_add_tab6(_script_cmds_Display, _sc_x, _sc_y + 30)
+# Üç buton: stroke (liste) genişliği baz alınarak eşit aralıklı (slot 0, 1, 2)
+_script_cmds_ShowCommandsBtn = QtBind.createButton(gui, 'script_cmds_button_ShowCmds', ' Komutları Göster ', _sc_x + 0 * _sc_btn_slot, _sc_btn_row_y)
+_add_tab6(_script_cmds_ShowCommandsBtn, _sc_x + 0 * _sc_btn_slot, _sc_btn_row_y)
+_script_cmds_DeleteCommandsBtn = QtBind.createButton(gui, 'script_cmds_button_DelCmds', '   Komutu Sil   ', _sc_x + 1 * _sc_btn_slot + 5, _sc_btn_row_y)
+_add_tab6(_script_cmds_DeleteCommandsBtn, _sc_x + 1 * _sc_btn_slot + 10, _sc_btn_row_y)
+_script_cmds_ShowPacketsBtn = QtBind.createButton(gui, 'script_cmds_button_ShowPackets', ' Paketleri Göster ', _sc_x + 2 * _sc_btn_slot, _sc_btn_row_y)
+_add_tab6(_script_cmds_ShowPacketsBtn, _sc_x + 2 * _sc_btn_slot, _sc_btn_row_y)
+_script_cmds_cbxShowPackets = QtBind.createCheckBox(gui, 'script_cmds_cbxAuto_clicked', 'Paketleri Göster', _sc_x + _sc_display_w + 15, _sc_y - 2)
+_add_tab6(_script_cmds_cbxShowPackets, _sc_x + _sc_display_w + 15, _sc_y - 2)
+# Açıklama: checkbox altı, strokelu alanın sağına; başlık + metin biraz aşağıda
+_sc_desc_x = _sc_x + _sc_display_w + 15
+_sc_desc_y0 = _sc_y + 38
+_sc_desc_line_h = 14
+_add_tab6(QtBind.createLabel(gui, 'Nedir / Nasıl çalışır?', _sc_desc_x, _sc_desc_y0), _sc_desc_x, _sc_desc_y0)
+_add_tab6(QtBind.createLabel(gui, '1 - Custom NPC, FGW, ışınlanma, özel işlemler için', _sc_desc_x, _sc_desc_y0 + _sc_desc_line_h + 4), _sc_desc_x, _sc_desc_y0 + _sc_desc_line_h + 4)
+_add_tab6(QtBind.createLabel(gui, '   komut dosyasını otomatik oluşturur.', _sc_desc_x, _sc_desc_y0 + 2 * _sc_desc_line_h + 4), _sc_desc_x, _sc_desc_y0 + 2 * _sc_desc_line_h + 4)
+_add_tab6(QtBind.createLabel(gui, '2 - Script esnasında kullanırsa bunları gerçekleştirir.', _sc_desc_x, _sc_desc_y0 + 3 * _sc_desc_line_h + 4), _sc_desc_x, _sc_desc_y0 + 3 * _sc_desc_line_h + 4)
+_add_tab6(QtBind.createLabel(gui, 'Örn: FGW giriş, FGW partisindeki üyeleri çekme.', _sc_desc_x, _sc_desc_y0 + 4 * _sc_desc_line_h + 4), _sc_desc_x, _sc_desc_y0 + 4 * _sc_desc_line_h + 4)
+
+def script_cmds_button_start():
+    global _script_cmds_BtnStart, _script_cmds_RecordedPackets, _script_cmds_Recording
+    if len(QtBind.text(gui, _script_cmds_SaveName)) <= 0:
+        log('[%s] Lütfen Özel Komut için bir isim girin' % pName)
+        return
+    if not _script_cmds_BtnStart:
+        _script_cmds_BtnStart = True
+        QtBind.setText(gui, _script_cmds_RecordBtn, ' Kaydı Durdur ')
+        log('[%s] Kayda başlandı, lütfen kayıt için NPC seçin' % pName)
+    else:
+        log('[%s] Kayıt Tamamlandı' % pName)
+        name = QtBind.text(gui, _script_cmds_SaveName)
+        _script_cmds_SaveNPCPackets(name, _script_cmds_RecordedPackets)
+        _script_cmds_BtnStart = False
+        QtBind.setText(gui, _script_cmds_RecordBtn, ' Kaydı Başlat ')
+        _script_cmds_Recording = False
+        _script_cmds_RecordedPackets = []
+        threading.Timer(1.0, script_cmds_button_ShowCmds, ()).start()
+
+def script_cmds_button_ShowCmds():
+    QtBind.clear(gui, _script_cmds_Display)
+    custom_path = _script_cmds_path + "CustomNPC.json"
+    if os.path.exists(custom_path):
+        with open(custom_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            for name in data:
+                QtBind.append(gui, _script_cmds_Display, name)
+    else:
+        log('[%s] Şu anda kaydedilmiş komut yok' % pName)
+
+def script_cmds_button_DelCmds():
+    name = QtBind.text(gui, _script_cmds_Display)
+    QtBind.clear(gui, _script_cmds_Display)
+    custom_path = _script_cmds_path + "CustomNPC.json"
+    if not name:
+        return
+    if os.path.exists(custom_path):
+        with open(custom_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if name in data:
+            del data[name]
+            with open(custom_path, "w", encoding="utf-8") as f:
+                f.write(json.dumps(data, indent=4, ensure_ascii=False))
+            log('[%s] Özel NPC Komutu [%s] silindi' % (pName, name))
+        else:
+            log('[%s] Özel NPC Komutu [%s] mevcut değil' % (pName, name))
+        threading.Timer(1.0, script_cmds_button_ShowCmds, ()).start()
+
+def script_cmds_button_ShowPackets():
+    name = QtBind.text(gui, _script_cmds_Display)
+    QtBind.clear(gui, _script_cmds_Display)
+    custom_path = _script_cmds_path + "CustomNPC.json"
+    if not name or not os.path.exists(custom_path):
+        return
+    with open(custom_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if name in data:
+        for packet in data[name].get('Packets', []):
+            QtBind.append(gui, _script_cmds_Display, packet)
+
+def script_cmds_cbxAuto_clicked(checked):
+    pass
+
+# Tab 7 - Envanter Sayacı (TR_InventoryCounter)
+_inv_cnt_name = 'TR_InventoryCounter'
+_inv_cnt_inGame = None
+_inv_cnt_selected_chat_channel = "PrivateSender"
+_inv_cnt_target_private_name = ""
+
+_ic_x = _tab_bar_x + 15
+_ic_y = _content_y + 8
+_ic_list_w = 430
+_ic_list_h = 195
+_inv_cnt_lstInfo = QtBind.createList(gui, _ic_x, _ic_y + 28, _ic_list_w, _ic_list_h)
+_add_tab7(_inv_cnt_lstInfo, _ic_x, _ic_y + 28)
+_inv_cnt_btn_row1_y = _ic_y + 2
+_inv_cnt_btn_dx = 82
+_inv_cnt_btnkarakter = QtBind.createButton(gui, 'inv_cnt_btnkarakter_clicked', ' Karakter ', _ic_x, _inv_cnt_btn_row1_y)
+_add_tab7(_inv_cnt_btnkarakter, _ic_x, _inv_cnt_btn_row1_y)
+_inv_cnt_btnelixir = QtBind.createButton(gui, 'inv_cnt_btnelixir_clicked', ' Elixir ', _ic_x + _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_add_tab7(_inv_cnt_btnelixir, _ic_x + _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_inv_cnt_btnevent = QtBind.createButton(gui, 'inv_cnt_btnevent_clicked', ' Event ', _ic_x + 2 * _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_add_tab7(_inv_cnt_btnevent, _ic_x + 2 * _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_inv_cnt_btncoin = QtBind.createButton(gui, 'inv_cnt_btncoin_clicked', ' Coin ', _ic_x + 3 * _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_add_tab7(_inv_cnt_btncoin, _ic_x + 3 * _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_inv_cnt_btnstone = QtBind.createButton(gui, 'inv_cnt_btnstone_clicked', ' Stone ', _ic_x + 4 * _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_add_tab7(_inv_cnt_btnstone, _ic_x + 4 * _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_inv_cnt_btnfgw = QtBind.createButton(gui, 'inv_cnt_btnfgw_clicked', ' FGW ', _ic_x + 5 * _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_add_tab7(_inv_cnt_btnfgw, _ic_x + 5 * _inv_cnt_btn_dx, _inv_cnt_btn_row1_y)
+_inv_cnt_btnegpty = QtBind.createButton(gui, 'inv_cnt_btnegpty_clicked', ' Egpty ', _ic_x, _inv_cnt_btn_row1_y + 22)
+_add_tab7(_inv_cnt_btnegpty, _ic_x, _inv_cnt_btn_row1_y + 22)
+_inv_cnt_btnstall = QtBind.createButton(gui, 'inv_cnt_btnstall_clicked', ' Stall ', _ic_x + _inv_cnt_btn_dx, _inv_cnt_btn_row1_y + 22)
+_add_tab7(_inv_cnt_btnstall, _ic_x + _inv_cnt_btn_dx, _inv_cnt_btn_row1_y + 22)
+_ic_right_x = _ic_x + _ic_list_w + 15
+_inv_cnt_tbxLeaders = QtBind.createLineEdit(gui, "", _ic_right_x, _ic_y, 100, 20)
+_add_tab7(_inv_cnt_tbxLeaders, _ic_right_x, _ic_y)
+_inv_cnt_lstLeaders = QtBind.createList(gui, _ic_right_x, _ic_y + 22, 100, 65)
+_add_tab7(_inv_cnt_lstLeaders, _ic_right_x, _ic_y + 22)
+_inv_cnt_btnAddLeader = QtBind.createButton(gui, 'inv_cnt_btnAddLeader_clicked', " Lider Ekle ", _ic_right_x + 105, _ic_y - 2)
+_add_tab7(_inv_cnt_btnAddLeader, _ic_right_x + 105, _ic_y - 2)
+_inv_cnt_btnRemLeader = QtBind.createButton(gui, 'inv_cnt_btnRemLeader_clicked', " Lider Sil ", _ic_right_x + 105, _ic_y + 20)
+_add_tab7(_inv_cnt_btnRemLeader, _ic_right_x + 105, _ic_y + 20)
+_inv_cnt_btnClearInfo = QtBind.createButton(gui, 'inv_cnt_btnClearInfo_clicked', "Temizle", _ic_right_x + 105, _ic_y + 88)
+_add_tab7(_inv_cnt_btnClearInfo, _ic_right_x + 105, _ic_y + 88)
+_ic_chat_y = _ic_y + 95
+_add_tab7(QtBind.createLabel(gui, 'Yanıt Kanalı:', _ic_right_x, _ic_chat_y), _ic_right_x, _ic_chat_y)
+_inv_cnt_cbxAllChat = QtBind.createCheckBox(gui, "inv_cnt_cbxAllChat_clicked", "Genel", _ic_right_x, _ic_chat_y + 16)
+_add_tab7(_inv_cnt_cbxAllChat, _ic_right_x, _ic_chat_y + 16)
+_inv_cnt_cbxPartyChat = QtBind.createCheckBox(gui, "inv_cnt_cbxPartyChat_clicked", "Parti", _ic_right_x, _ic_chat_y + 32)
+_add_tab7(_inv_cnt_cbxPartyChat, _ic_right_x, _ic_chat_y + 32)
+_inv_cnt_cbxGuildChat = QtBind.createCheckBox(gui, "inv_cnt_cbxGuildChat_clicked", "Guild", _ic_right_x, _ic_chat_y + 48)
+_add_tab7(_inv_cnt_cbxGuildChat, _ic_right_x, _ic_chat_y + 48)
+_inv_cnt_cbxUnionChat = QtBind.createCheckBox(gui, "inv_cnt_cbxUnionChat_clicked", "Birlik", _ic_right_x, _ic_chat_y + 64)
+_add_tab7(_inv_cnt_cbxUnionChat, _ic_right_x, _ic_chat_y + 64)
+_inv_cnt_cbxPrivateChatSender = QtBind.createCheckBox(gui, "inv_cnt_cbxPrivateChatSender_clicked", "Özel (Lider)", _ic_right_x, _ic_chat_y + 80)
+_add_tab7(_inv_cnt_cbxPrivateChatSender, _ic_right_x, _ic_chat_y + 80)
+_inv_cnt_cbxPrivateChatTarget = QtBind.createCheckBox(gui, "inv_cnt_cbxPrivateChatTarget_clicked", "Özel (Hedef)", _ic_right_x, _ic_chat_y + 96)
+_add_tab7(_inv_cnt_cbxPrivateChatTarget, _ic_right_x, _ic_chat_y + 96)
+_inv_cnt_tbxTargetPrivate = QtBind.createLineEdit(gui, "", _ic_right_x, _ic_chat_y + 114, 100, 20)
+_add_tab7(_inv_cnt_tbxTargetPrivate, _ic_right_x, _ic_chat_y + 114)
+_inv_cnt_btnSaveChatSettings = QtBind.createButton(gui, 'inv_cnt_btnSaveChatSettings_clicked', " Kaydet ", _ic_right_x + 105, _ic_chat_y + 14)
+_add_tab7(_inv_cnt_btnSaveChatSettings, _ic_right_x + 105, _ic_chat_y + 14)
+QtBind.append(gui, _inv_cnt_lstInfo, "   TR_InventoryCounter - Lider ekleyip sohbetten komut gönderin (ENV, DEPO, GOLD, EXP, SOX vb.).")
+QtBind.append(gui, _inv_cnt_lstInfo, "   Komut listesi için üstteki butonlara tıklayın.")
+
+def inv_cnt_getPath():
+    return get_config_dir() + _inv_cnt_name + "\\"
+
+def inv_cnt_getConfig():
+    return inv_cnt_getPath() + _inv_cnt_inGame['server'] + "_" + _inv_cnt_inGame['name'] + ".json"
+
+def inv_cnt_isJoined():
+    global _inv_cnt_inGame
+    _inv_cnt_inGame = get_character_data()
+    if not (_inv_cnt_inGame and "name" in _inv_cnt_inGame and _inv_cnt_inGame["name"]):
+        _inv_cnt_inGame = None
+    return _inv_cnt_inGame
+
+def inv_cnt_loadConfigs():
+    global _inv_cnt_selected_chat_channel, _inv_cnt_target_private_name
+    QtBind.clear(gui, _inv_cnt_lstLeaders)
+    if inv_cnt_isJoined():
+        cfg = inv_cnt_getConfig()
+        if os.path.exists(cfg):
+            try:
+                with open(cfg, "r", encoding='utf-8') as f:
+                    data = json.load(f)
+                if "Leaders" in data:
+                    for nickname in data["Leaders"]:
+                        QtBind.append(gui, _inv_cnt_lstLeaders, nickname)
+                _inv_cnt_selected_chat_channel = data.get("ChatChannel", "PrivateSender")
+                _inv_cnt_target_private_name = data.get("TargetPrivateName", "")
+                QtBind.setChecked(gui, _inv_cnt_cbxAllChat, _inv_cnt_selected_chat_channel == "All")
+                QtBind.setChecked(gui, _inv_cnt_cbxPartyChat, _inv_cnt_selected_chat_channel == "Party")
+                QtBind.setChecked(gui, _inv_cnt_cbxGuildChat, _inv_cnt_selected_chat_channel == "Guild")
+                QtBind.setChecked(gui, _inv_cnt_cbxUnionChat, _inv_cnt_selected_chat_channel == "Union")
+                QtBind.setChecked(gui, _inv_cnt_cbxPrivateChatSender, _inv_cnt_selected_chat_channel == "PrivateSender")
+                QtBind.setChecked(gui, _inv_cnt_cbxPrivateChatTarget, _inv_cnt_selected_chat_channel == "PrivateTarget")
+                QtBind.setText(gui, _inv_cnt_tbxTargetPrivate, _inv_cnt_target_private_name)
+            except Exception as e:
+                log('[%s] [Envanter Sayacı] Config yüklenirken hata: %s' % (pName, e))
+                _inv_cnt_selected_chat_channel = "PrivateSender"
+                _inv_cnt_target_private_name = ""
+                QtBind.setChecked(gui, _inv_cnt_cbxPrivateChatSender, True)
+                QtBind.setText(gui, _inv_cnt_tbxTargetPrivate, "")
+        else:
+            _inv_cnt_selected_chat_channel = "PrivateSender"
+            _inv_cnt_target_private_name = ""
+            QtBind.setChecked(gui, _inv_cnt_cbxPrivateChatSender, True)
+            QtBind.setText(gui, _inv_cnt_tbxTargetPrivate, "")
+
+def inv_cnt_saveConfigs():
+    global _inv_cnt_target_private_name
+    if not inv_cnt_isJoined():
+        return
+    if _inv_cnt_inGame:
+        cfg = inv_cnt_getConfig()
+        data = {}
+        if os.path.exists(cfg):
+            try:
+                with open(cfg, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            except Exception:
+                data = {"Leaders": QtBind.getItems(gui, _inv_cnt_lstLeaders)}
+        _inv_cnt_target_private_name = QtBind.text(gui, _inv_cnt_tbxTargetPrivate)
+        data["ChatChannel"] = _inv_cnt_selected_chat_channel
+        data["TargetPrivateName"] = _inv_cnt_target_private_name
+        data["Leaders"] = QtBind.getItems(gui, _inv_cnt_lstLeaders)
+        try:
+            with open(cfg, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4, sort_keys=True, ensure_ascii=False)
+        except Exception as e:
+            log('[%s] [Envanter Sayacı] Config yazılırken hata: %s' % (pName, e))
+
+def inv_cnt_btnkarakter_clicked():
+    QtBind.clear(gui, _inv_cnt_lstInfo)
+    QtBind.append(gui, _inv_cnt_lstInfo, 'EXP, SP, GOLD, GOLDGUILD, GOLDDEPO, ENV, DEPO, JOBINFO, JOBBOX, SOX...')
+
+def inv_cnt_btnelixir_clicked():
+    QtBind.clear(gui, _inv_cnt_lstInfo)
+    QtBind.append(gui, _inv_cnt_lstInfo, 'INCELX, 8ELX-11ELX, ENH12-ENH17')
+
+def inv_cnt_btnevent_clicked():
+    QtBind.clear(gui, _inv_cnt_lstInfo)
+    QtBind.append(gui, _inv_cnt_lstInfo, 'FLOWER, ZERK, PANDORA, MONSTER, CATA, ICE, LUCKYBOX, PLEDGE, ALIBABA, RUBBER, THANKS, FLAKE, HALLOWEN')
+
+def inv_cnt_btncoin_clicked():
+    QtBind.clear(gui, _inv_cnt_lstInfo)
+    QtBind.append(gui, _inv_cnt_lstInfo, 'COIN, COMBATI, TOKEN1-TOKEN3')
+
+def inv_cnt_btnstone_clicked():
+    QtBind.clear(gui, _inv_cnt_lstInfo)
+    QtBind.append(gui, _inv_cnt_lstInfo, '8BLUE-11BLUE, 8STAT-11STAT, 8LUCK-11LUCK, 8STEADY-11STEADY')
+
+def inv_cnt_btnfgw_clicked():
+    QtBind.clear(gui, _inv_cnt_lstInfo)
+    QtBind.append(gui, _inv_cnt_lstInfo, '8FGW1/2, 9FGW1/2, 10FGW1/2, 11FGW1/2, FADED, PETSTR, PETINT')
+
+def inv_cnt_btnegpty_clicked():
+    QtBind.clear(gui, _inv_cnt_lstInfo)
+    QtBind.append(gui, _inv_cnt_lstInfo, 'SETA, SETB (Egpty A/B drop sayısı)')
+
+def inv_cnt_btnstall_clicked():
+    QtBind.clear(gui, _inv_cnt_lstInfo)
+    QtBind.append(gui, _inv_cnt_lstInfo, 'GLOBALSC, REVSC, CLOCKSC, DEVILSC, PREPLUS, HAMMER, ASTRAL, IMMORTAL, ENVANTERSC, STORAGESC, JOBBLUE, JOBARTI')
+
+def inv_cnt_btnClearInfo_clicked():
+    QtBind.clear(gui, _inv_cnt_lstInfo)
+    log('[%s] [Envanter Sayacı] Bilgi listesi temizlendi.' % pName)
+
+def inv_cnt_lstLeaders_exist(nickname):
+    nickname_lower = nickname.lower()
+    for player in QtBind.getItems(gui, _inv_cnt_lstLeaders):
+        if player.lower() == nickname_lower:
+            return True
+    return False
+
+def inv_cnt_btnAddLeader_clicked():
+    if not inv_cnt_isJoined():
+        log('[%s] [Envanter Sayacı] Oyuna giriş yapılmamış.' % pName)
+        return
+    player = QtBind.text(gui, _inv_cnt_tbxLeaders)
+    if not player or inv_cnt_lstLeaders_exist(player):
+        if player:
+            QtBind.setText(gui, _inv_cnt_tbxLeaders, "")
+        return
+    cfg = inv_cnt_getConfig()
+    data = {}
+    if os.path.exists(cfg):
+        try:
+            with open(cfg, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+    if "Leaders" not in data:
+        data['Leaders'] = []
+    if player not in data['Leaders']:
+        data['Leaders'].append(player)
+        try:
+            with open(cfg, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4, sort_keys=True, ensure_ascii=False)
+            QtBind.append(gui, _inv_cnt_lstLeaders, player)
+            QtBind.setText(gui, _inv_cnt_tbxLeaders, "")
+            log('[%s] [Envanter Sayacı] Lider eklendi: [%s]' % (pName, player))
+        except Exception as e:
+            log('[%s] [Envanter Sayacı] Config yazılamadı: %s' % (pName, e))
+
+def inv_cnt_btnRemLeader_clicked():
+    if not inv_cnt_isJoined():
+        return
+    selected = QtBind.text(gui, _inv_cnt_lstLeaders)
+    if not selected:
+        return
+    cfg = inv_cnt_getConfig()
+    data = {"Leaders": []}
+    if os.path.exists(cfg):
+        try:
+            with open(cfg, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if "Leaders" in data and selected in data["Leaders"]:
+                data["Leaders"].remove(selected)
+                with open(cfg, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, sort_keys=True, ensure_ascii=False)
+                QtBind.remove(gui, _inv_cnt_lstLeaders, selected)
+                log('[%s] [Envanter Sayacı] Lider silindi: [%s]' % (pName, selected))
+        except Exception as e:
+            log('[%s] [Envanter Sayacı] Lider silinirken hata: %s' % (pName, e))
+
+def inv_cnt_update_selected_channel(channel_name):
+    global _inv_cnt_selected_chat_channel
+    _inv_cnt_selected_chat_channel = channel_name
+    QtBind.setChecked(gui, _inv_cnt_cbxAllChat, channel_name == "All")
+    QtBind.setChecked(gui, _inv_cnt_cbxPartyChat, channel_name == "Party")
+    QtBind.setChecked(gui, _inv_cnt_cbxGuildChat, channel_name == "Guild")
+    QtBind.setChecked(gui, _inv_cnt_cbxUnionChat, channel_name == "Union")
+    QtBind.setChecked(gui, _inv_cnt_cbxPrivateChatSender, channel_name == "PrivateSender")
+    QtBind.setChecked(gui, _inv_cnt_cbxPrivateChatTarget, channel_name == "PrivateTarget")
+
+def inv_cnt_cbxAllChat_clicked(checked):
+    if checked:
+        inv_cnt_update_selected_channel("All")
+
+def inv_cnt_cbxPartyChat_clicked(checked):
+    if checked:
+        inv_cnt_update_selected_channel("Party")
+
+def inv_cnt_cbxGuildChat_clicked(checked):
+    if checked:
+        inv_cnt_update_selected_channel("Guild")
+
+def inv_cnt_cbxUnionChat_clicked(checked):
+    if checked:
+        inv_cnt_update_selected_channel("Union")
+
+def inv_cnt_cbxPrivateChatSender_clicked(checked):
+    if checked:
+        inv_cnt_update_selected_channel("PrivateSender")
+
+def inv_cnt_cbxPrivateChatTarget_clicked(checked):
+    if checked:
+        inv_cnt_update_selected_channel("PrivateTarget")
+
+def inv_cnt_btnSaveChatSettings_clicked():
+    inv_cnt_saveConfigs()
+    log('[%s] [Envanter Sayacı] Sohbet ayarları kaydedildi.' % pName)
+
+def _inv_cnt_send_response(command_sender, message):
+    global _inv_cnt_selected_chat_channel
+    ch = _inv_cnt_selected_chat_channel
+    try:
+        if ch == "All":
+            phBotChat.All(message)
+        elif ch == "Party":
+            if get_party():
+                phBotChat.Party(message)
+            else:
+                phBotChat.Private(command_sender, "(Partide degil) " + message)
+        elif ch == "Guild":
+            if get_guild():
+                phBotChat.Guild(message)
+            else:
+                phBotChat.Private(command_sender, "(Guildde degil) " + message)
+        elif ch == "Union":
+            if get_guild():
+                phBotChat.Union(message)
+            else:
+                phBotChat.Private(command_sender, "(Guildde degil) " + message)
+        elif ch == "PrivateSender":
+            phBotChat.Private(command_sender, message)
+        elif ch == "PrivateTarget":
+            target_name = QtBind.text(gui, _inv_cnt_tbxTargetPrivate)
+            if target_name:
+                phBotChat.Private(target_name, message)
+            else:
+                phBotChat.Private(command_sender, "(Hedef bos!)")
+        else:
+            phBotChat.Private(command_sender, message)
+    except Exception as e:
+        log('[%s] [Envanter Sayacı] Gönderim hatası: %s' % (pName, e))
+        try:
+            phBotChat.Private(command_sender, message)
+        except Exception:
+            pass
+
+def _inv_cnt_get_sox_counts():
+    sox_inv = sox_pet = sox_storage = 0
+    def is_sox(item):
+        if item and item.get('servername'):
+            sn = item['servername']
+            return 'RARE' in sn and 'EVENT' not in sn and 'ARCHEMY' not in sn and 'ITEM_TRADE' not in sn
+        return False
+    inv = get_inventory()
+    if inv and inv.get('items'):
+        for item in inv['items'][13:]:
+            if is_sox(item):
+                sox_inv += 1
+    pets = get_pets()
+    if pets:
+        for p_info in pets.values():
+            if p_info.get('type') == 'pick' and p_info.get('items'):
+                for item in p_info['items']:
+                    if is_sox(item):
+                        sox_pet += 1
+    st = get_storage()
+    if st and st.get('items'):
+        for item in st['items']:
+            if is_sox(item):
+                sox_storage += 1
+    return sox_inv, sox_pet, sox_storage
+
+def _inv_cnt_checkInv(arg, player):
+    try:
+        _inv_cnt_checkInv_impl(arg, player)
+    except Exception as e:
+        log('[%s] [Envanter Sayacı] checkInv hatası: %s' % (pName, e))
+
+# checkInv tam implementasyonu için TR_InventoryCounter.checkInv kullanılacak; burada sadece temel komutlar
+def _inv_cnt_checkInv_impl(arg, player):
+    inventory = get_inventory()
+    storage = get_storage()
+    pets = get_pets()
+    inv_items = inventory['items'][13:] if inventory and inventory.get('items') else []
+    st_items = storage['items'] if storage and storage.get('items') else []
+    pet_items = []
+    if pets:
+        for p in pets.values():
+            if p.get('type') == 'pick':
+                pet_items.extend(p.get('items', []))
+    all_items = inv_items + st_items + pet_items
+    weapon1 = weapon2 = weapon3 = weapon4 = weapon5 = 0
+    protector1 = protector2 = protector3 = protector4 = protector5 = 0
+    accessory1 = accessory2 = accessory3 = accessory4 = accessory5 = 0
+    shield1 = shield2 = shield3 = shield4 = shield5 = 0
+    for item in all_items:
+        if not item or not item.get('name'):
+            continue
+        name = item['name']
+        q = item.get('quantity', 1)
+        if "Incomplete" in name and "Weapon" in name: weapon5 += q
+        if "Incomplete" in name and "Armor" in name: protector5 += q
+        if "Incomplete" in name and "Accessory" in name: accessory5 += q
+        if "Incomplete" in name and "Shield" in name: shield5 += q
+        if "Lv.8" in name and "Weapon" in name: weapon1 += q
+        if "Lv.8" in name and "Armor" in name: protector1 += q
+        if "Lv.8" in name and "Accessory" in name: accessory1 += q
+        if "Lv.8" in name and "Shield" in name: shield1 += q
+        if "Lv.9" in name and "Weapon" in name: weapon2 += q
+        if "Lv.9" in name and "Armor" in name: protector2 += q
+        if "Lv.9" in name and "Accessory" in name: accessory2 += q
+        if "Lv.9" in name and "Shield" in name: shield2 += q
+        if "Lv.10" in name and "Weapon" in name: weapon3 += q
+        if "Lv.10" in name and "Armor" in name: protector3 += q
+        if "Lv.10" in name and "Accessory" in name: accessory3 += q
+        if "Lv.10" in name and "Shield" in name: shield3 += q
+        if "Lv.11" in name and "Weapon" in name: weapon4 += q
+        if "Lv.11" in name and "Armor" in name: protector4 += q
+        if "Lv.11" in name and "Accessory" in name: accessory4 += q
+        if "Lv.11" in name and "Shield" in name: shield4 += q
+    if arg == "ElixirInc":
+        _inv_cnt_send_response(player, "Incomplete W %d, Armor %d, Shield %d, Acc %d" % (weapon5, protector5, shield5, accessory5))
+    if arg == "Elixir8":
+        _inv_cnt_send_response(player, "8DG Elixir; W %d, Armor %d, Shield %d, Acc %d" % (weapon1, protector1, shield1, accessory1))
+    if arg == "Elixir9":
+        _inv_cnt_send_response(player, "9DG Elixir; W %d, Armor %d, Shield %d, Acc %d" % (weapon2, protector2, shield2, accessory2))
+    if arg == "Elixir10":
+        _inv_cnt_send_response(player, "10DG Elixir; W %d, Armor %d, Shield %d, Acc %d" % (weapon3, protector3, shield3, accessory3))
+    if arg == "Elixir11":
+        _inv_cnt_send_response(player, "11DG Elixir; W %d, Armor %d, Shield %d, Acc %d" % (weapon4, protector4, shield4, accessory4))
+
+def _inv_cnt_handle_chat(t, player, msg):
+    if not (player and inv_cnt_lstLeaders_exist(player)) and t != 100:
+        return
+    msg = (msg or "").strip().upper()
+    if msg == "ENV":
+        try:
+            inv_data = get_inventory()
+            if inv_data and 'items' in inv_data and 'size' in inv_data:
+                total = inv_data['size']
+                eq_slots = 13
+                inv_count = total - eq_slots
+                items = inv_data['items']
+                if inv_count > 0 and len(items) >= total:
+                    free = sum(1 for item in items[eq_slots:total] if not item or item == {})
+                    occ = inv_count - free
+                    _inv_cnt_send_response(player, "Bos Alan: %d ----> Dolu: %d/%d (Toplam: %d)" % (free, occ, inv_count, total))
+                else:
+                    _inv_cnt_send_response(player, "Envanter hesaplanamadi.")
+            else:
+                _inv_cnt_send_response(player, "Envanter bilgisi alinamadi.")
+        except Exception as e:
+            _inv_cnt_send_response(player, "ENV hatasi.")
+    elif msg == "DEPO":
+        try:
+            st = get_storage()
+            if st and 'items' in st and 'size' in st:
+                size = st['size']
+                items = st['items']
+                free = items[:size].count({}) if size else 0
+                occ = size - free
+                _inv_cnt_send_response(player, "Depo Bos: %d ----> Dolu: %d/%d" % (free, occ, size))
+            else:
+                _inv_cnt_send_response(player, "Depo bilgisi alinamadi.")
+        except Exception:
+            _inv_cnt_send_response(player, "DEPO hatasi.")
+    elif msg == "EXP":
+        try:
+            data = get_character_data()
+            if data and 'current_exp' in data and 'level' in data and 'max_exp' in data and data['max_exp'] > 0:
+                pct = (100.0 * data['current_exp']) / data['max_exp']
+                _inv_cnt_send_response(player, "Seviye: %s - EXP: %.2f%%" % (data['level'], pct))
+            else:
+                _inv_cnt_send_response(player, "EXP alinamadi.")
+        except Exception:
+            _inv_cnt_send_response(player, "EXP hatasi.")
+    elif msg == "GOLD":
+        try:
+            data = get_character_data()
+            if data and 'gold' in data:
+                _inv_cnt_send_response(player, "Envanterde %s Altin." % ("{:,}".format(data['gold'])))
+            else:
+                _inv_cnt_send_response(player, "Altin bilgisi alinamadi.")
+        except Exception:
+            _inv_cnt_send_response(player, "GOLD hatasi.")
+    elif msg == "GOLDDEPO":
+        try:
+            st = get_storage()
+            if st and 'gold' in st:
+                _inv_cnt_send_response(player, "Depoda %s Altin." % ("{:,}".format(st['gold'])))
+            else:
+                _inv_cnt_send_response(player, "Depo altin alinamadi.")
+        except Exception:
+            _inv_cnt_send_response(player, "GOLDDEPO hatasi.")
+    elif msg == "SP":
+        try:
+            data = get_character_data()
+            if data and 'sp' in data:
+                _inv_cnt_send_response(player, "Su an %s Skill Point." % ("{:,}".format(data['sp'])))
+            else:
+                _inv_cnt_send_response(player, "SP alinamadi.")
+        except Exception:
+            _inv_cnt_send_response(player, "SP hatasi.")
+    elif msg == "SOX":
+        try:
+            inv_c, pet_c, st_c = _inv_cnt_get_sox_counts()
+            _inv_cnt_send_response(player, "Envanter ( %d ) , Pet ( %d ) , Depo ( %d )" % (inv_c, pet_c, st_c))
+        except Exception:
+            _inv_cnt_send_response(player, "SOX hatasi.")
+    elif msg == "JOBINFO":
+        try:
+            data = get_character_data()
+            if data:
+                jn = data.get('job_name', 'N/A')
+                jl = data.get('job_level', 0)
+                jt = data.get('job_type', 'N/A')
+                jcur = data.get('job_current_exp', 0)
+                jmax = data.get('job_max_exp', 1)
+                pct = (100.0 * jcur / jmax) if jmax else 0
+                _inv_cnt_send_response(player, "JOB: %s, Lv %s, Tip: %s, Exp: %.2f%%" % (jn, jl, jt, pct))
+            else:
+                _inv_cnt_send_response(player, "JOB bilgisi alinamadi.")
+        except Exception:
+            _inv_cnt_send_response(player, "JOBINFO hatasi.")
+    elif msg == "GOLDGUILD":
+        try:
+            gs = get_guild_storage()
+            if gs and 'gold' in gs:
+                _inv_cnt_send_response(player, "Guild Deposunda %s Altin." % ("{:,}".format(gs['gold'])))
+            else:
+                _inv_cnt_send_response(player, "Guild depo alinamadi.")
+        except Exception:
+            _inv_cnt_send_response(player, "GOLDGUILD hatasi.")
+    elif msg == "JOBBOX":
+        try:
+            pouch = get_job_pouch()
+            if pouch and pouch.get("items") is not None:
+                items = pouch["items"]
+                total_q = sum((it.get("quantity") or 0) for it in items if it)
+                _inv_cnt_send_response(player, "Specialty -> %d / %d (%d slot)" % (total_q, len(items) * 5, len(items)))
+            else:
+                _inv_cnt_send_response(player, "Meslek cantasi alinamadi.")
+        except Exception:
+            _inv_cnt_send_response(player, "JOBBOX hatasi.")
+    else:
+        cmds = {"INCELX": "ElixirInc", "8ELX": "Elixir8", "9ELX": "Elixir9", "10ELX": "Elixir10", "11ELX": "Elixir11"}
+        if msg in cmds:
+            _inv_cnt_checkInv(cmds[msg], player)
+
+# Tab 8 - Hakkımda
 _t3_container_x = _tab_bar_x + 30
 _t3_container_y = _content_y + 15
 _t3_container_w = _tab_bar_w - 60
 _t3_container_h = 245
 
 _t3_container = QtBind.createList(gui, _t3_container_x, _t3_container_y, _t3_container_w, _t3_container_h)
-_add_tab6(_t3_container, _t3_container_x, _t3_container_y)
+_add_tab8(_t3_container, _t3_container_x, _t3_container_y)
 
 _t3_x = _t3_container_x + 15
 _t3_y = _t3_container_y + 15
 
-_add_tab6(QtBind.createLabel(gui, '╔═════════════════════════╗', _t3_x, _t3_y), _t3_x, _t3_y)
-_add_tab6(QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _t3_x, _t3_y + 16), _t3_x, _t3_y + 16)
-_add_tab6(QtBind.createLabel(gui, '╚═════════════════════════╝', _t3_x, _t3_y + 32), _t3_x, _t3_y + 32)
+_add_tab8(QtBind.createLabel(gui, '╔═════════════════════════╗', _t3_x, _t3_y), _t3_x, _t3_y)
+_add_tab8(QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _t3_x, _t3_y + 16), _t3_x, _t3_y + 16)
+_add_tab8(QtBind.createLabel(gui, '╚═════════════════════════╝', _t3_x, _t3_y + 32), _t3_x, _t3_y + 32)
 
 _version_y = _t3_y + 58
-_add_tab6(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _t3_x, _version_y)
+_add_tab8(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _t3_x, _version_y)
 
 _btn_y = _version_y + 26
-_add_tab6(QtBind.createButton(gui, 'check_update', 'Kontrol', _t3_x, _btn_y), _t3_x, _btn_y)
-_add_tab6(QtBind.createButton(gui, 'do_auto_update', 'Güncelle', _t3_x + 70, _btn_y), _t3_x + 70, _btn_y)
+_add_tab8(QtBind.createButton(gui, 'check_update', 'Kontrol', _t3_x, _btn_y), _t3_x, _btn_y)
+_add_tab8(QtBind.createButton(gui, 'do_auto_update', 'Güncelle', _t3_x + 70, _btn_y), _t3_x + 70, _btn_y)
 
 _status_y = _btn_y + 30
 _update_label_ref = QtBind.createLabel(gui, '', _t3_x, _status_y)
-_add_tab6(_update_label_ref, _t3_x, _status_y)
+_add_tab8(_update_label_ref, _t3_x, _status_y)
 
 _features_y = _status_y + 35
-_add_tab6(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
-_add_tab6(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
-_add_tab6(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
-_add_tab6(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
-_add_tab6(QtBind.createLabel(gui, '• Garden Dungeon otomatik oynatma', _t3_x, _features_y + 82), _t3_x, _features_y + 82)
-_add_tab6(QtBind.createLabel(gui, '• Auto Hwt sistemi', _t3_x, _features_y + 102), _t3_x, _features_y + 102)
-_add_tab6(QtBind.createLabel(gui, '• Oto Kervan sistemi', _t3_x, _features_y + 122), _t3_x, _features_y + 122)
-_add_tab6(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 142), _t3_x, _features_y + 142)
+_add_tab8(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
+_add_tab8(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
+_add_tab8(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
+_add_tab8(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
+_add_tab8(QtBind.createLabel(gui, '• Garden Dungeon otomatik oynatma', _t3_x, _features_y + 82), _t3_x, _features_y + 82)
+_add_tab8(QtBind.createLabel(gui, '• Auto Hwt sistemi', _t3_x, _features_y + 102), _t3_x, _features_y + 102)
+_add_tab8(QtBind.createLabel(gui, '• Oto Kervan sistemi', _t3_x, _features_y + 122), _t3_x, _features_y + 122)
+_add_tab8(QtBind.createLabel(gui, '• Script Komutları (TR_ScriptCommands)', _t3_x, _features_y + 142), _t3_x, _features_y + 142)
+_add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı (TR_InventoryCounter)', _t3_x, _features_y + 162), _t3_x, _features_y + 162)
+_add_tab8(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 182), _t3_x, _features_y + 182)
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
 _tab_move(_tab4_widgets, True)
 _tab_move(_tab5_widgets, True)
 _tab_move(_tab6_widgets, True)
+_tab_move(_tab7_widgets, True)
+_tab_move(_tab8_widgets, True)
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
+try:
+    inv_cnt_path = get_config_dir() + _inv_cnt_name + "\\"
+    if not os.path.exists(inv_cnt_path):
+        os.makedirs(inv_cnt_path)
+except Exception:
+    pass
 threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()
 threading.Thread(target=_check_script_updates_thread, name=pName + '_script_update', daemon=True).start()
 
@@ -2662,8 +3741,53 @@ if not os.path.exists(getPath()):
 
 # ______________________________ Events ______________________________ #
 
+def event_loop():
+    """Script Komutları: StartBot/CloseBot zamanlama kontrolü"""
+    global _script_cmds_delay_counter, _script_cmds_CheckStartTime, _script_cmds_CheckCloseTime, _script_cmds_SkipCommand
+    if _script_cmds_CheckStartTime:
+        _script_cmds_delay_counter += 500
+        if _script_cmds_delay_counter >= 60000:
+            _script_cmds_delay_counter = 0
+            current_time = str(datetime.now())[11:16]
+            if current_time == _script_cmds_StartBotAt:
+                _script_cmds_CheckStartTime = False
+                _script_cmds_SkipCommand = True
+                log('[%s] Bot başlatılıyor' % pName)
+                start_bot()
+    elif _script_cmds_CheckCloseTime:
+        _script_cmds_delay_counter += 500
+        if _script_cmds_delay_counter >= 60000:
+            _script_cmds_delay_counter = 0
+            current_time = str(datetime.now())[11:16]
+            if current_time == _script_cmds_CloseBotAt:
+                _script_cmds_CheckCloseTime = False
+                _script_cmds_Terminate()
+
+def handle_silkroad(opcode, data):
+    """Script Komutları: Özel NPC paket kaydı"""
+    global _script_cmds_Recording, _script_cmds_BtnStart, _script_cmds_RecordedPackets
+    if data is None:
+        return True
+    if _script_cmds_BtnStart:
+        if opcode == 0x7045 or opcode == 0x7C45:
+            _script_cmds_Recording = True
+            log('[%s] Kayıt Başladı' % pName)
+            _script_cmds_RecordedPackets.append("0x" + '%02X' % opcode + ":" + ' '.join('%02X' % x for x in data))
+            if _script_cmds_cbxShowPackets is not None and QtBind.isChecked(gui, _script_cmds_cbxShowPackets):
+                log('[%s] Kaydedildi (Opcode) 0x%02X (Veri) %s' % (pName, opcode, 'None' if not data else ' '.join('%02X' % x for x in data)))
+        if _script_cmds_Recording:
+            if opcode != 0x7045 and opcode != 0x7C45:
+                _script_cmds_RecordedPackets.append("0x" + '%02X' % opcode + ":" + ' '.join('%02X' % x for x in data))
+                if _script_cmds_cbxShowPackets is not None and QtBind.isChecked(gui, _script_cmds_cbxShowPackets):
+                    log('[%s] Kaydedildi (Opcode) 0x%02X (Veri) %s' % (pName, opcode, 'None' if not data else ' '.join('%02X' % x for x in data)))
+    return True
+
 def joined_game():
     loadConfigs()
+    inv_cnt_loadConfigs()
+
+def handle_chat(t, player, msg):
+    _inv_cnt_handle_chat(t, player, msg)
 
 def handle_joymax(opcode, data):
     # SERVER_DIMENSIONAL_INVITATION_REQUEST
