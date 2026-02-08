@@ -127,7 +127,6 @@ _garden_dungeon_lock = threading.Lock()
 
 # Oto Kervan global değişkenleri
 _caravan_script_list = []  # GitHub'dan gelen .txt dosya adları (liste sırası = gösterim sırası)
-_caravan_profile_keys = []
 _caravan_running = False
 _caravan_script_path = ""
 _caravan_thread = None
@@ -1145,7 +1144,24 @@ def kervan_refresh_list():
     QtBind.setText(gui, lblKervanStatus, 'Durum: %d script listelendi' % len(names))
     log('[%s] [Oto-Kervan] %d karavan scripti listelendi.' % (pName, len(names)))
     _caravan_ensure_karavan_profile_on_init()
-    _caravan_fill_profile_combo()
+    _caravan_update_profile_display()
+
+def _caravan_update_profile_display():
+    """Aktif profil adını gösterir."""
+    try:
+        path = get_config_path()
+        if not path:
+            QtBind.setText(gui, lblKervanProfile, '(Bilinmiyor)')
+            return
+        base = os.path.basename(path)
+        if base.endswith('.json'):
+            profile_name = base[:-5]  # .json eki çıkarılır
+            QtBind.setText(gui, lblKervanProfile, profile_name)
+        else:
+            QtBind.setText(gui, lblKervanProfile, '(Bilinmiyor)')
+    except Exception:
+        QtBind.setText(gui, lblKervanProfile, '(Hata)')
+
 
 # Bu mesafenin altındaysak rota üzerindeyiz sayılır; üstündeyse bot en yakın script noktasına götürür sonra script devam eder
 CARAVAN_JOIN_STEP = 5
@@ -1281,63 +1297,6 @@ def _caravan_db3_dir():
     d = get_config_dir()
     return d.rstrip('/\\') if d else ''
 
-
-def _caravan_get_current_profile_key():
-    """phBot'ta şu an seçili olan profil anahtarını döndürür (örn. Sirion_VisKi.karavan). Config path'ten türetilir."""
-    path = get_config_path()
-    if not path:
-        return None
-    base = os.path.basename(path)
-    if base.endswith('.json'):
-        return base[:-5]  # .json kesilir
-    return None
-
-
-def _caravan_list_profile_keys():
-    """Bu karakter için Config klasöründeki tüm profil dosyalarını listeler. (görünen_ad, profil_anahtarı) listesi."""
-    fn = _caravan_db3_filename()
-    if not fn:
-        return []
-    config_dir = _caravan_db3_dir()
-    if not config_dir or not os.path.isdir(config_dir):
-        return []
-    result = []
-    try:
-        for name in sorted(os.listdir(config_dir)):
-            if not name.endswith('.json'):
-                continue
-            if name == fn + '.json':
-                result.append(('Varsayılan', fn))
-            elif name.startswith(fn + '.'):
-                # Sirion_VisKi.karavan.json -> "karavan"
-                suffix = name[len(fn) + 1:-5]
-                if suffix:
-                    result.append((suffix, fn + '.' + suffix))
-    except Exception:
-        pass
-    return result
-
-
-def _caravan_fill_profile_combo():
-    """Karavan profili combobox'ını Config'teki profillerle doldurur; karavan varsa onu seçer."""
-    global _caravan_profile_keys
-    try:
-        QtBind.clear(gui, comboKervanProfile)
-        _caravan_profile_keys = []
-        items = _caravan_list_profile_keys()
-        default_idx = 0
-        for i, (display, key) in enumerate(items):
-            QtBind.append(gui, comboKervanProfile, display)
-            _caravan_profile_keys.append(key)
-            if 'karavan' in key.lower():
-                default_idx = i
-        if _caravan_profile_keys and hasattr(QtBind, 'setCurrentIndex'):
-            try:
-                QtBind.setCurrentIndex(gui, comboKervanProfile, min(default_idx, len(_caravan_profile_keys) - 1))
-            except Exception:
-                pass
-    except Exception:
-        _caravan_profile_keys = []
 
 def _caravan_db3_current_path():
     """Aktif db3 dosya yolu."""
@@ -1788,15 +1747,25 @@ def _caravan_loop():
 
 def kervan_start():
     global _caravan_script_path, _caravan_thread
-    current_key = _caravan_get_current_profile_key()
-    if not current_key:
-        log('[%s] [Oto-Kervan] Profil bilgisi alınamadı. Botu tekrardan açıp Oyuna giriş yapıp tekrar deneyin.' % pName)
-        QtBind.setText(gui, lblKervanStatus, 'Durum: Profil alınamadı')
+    # Profil kontrolü: karavan profili seçili olmalı
+    try:
+        path = get_config_path()
+        if not path:
+            log('[%s] [Oto-Kervan] Profil bilgisi alınamadı. Botu tekrar açıp oyuna giriş yapın.' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Profil alınamadı')
+            return
+        profile_name = os.path.basename(path)
+        if profile_name.endswith('.json'):
+            profile_name = profile_name[:-5]
+        if 'karavan' not in profile_name.lower():
+            log('[%s] [Oto-Kervan] Karavan profili seçili değil! Ana pencereden karavan profilini seçin, sonra Başlat\'a basın.' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Karavan profili seçili değil!')
+            return
+    except Exception:
+        log('[%s] [Oto-Kervan] Profil kontrolü yapılamadı.' % pName)
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Profil kontrolü hatası')
         return
-    if 'karavan' not in current_key.lower():
-        log('[%s] [Oto-Kervan] Karavan profili seçili değil. Otomatik yapılandırma profil listesinden karavan profilini seçin, sonra Başlat\'a basın.' % pName)
-        QtBind.setText(gui, lblKervanStatus, 'Durum: Önce Karavan profilini seçin')
-        return
+    
     selected_display = QtBind.text(gui, lstKervanScripts).strip()
     if not selected_display or selected_display.startswith('('):
         log('[%s] [Oto-Kervan] Lütfen listeden bir script seçin.' % pName)
@@ -2821,40 +2790,40 @@ _bank_container_x = _container_start_x + _container_w + _container_gap
 
 _inv_container = QtBind.createList(gui, _inv_container_x, _row2_y, _container_w, _container_h)
 _add_tab1(_inv_container, _inv_container_x, _row2_y)
-_add_tab1(QtBind.createLabel(gui, 'Çanta İşlemleri', _inv_container_x + 12, _row2_y + 8), _inv_container_x + 12, _row2_y + 8)
+_add_tab1(QtBind.createLabel(gui, 'Çanta İşlemleri', _inv_container_x + (_container_w - 100) // 2, _row2_y + 8), _inv_container_x + (_container_w - 100) // 2, _row2_y + 8)
 
 _iy1 = _row2_y + 32
 _frame2 = QtBind.createList(gui, _inv_container_x + 12, _iy1, _container_w - 24, 50)
 _add_tab1(_frame2, _inv_container_x + 12, _iy1)
-_add_tab1(QtBind.createLabel(gui, 'Çantayı Birleştir', _inv_container_x + 20, _iy1 + 5), _inv_container_x + 20, _iy1 + 5)
-_add_tab1(QtBind.createButton(gui, 'merge_start', 'Başla', _inv_container_x + 20, _iy1 + 25), _inv_container_x + 20, _iy1 + 25)
-_add_tab1(QtBind.createButton(gui, 'merge_stop', 'Durdur', _inv_container_x + 100, _iy1 + 25), _inv_container_x + 100, _iy1 + 25)
+_add_tab1(QtBind.createLabel(gui, 'Çantayı Birleştir', _inv_container_x + (_container_w - 100) // 2, _iy1 + 5), _inv_container_x + (_container_w - 100) // 2, _iy1 + 5)
+_add_tab1(QtBind.createButton(gui, 'merge_start', 'Başla', _inv_container_x + (_container_w - 160) // 2, _iy1 + 25), _inv_container_x + (_container_w - 160) // 2, _iy1 + 25)
+_add_tab1(QtBind.createButton(gui, 'merge_stop', 'Durdur', _inv_container_x + (_container_w - 160) // 2 + 80, _iy1 + 25), _inv_container_x + (_container_w - 160) // 2 + 80, _iy1 + 25)
 
 _iy2 = _iy1 + 58
 _frame3 = QtBind.createList(gui, _inv_container_x + 12, _iy2, _container_w - 24, 50)
 _add_tab1(_frame3, _inv_container_x + 12, _iy2)
-_add_tab1(QtBind.createLabel(gui, 'Çantayı Sırala', _inv_container_x + 20, _iy2 + 5), _inv_container_x + 20, _iy2 + 5)
-_add_tab1(QtBind.createButton(gui, 'sort_start', 'Başla', _inv_container_x + 20, _iy2 + 25), _inv_container_x + 20, _iy2 + 25)
-_add_tab1(QtBind.createButton(gui, 'sort_stop', 'Durdur', _inv_container_x + 100, _iy2 + 25), _inv_container_x + 100, _iy2 + 25)
+_add_tab1(QtBind.createLabel(gui, 'Çantayı Sırala', _inv_container_x + (_container_w - 90) // 2, _iy2 + 5), _inv_container_x + (_container_w - 90) // 2, _iy2 + 5)
+_add_tab1(QtBind.createButton(gui, 'sort_start', 'Başla', _inv_container_x + (_container_w - 160) // 2, _iy2 + 25), _inv_container_x + (_container_w - 160) // 2, _iy2 + 25)
+_add_tab1(QtBind.createButton(gui, 'sort_stop', 'Durdur', _inv_container_x + (_container_w - 160) // 2 + 80, _iy2 + 25), _inv_container_x + (_container_w - 160) // 2 + 80, _iy2 + 25)
 
 _bank_container = QtBind.createList(gui, _bank_container_x, _row2_y, _container_w, _container_h)
 _add_tab1(_bank_container, _bank_container_x, _row2_y)
-_add_tab1(QtBind.createLabel(gui, 'Banka İşlemleri', _bank_container_x + 12, _row2_y + 8), _bank_container_x + 12, _row2_y + 8)
-_add_tab1(QtBind.createLabel(gui, 'Banka NPC yakındaysa otomatik açılır.', _bank_container_x + 12, _row2_y + 24), _bank_container_x + 12, _row2_y + 24)
+_add_tab1(QtBind.createLabel(gui, 'Banka İşlemleri', _bank_container_x + (_container_w - 100) // 2, _row2_y + 8), _bank_container_x + (_container_w - 100) // 2, _row2_y + 8)
+_add_tab1(QtBind.createLabel(gui, 'Banka NPC yakındaysa otomatik açılır.', _bank_container_x + (_container_w - 220) // 2 + 25, _row2_y + 24), _bank_container_x + (_container_w - 220) // 2 + 25, _row2_y + 24)
 
 _by1 = _row2_y + 46
 _store_merge_frame = QtBind.createList(gui, _bank_container_x + 12, _by1, _container_w - 24, 50)
 _add_tab1(_store_merge_frame, _bank_container_x + 12, _by1)
-_add_tab1(QtBind.createLabel(gui, 'Bankayı Birleştir', _bank_container_x + 20, _by1 + 5), _bank_container_x + 20, _by1 + 5)
-_add_tab1(QtBind.createButton(gui, 'bank_merge_start', 'Başla', _bank_container_x + 20, _by1 + 25), _bank_container_x + 20, _by1 + 25)
-_add_tab1(QtBind.createButton(gui, 'bank_merge_stop', 'Durdur', _bank_container_x + 100, _by1 + 25), _bank_container_x + 100, _by1 + 25)
+_add_tab1(QtBind.createLabel(gui, 'Bankayı Birleştir', _bank_container_x + (_container_w - 105) // 2, _by1 + 5), _bank_container_x + (_container_w - 105) // 2, _by1 + 5)
+_add_tab1(QtBind.createButton(gui, 'bank_merge_start', 'Başla', _bank_container_x + (_container_w - 160) // 2, _by1 + 25), _bank_container_x + (_container_w - 160) // 2, _by1 + 25)
+_add_tab1(QtBind.createButton(gui, 'bank_merge_stop', 'Durdur', _bank_container_x + (_container_w - 160) // 2 + 80, _by1 + 25), _bank_container_x + (_container_w - 160) // 2 + 80, _by1 + 25)
 
 _by2 = _by1 + 58
 _store_sort_frame = QtBind.createList(gui, _bank_container_x + 12, _by2, _container_w - 24, 50)
 _add_tab1(_store_sort_frame, _bank_container_x + 12, _by2)
-_add_tab1(QtBind.createLabel(gui, 'Bankayı Sırala', _bank_container_x + 20, _by2 + 5), _bank_container_x + 20, _by2 + 5)
-_add_tab1(QtBind.createButton(gui, 'bank_sort_start', 'Başla', _bank_container_x + 20, _by2 + 25), _bank_container_x + 20, _by2 + 25)
-_add_tab1(QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _bank_container_x + 100, _by2 + 25), _bank_container_x + 100, _by2 + 25)
+_add_tab1(QtBind.createLabel(gui, 'Bankayı Sırala', _bank_container_x + (_container_w - 95) // 2, _by2 + 5), _bank_container_x + (_container_w - 95) // 2, _by2 + 5)
+_add_tab1(QtBind.createButton(gui, 'bank_sort_start', 'Başla', _bank_container_x + (_container_w - 160) // 2, _by2 + 25), _bank_container_x + (_container_w - 160) // 2, _by2 + 25)
+_add_tab1(QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _bank_container_x + (_container_w - 160) // 2 + 80, _by2 + 25), _bank_container_x + (_container_w - 160) // 2 + 80, _by2 + 25)
 
 # Tab 2 - Auto Dungeon
 _t2_y = _content_y + 10
@@ -3029,42 +2998,30 @@ _add_tab4(QtBind.createLabel(gui, 'Auto Hwt', _hwt_title_x, _hwt_title_y), _hwt_
 _add_tab4(QtBind.createLabel(gui, 'Yakında eklenecek...', _hwt_title_x, _hwt_title_y + 30), _hwt_title_x, _hwt_title_y + 30)
 
 # Tab 5 - Oto Kervan (GitHub'dan script listesi, seçilen ile Başla/Durdur)
-_kervan_container_w = 450
-_kervan_container_h = 260
-_kervan_container_x = _tab_bar_x + (_tab_bar_w - _kervan_container_w) // 2
-_kervan_container_y = _content_y + 15
+_kervan_x = _tab_bar_x + 30
+_kervan_y = _content_y + 20
 
-_kervan_container = QtBind.createList(gui, _kervan_container_x, _kervan_container_y, _kervan_container_w, _kervan_container_h)
-_add_tab5(_kervan_container, _kervan_container_x, _kervan_container_y)
-
-_kervan_title_x = _kervan_container_x + 20
-_kervan_title_y = _kervan_container_y + 10
-
-_add_tab5(QtBind.createLabel(gui, '═══════════ Oto Kervan ═══════════', _kervan_title_x, _kervan_title_y), _kervan_title_x, _kervan_title_y)
-_add_tab5(QtBind.createLabel(gui, 'GitHub\'daki karavan scriptlerinden birini seçin; Başla ile yürütün.', _kervan_title_x, _kervan_title_y + 18), _kervan_title_x, _kervan_title_y + 18)
-
-# Karavan profili listesi (Başlat için ana pencerede karavan profilini seçin)
-_kervan_profile_y = _kervan_title_y + 40
-_add_tab5(QtBind.createLabel(gui, 'Karavan profili:', _kervan_title_x, _kervan_profile_y), _kervan_title_x, _kervan_profile_y)
-comboKervanProfile = QtBind.createCombobox(gui, _kervan_title_x + 95, _kervan_profile_y - 2, 200, 22)
-_add_tab5(comboKervanProfile, _kervan_title_x + 95, _kervan_profile_y - 2)
+# Aktif profil gösterimi
+_kervan_profile_y = _kervan_y
+_add_tab5(QtBind.createLabel(gui, 'Aktif Profil:', _kervan_x, _kervan_profile_y), _kervan_x, _kervan_profile_y)
+lblKervanProfile = QtBind.createLabel(gui, 'Yükleniyor...', _kervan_x + 75, _kervan_profile_y)
+_add_tab5(lblKervanProfile, _kervan_x + 75, _kervan_profile_y)
 
 # Script listesi
-_kervan_list_y = _kervan_title_y + 68
-_add_tab5(QtBind.createLabel(gui, 'Script listesi:', _kervan_title_x, _kervan_list_y), _kervan_title_x, _kervan_list_y)
-lstKervanScripts = QtBind.createList(gui, _kervan_title_x, _kervan_list_y + 18, 300, 120)
-_add_tab5(lstKervanScripts, _kervan_title_x, _kervan_list_y + 18)
+_kervan_list_y = _kervan_profile_y + 25
+_add_tab5(QtBind.createLabel(gui, 'Script listesi:', _kervan_x, _kervan_list_y), _kervan_x, _kervan_list_y)
+lstKervanScripts = QtBind.createList(gui, _kervan_x, _kervan_list_y + 20, 400, 120)
+_add_tab5(lstKervanScripts, _kervan_x, _kervan_list_y + 20)
 QtBind.append(gui, lstKervanScripts, '(Önce "Yenile" ile listeyi yükleyin)')
 
 # Yenile / Başla / Durdur
 _kervan_btn_y = _kervan_list_y + 145
-_kervan_btn_x = _kervan_title_x
-_add_tab5(QtBind.createButton(gui, 'kervan_refresh_list', ' Yenile ', _kervan_btn_x, _kervan_btn_y), _kervan_btn_x, _kervan_btn_y)
-_add_tab5(QtBind.createButton(gui, 'kervan_start', ' Başla ', _kervan_btn_x + 75, _kervan_btn_y), _kervan_btn_x + 75, _kervan_btn_y)
-_add_tab5(QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_btn_x + 150, _kervan_btn_y), _kervan_btn_x + 150, _kervan_btn_y)
+_add_tab5(QtBind.createButton(gui, 'kervan_refresh_list', ' Yenile ', _kervan_x, _kervan_btn_y), _kervan_x, _kervan_btn_y)
+_add_tab5(QtBind.createButton(gui, 'kervan_start', ' Başla ', _kervan_x + 80, _kervan_btn_y), _kervan_x + 80, _kervan_btn_y)
+_add_tab5(QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_x + 160, _kervan_btn_y), _kervan_x + 160, _kervan_btn_y)
 
-lblKervanStatus = QtBind.createLabel(gui, 'Durum: Hazır', _kervan_title_x, _kervan_btn_y + 28)
-_add_tab5(lblKervanStatus, _kervan_title_x, _kervan_btn_y + 28)
+lblKervanStatus = QtBind.createLabel(gui, 'Durum: Hazır', _kervan_x, _kervan_btn_y + 28)
+_add_tab5(lblKervanStatus, _kervan_x, _kervan_btn_y + 28)
 
 def _caravan_init_load():
     """Init sonrası karavan profilini (yoksa) oluşturur, ardından script listesini arka planda yükler."""
