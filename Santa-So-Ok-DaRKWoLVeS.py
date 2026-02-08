@@ -3689,11 +3689,14 @@ _add_tab8(_t3_container, _t3_container_x, _t3_container_y)
 _t3_x = _t3_container_x + 15
 _t3_y = _t3_container_y + 15
 
-_add_tab8(QtBind.createLabel(gui, '╔═════════════════════════╗', _t3_x, _t3_y), _t3_x, _t3_y)
-_add_tab8(QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _t3_x, _t3_y + 16), _t3_x, _t3_y + 16)
-_add_tab8(QtBind.createLabel(gui, '╚═════════════════════════╝', _t3_x, _t3_y + 32), _t3_x, _t3_y + 32)
+# Author - sağda ortalanmış
+_author_x = _t3_container_x + _t3_container_w - 320
+_add_tab8(QtBind.createLabel(gui, '╔═════════════════════════╗', _author_x, _t3_y), _author_x, _t3_y)
+_add_tab8(QtBind.createLabel(gui, '║   Author:  V i S K i   DaRK_WoLVeS <3      ║', _author_x, _t3_y + 16), _author_x, _t3_y + 16)
+_add_tab8(QtBind.createLabel(gui, '╚═════════════════════════╝', _author_x, _t3_y + 32), _author_x, _t3_y + 32)
 
-_version_y = _t3_y + 58
+# Sürüm ve butonlar - yukarı taşındı
+_version_y = _t3_y
 _add_tab8(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _t3_x, _version_y)
 
 _btn_y = _version_y + 26
@@ -3706,15 +3709,21 @@ _add_tab8(_update_label_ref, _t3_x, _status_y)
 
 _features_y = _status_y + 35
 _add_tab8(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
-_add_tab8(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _t3_x, _features_y + 22), _t3_x, _features_y + 22)
-_add_tab8(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _t3_x, _features_y + 42), _t3_x, _features_y + 42)
-_add_tab8(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _t3_x, _features_y + 62), _t3_x, _features_y + 62)
-_add_tab8(QtBind.createLabel(gui, '• Garden Dungeon otomatik oynatma', _t3_x, _features_y + 82), _t3_x, _features_y + 82)
-_add_tab8(QtBind.createLabel(gui, '• Auto Hwt sistemi', _t3_x, _features_y + 102), _t3_x, _features_y + 102)
-_add_tab8(QtBind.createLabel(gui, '• Oto Kervan sistemi', _t3_x, _features_y + 122), _t3_x, _features_y + 122)
-_add_tab8(QtBind.createLabel(gui, '• Script Komutları (TR_ScriptCommands)', _t3_x, _features_y + 142), _t3_x, _features_y + 142)
-_add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı (TR_InventoryCounter)', _t3_x, _features_y + 162), _t3_x, _features_y + 162)
-_add_tab8(QtBind.createLabel(gui, '• Otomatik güncelleme desteği', _t3_x, _features_y + 182), _t3_x, _features_y + 182)
+
+# Sol sütun
+_col1_x = _t3_x
+_add_tab8(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _col1_x, _features_y + 22), _col1_x, _features_y + 22)
+_add_tab8(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _col1_x, _features_y + 42), _col1_x, _features_y + 42)
+_add_tab8(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _col1_x, _features_y + 62), _col1_x, _features_y + 62)
+_add_tab8(QtBind.createLabel(gui, '• Garden Dungeon otomatik', _col1_x, _features_y + 82), _col1_x, _features_y + 82)
+_add_tab8(QtBind.createLabel(gui, '• Auto Hwt sistemi', _col1_x, _features_y + 102), _col1_x, _features_y + 102)
+
+# Sağ sütun
+_col2_x = _t3_x + 300
+_add_tab8(QtBind.createLabel(gui, '• Oto Kervan sistemi', _col2_x, _features_y + 22), _col2_x, _features_y + 22)
+_add_tab8(QtBind.createLabel(gui, '• Script Komutları', _col2_x, _features_y + 42), _col2_x, _features_y + 42)
+_add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı', _col2_x, _features_y + 62), _col2_x, _features_y + 62)
+_add_tab8(QtBind.createLabel(gui, '• Otomatik güncelleme', _col2_x, _features_y + 82), _col2_x, _features_y + 82)
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
