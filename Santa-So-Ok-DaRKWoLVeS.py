@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 
 pName = 'DaRKWoLVeS Alet Çantası'
 PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
-pVersion = '1.5.0'
+pVersion = '1.5.1'
 
 MOVE_DELAY = 0.25
 
