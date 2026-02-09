@@ -149,6 +149,105 @@ _script_cmds_Index = 0
 _script_cmds_StopBot = True
 _script_cmds_cbxShowPackets = None  # Tab 7'de oluşturulacak
 
+# Sunucu İletişimi (Server Communication) global değişkenleri
+_server_license_key = ""  # Kullanıcının lisans anahtarı
+_server_user_ip = ""  # Kullanıcının external IP adresi
+_server_ip_fetch_lock = threading.Lock()
+_server_ip_last_fetch = 0  # Son IP fetch zamanı (timestamp)
+
+def _fetch_user_external_ip():
+    """
+    Kullanıcının external IP adresini alır.
+    Birden fazla servis deneyerek güvenilirlik sağlar.
+    """
+    global _server_user_ip, _server_ip_last_fetch
+    
+    # Son 5 dakika içinde alınmışsa cache'den dön
+    now = time.time()
+    with _server_ip_fetch_lock:
+        if _server_user_ip and (now - _server_ip_last_fetch) < 300:
+            return _server_user_ip
+    
+    # Deneme yapılacak servisler (sırayla)
+    ip_services = [
+        'https://api.ipify.org?format=text',
+        'https://icanhazip.com',
+        'https://ident.me',
+        'https://ipinfo.io/ip'
+    ]
+    
+    fetched_ip = None
+    for service_url in ip_services:
+        try:
+            req = urllib.request.Request(
+                service_url,
+                headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            )
+            with urllib.request.urlopen(req, timeout=8) as r:
+                ip = r.read().decode('utf-8').strip()
+                # Basit IP format kontrolü (IPv4)
+                parts = ip.split('.')
+                if len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+                    fetched_ip = ip
+                    break
+        except Exception:
+            continue
+    
+    if fetched_ip:
+        with _server_ip_fetch_lock:
+            _server_user_ip = fetched_ip
+            _server_ip_last_fetch = now
+        log('[%s] [Server] Kullanıcı IP alındı: %s' % (pName, fetched_ip))
+        return fetched_ip
+    else:
+        log('[%s] [Server] IP adresi alınamadı!' % pName)
+        return None
+
+def _get_license_key():
+    """Config'den lisans anahtarını okur"""
+    global _server_license_key
+    return _server_license_key
+
+def _set_license_key(key):
+    """Lisans anahtarını ayarlar ve config'e kaydeder"""
+    global _server_license_key
+    _server_license_key = key.strip()
+    _save_server_config()
+    log('[%s] [Server] Lisans anahtarı güncellendi' % pName)
+
+def _save_server_config():
+    """Sunucu ayarlarını config dosyasına kaydeder"""
+    try:
+        config_path = get_config_dir() + pName + "\\" + "server_config.json"
+        config_dir = os.path.dirname(config_path)
+        
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        
+        config = {
+            "license_key": _server_license_key
+        }
+        
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+    except Exception as ex:
+        log('[%s] [Server] Config kaydetme hatası: %s' % (pName, str(ex)))
+
+def _load_server_config():
+    """Sunucu ayarlarını config dosyasından yükler"""
+    global _server_license_key
+    try:
+        config_path = get_config_dir() + pName + "\\" + "server_config.json"
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                _server_license_key = config.get("license_key", "")
+            log('[%s] [Server] Config yüklendi' % pName)
+    except Exception as ex:
+        log('[%s] [Server] Config yükleme hatası: %s' % (pName, str(ex)))
+        _server_license_key = ""
+
 def _download_garden_script(script_type="normal"):
     """GitHub'dan garden-dungeon script dosyasını indirir"""
     try:
@@ -495,6 +594,52 @@ def _do_auto_update_thread():
 def do_auto_update():
     t = threading.Thread(target=_do_auto_update_thread, name=pName + '_auto_update', daemon=True)
     t.start()
+
+def _save_license_key_clicked():
+    """Lisans anahtarını kaydet butonuna tıklandığında"""
+    try:
+        key = QtBind.text(gui, _tbx_license_key)
+        _set_license_key(key)
+        log('[%s] [Server] Lisans anahtarı kaydedildi.' % pName)
+    except Exception as ex:
+        log('[%s] [Server] Lisans kaydetme hatası: %s' % (pName, str(ex)))
+
+def _refresh_ip_clicked():
+    """IP yenile butonuna tıklandığında"""
+    try:
+        QtBind.setText(gui, _lbl_user_ip, 'Alınıyor...')
+        threading.Thread(target=_fetch_and_update_ip_ui, name=pName + '_fetch_ip', daemon=True).start()
+    except Exception as ex:
+        log('[%s] [Server] IP yenileme hatası: %s' % (pName, str(ex)))
+
+def _fetch_and_update_ip_ui():
+    """IP'yi fetch eder ve UI'ı günceller (thread-safe)"""
+    ip = _fetch_user_external_ip()
+    if ip:
+        try:
+            QtBind.setText(gui, _lbl_user_ip, ip)
+        except Exception:
+            pass
+    else:
+        try:
+            QtBind.setText(gui, _lbl_user_ip, 'Alınamadı')
+        except Exception:
+            pass
+
+def _init_server_credentials():
+    """Plugin başlatıldığında sunucu bilgilerini yükler ve IP'yi alır"""
+    # Config'i yükle
+    _load_server_config()
+    
+    # UI'ya lisans key'i yükle
+    try:
+        if _server_license_key:
+            QtBind.setText(gui, _tbx_license_key, _server_license_key)
+    except Exception:
+        pass
+    
+    # IP'yi background'da fetch et
+    threading.Thread(target=_fetch_and_update_ip_ui, name=pName + '_init_ip', daemon=True).start()
 
 NPC_STORAGE_SERVERNAMES = [
     'NPC_CH_WAREHOUSE_M', 'NPC_CH_WAREHOUSE_W', 'NPC_EU_WAREHOUSE',
@@ -4157,11 +4302,7 @@ def _inv_cnt_handle_chat(t, player, msg):
 _t3_x = _tab_bar_x + 20
 _t3_y = _content_y + 20
 
-# Author - sağda
-_author_x = _tab_bar_x + 420
-_add_tab8(QtBind.createLabel(gui, 'Author:  V i S K i   DaRK_WoLVeS <3', _author_x, _t3_y), _author_x, _t3_y)
-
-# Sürüm ve butonlar
+# Sürüm ve butonlar (Sol)
 _version_y = _t3_y
 _add_tab8(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _t3_x, _version_y)
 
@@ -4173,23 +4314,61 @@ _status_y = _btn_y + 30
 _update_label_ref = QtBind.createLabel(gui, '', _t3_x, _status_y)
 _add_tab8(_update_label_ref, _t3_x, _status_y)
 
-_features_y = _status_y + 35
+# Author ve Lisans Bilgileri (Sağ - Tek container)
+_right_section_x = _tab_bar_x + 450
+_right_section_y = _t3_y
+_right_section_w = 230
+_right_section_h = 180
+
+_right_container = QtBind.createList(gui, _right_section_x, _right_section_y, _right_section_w, _right_section_h)
+_add_tab8(_right_container, _right_section_x, _right_section_y)
+
+# Author
+_author_label_x = _right_section_x + 8
+_author_label_y = _right_section_y + 8
+_add_tab8(QtBind.createLabel(gui, 'Author:', _author_label_x, _author_label_y), _author_label_x, _author_label_y)
+_add_tab8(QtBind.createLabel(gui, 'V i S K i   DaRK_WoLVeS <3', _author_label_x + 5, _author_label_y + 18), _author_label_x + 5, _author_label_y + 18)
+
+# Lisans Key
+_license_key_y = _author_label_y + 43
+_add_tab8(QtBind.createLabel(gui, 'Lisans Key:', _author_label_x, _license_key_y), _author_label_x, _license_key_y)
+_tbx_license_key = QtBind.createLineEdit(gui, "", _author_label_x, _license_key_y + 18, 210, 18)
+_add_tab8(_tbx_license_key, _author_label_x, _license_key_y + 18)
+_btn_save_license = QtBind.createButton(gui, '_save_license_key_clicked', 'Kaydet', _author_label_x, _license_key_y + 39)
+_add_tab8(_btn_save_license, _author_label_x, _license_key_y + 39)
+
+# IP Adresi
+_ip_y = _license_key_y + 71
+_add_tab8(QtBind.createLabel(gui, 'IP:', _author_label_x, _ip_y), _author_label_x, _ip_y)
+_lbl_user_ip = QtBind.createLabel(gui, 'Alınıyor...', _author_label_x + 25, _ip_y)
+_add_tab8(_lbl_user_ip, _author_label_x + 25, _ip_y)
+_btn_refresh_ip = QtBind.createButton(gui, '_refresh_ip_clicked', 'Yenile', _author_label_x + 120, _ip_y - 6)
+_add_tab8(_btn_refresh_ip, _author_label_x + 120, _ip_y - 6)
+
+# Sunucu Durumu
+_server_status_y = _ip_y + 24
+_add_tab8(QtBind.createLabel(gui, 'Sunucu:', _author_label_x, _server_status_y), _author_label_x, _server_status_y)
+_lbl_server_status = QtBind.createLabel(gui, 'Bağlı Değil', _author_label_x + 55, _server_status_y)
+_add_tab8(_lbl_server_status, _author_label_x + 55, _server_status_y)
+
+# Plugin Özellikleri (Güncelleme durumunun altında)
+_features_y = _status_y + 30
 _add_tab8(QtBind.createLabel(gui, 'Plugin Özellikleri:', _t3_x, _features_y), _t3_x, _features_y)
 
 # Sol sütun
 _col1_x = _t3_x
-_add_tab8(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _col1_x, _features_y + 22), _col1_x, _features_y + 22)
-_add_tab8(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _col1_x, _features_y + 42), _col1_x, _features_y + 42)
-_add_tab8(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _col1_x, _features_y + 62), _col1_x, _features_y + 62)
-_add_tab8(QtBind.createLabel(gui, '• Garden Dungeon otomatik', _col1_x, _features_y + 82), _col1_x, _features_y + 82)
-_add_tab8(QtBind.createLabel(gui, '• Auto Hwt sistemi', _col1_x, _features_y + 102), _col1_x, _features_y + 102)
+_add_tab8(QtBind.createLabel(gui, '• So-Ok Event otomatik kullanma', _col1_x, _features_y + 18), _col1_x, _features_y + 18)
+_add_tab8(QtBind.createLabel(gui, '• Çanta/Banka birleştir ve sırala', _col1_x, _features_y + 34), _col1_x, _features_y + 34)
+_add_tab8(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _col1_x, _features_y + 50), _col1_x, _features_y + 50)
+_add_tab8(QtBind.createLabel(gui, '• Garden Dungeon otomatik', _col1_x, _features_y + 66), _col1_x, _features_y + 66)
+_add_tab8(QtBind.createLabel(gui, '• Auto Hwt sistemi', _col1_x, _features_y + 82), _col1_x, _features_y + 82)
 
 # Sağ sütun
 _col2_x = _t3_x + 300
-_add_tab8(QtBind.createLabel(gui, '• Oto Kervan sistemi', _col2_x, _features_y + 22), _col2_x, _features_y + 22)
-_add_tab8(QtBind.createLabel(gui, '• Script Komutları', _col2_x, _features_y + 42), _col2_x, _features_y + 42)
-_add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı', _col2_x, _features_y + 62), _col2_x, _features_y + 62)
-_add_tab8(QtBind.createLabel(gui, '• Otomatik güncelleme', _col2_x, _features_y + 82), _col2_x, _features_y + 82)
+_add_tab8(QtBind.createLabel(gui, '• Oto Kervan sistemi', _col2_x, _features_y + 18), _col2_x, _features_y + 18)
+_add_tab8(QtBind.createLabel(gui, '• Script Komutları', _col2_x, _features_y + 34), _col2_x, _features_y + 34)
+_add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı', _col2_x, _features_y + 50), _col2_x, _features_y + 50)
+_add_tab8(QtBind.createLabel(gui, '• Otomatik güncelleme', _col2_x, _features_y + 66), _col2_x, _features_y + 66)
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
@@ -4206,6 +4385,10 @@ try:
         os.makedirs(inv_cnt_path)
 except Exception:
     pass
+
+# Sunucu bilgilerini yükle ve IP'yi al
+_init_server_credentials()
+
 threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()
 threading.Thread(target=_check_script_updates_thread, name=pName + '_script_update', daemon=True).start()
 
@@ -4260,6 +4443,8 @@ def handle_silkroad(opcode, data):
 def joined_game():
     loadConfigs()
     inv_cnt_loadConfigs()
+    # IP'yi güncelle (oyuna girişte)
+    threading.Thread(target=_fetch_and_update_ip_ui, name=pName + '_joined_ip', daemon=True).start()
 
 def handle_chat(t, player, msg):
     _inv_cnt_handle_chat(t, player, msg)
