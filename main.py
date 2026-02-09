@@ -4,8 +4,9 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
+from enum import Enum
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -109,9 +110,26 @@ class UserResponse(BaseModel):
     public_id: str
     created_at: datetime
     is_active: bool
+    session_count: int = 0
+
+    @classmethod
+    def from_orm(cls, obj: models.User):
+        user_res = cls(
+            id=obj.id,
+            username=obj.username,
+            public_id=obj.public_id,
+            created_at=obj.created_at,
+            is_active=obj.is_active,
+            session_count=len(obj.sessions)
+        )
+        return user_res
 
     class Config:
         from_attributes = True
+
+class FileType(str, Enum):
+    CARAVAN = "CARAVAN"
+    SC = "SC"
 
 # --- ADMIN ROUTES ---
 
@@ -124,9 +142,10 @@ def create_user(user: UserCreate, db: Session = Depends(get_db), auth: bool = De
     return db_user
 
 
-@app.get("/admin/api/users", response_model=List[UserResponse], include_in_schema=False)
+@app.get("/admin/api/users", include_in_schema=False)
 def get_users(db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
-    return db.query(models.User).all()
+    db_users = db.query(models.User).all()
+    return [UserResponse.from_orm(user) for user in db_users]
 
 
 @app.delete("/admin/api/users/{user_id}", include_in_schema=False)
@@ -138,6 +157,25 @@ def delete_user(user_id: int, db: Session = Depends(get_db), auth: bool = Depend
     db.commit()
     return {"message": "User deleted"}
 
+
+@app.get("/admin/api/sessions/{user_id}", include_in_schema=False)
+def get_user_sessions(user_id: int, db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
+    return db.query(models.ActiveSession).filter(models.ActiveSession.user_id == user_id).all()
+
+@app.delete("/admin/api/sessions/{session_id}", include_in_schema=False)
+def delete_session(session_id: int, db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
+    session = db.query(models.ActiveSession).filter(models.ActiveSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    db.delete(session)
+    db.commit()
+    return {"message": "Session deleted"}
+
+@app.delete("/admin/api/sessions/user/{user_id}", include_in_schema=False)
+def delete_all_user_sessions(user_id: int, db: Session = Depends(get_db), auth: bool = Depends(authenticate_admin)):
+    db.query(models.ActiveSession).filter(models.ActiveSession.user_id == user_id).delete()
+    db.commit()
+    return {"message": "All sessions cleared"}
 
 @app.get("/admin/api/files", include_in_schema=False)
 def list_available_files(auth: bool = Depends(authenticate_admin)):
@@ -159,11 +197,20 @@ enum_files = {
     "SC": "files/sc"
 }
 
+def cleanup_sessions(db: Session, user_id: int):
+    """Delete sessions that haven't been active for more than 5 minutes."""
+    expiry_time = datetime.utcnow() - timedelta(minutes=5)
+    db.query(models.ActiveSession).filter(
+        models.ActiveSession.user_id == user_id,
+        models.ActiveSession.last_active < expiry_time
+    ).delete()
+    db.commit()
+
 @app.get("/api/download", tags=["Bot API"], summary="Dosya İndirme", description="Botun script ve ayar dosyalarını indirmesini sağlar. Lisans kontrolü ve IP sınırlaması içerir.")
 async def download_file(
     publicId: str = Query(..., description="Kullanıcının lisans anahtarı (Public ID)"), 
     ip: str = Query(..., description="Botun çalıştığı karakterin IP adresi"), 
-    type: str = Query(..., description="Dosya türü (CARAVAN veya SC)"), 
+    type: FileType = Query(..., description="Dosya türü"), 
     filename: str = Query(..., description="İndirilmek istenen dosya adı"),
     db: Session = Depends(get_db)
 ):
@@ -173,7 +220,10 @@ async def download_file(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid Public ID")
 
-    # 2. Check/Update Session
+    # 2. Cleanup stale sessions
+    cleanup_sessions(db, user.id)
+
+    # 3. Check/Update Session
     session = db.query(models.ActiveSession).filter(
         models.ActiveSession.user_id == user.id,
         models.ActiveSession.ip_address == ip
@@ -181,15 +231,16 @@ async def download_file(
 
     if not session:
         # Check active sessions count
-        # For simplicity, we consider any session in table as "active". 
-        # In a real app, you might check if last_active > 5 mins ago.
         active_count = db.query(models.ActiveSession).filter(models.ActiveSession.user_id == user.id).count()
         
         if active_count >= 2:
-            # Invalidate all existing sessions for this user
-            db.query(models.ActiveSession).filter(models.ActiveSession.user_id == user.id).delete()
-            db.commit()
-            # Note: The other 2 will get 401 on their next request because their session won't exist.
+            # Delete the oldest session to make room
+            oldest_session = db.query(models.ActiveSession).filter(
+                models.ActiveSession.user_id == user.id
+            ).order_by(models.ActiveSession.last_active.asc()).first()
+            if oldest_session:
+                db.delete(oldest_session)
+                db.commit()
         
         # Create new session
         session = models.ActiveSession(user_id=user.id, ip_address=ip)
@@ -201,7 +252,7 @@ async def download_file(
         session.last_active = datetime.utcnow()
         db.commit()
 
-    # 3. Serve File
+    # 4. Serve File
     if type.upper() not in enum_files:
         raise HTTPException(status_code=400, detail="Invalid enum type. Use CARAVAN or SC.")
     
@@ -224,13 +275,24 @@ async def validate_connection(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid Public ID")
 
+    # Cleanup stale sessions
+    cleanup_sessions(db, user.id)
+
     session = db.query(models.ActiveSession).filter(
         models.ActiveSession.user_id == user.id,
         models.ActiveSession.ip_address == ip
     ).first()
 
     if not session:
-        raise HTTPException(status_code=401, detail="Session terminated")
+        # Try to create a session if there's room
+        active_count = db.query(models.ActiveSession).filter(models.ActiveSession.user_id == user.id).count()
+        if active_count < 2:
+            session = models.ActiveSession(user_id=user.id, ip_address=ip)
+            db.add(session)
+            db.commit()
+            return {"status": "ok", "message": "Authorized (New session)"}
+        else:
+            raise HTTPException(status_code=401, detail="Session terminated and limit reached")
 
     session.last_active = datetime.utcnow()
     db.commit()
@@ -240,7 +302,7 @@ async def validate_connection(
 async def list_files_public(
     publicId: str = Query(..., description="Lisans anahtarı"), 
     ip: str = Query(..., description="IP adresi"), 
-    type: str = Query(..., description="İndirilebilir dosya türü"), 
+    type: FileType = Query(..., description="İndirilebilir dosya türü"), 
     db: Session = Depends(get_db)
 ):
 
@@ -250,13 +312,27 @@ async def list_files_public(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
     
+    # Cleanup stale sessions
+    cleanup_sessions(db, user.id)
+
     # Check session
     session = db.query(models.ActiveSession).filter(
         models.ActiveSession.user_id == user.id,
         models.ActiveSession.ip_address == ip
     ).first()
     if not session:
-        raise HTTPException(status_code=401, detail="No active session")
+        # Try to create a session if there's room
+        active_count = db.query(models.ActiveSession).filter(models.ActiveSession.user_id == user.id).count()
+        if active_count < 2:
+            session = models.ActiveSession(user_id=user.id, ip_address=ip)
+            db.add(session)
+            db.commit()
+        else:
+            raise HTTPException(status_code=401, detail="No active session and limit reached")
+    else:
+        # Update activity
+        session.last_active = datetime.utcnow()
+        db.commit()
 
     # List files
     if type.upper() not in enum_files:

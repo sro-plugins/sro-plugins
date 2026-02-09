@@ -13,7 +13,13 @@ const elements = {
     usersTab: document.getElementById('usersTab'),
     testerTab: document.getElementById('testerTab'),
     usersSection: document.getElementById('usersSection'),
-    testerSection: document.getElementById('testerSection')
+    testerSection: document.getElementById('testerSection'),
+    sessionModal: document.getElementById('sessionModal'),
+    sessionList: document.getElementById('sessionList'),
+    closeSessionModal: document.getElementById('closeSessionModal'),
+    dismissSessionModal: document.getElementById('dismissSessionModal'),
+    sessionUserSub: document.getElementById('sessionUserSub'),
+    clearAllSessionsBtn: document.getElementById('clearAllSessionsBtn')
 };
 
 
@@ -66,7 +72,7 @@ function renderUsers() {
     elements.userList.innerHTML = '';
 
     if (users.length === 0) {
-        elements.userList.innerHTML = `<tr><td colspan="5" style="text-align: center; color: #b0b0b0;">No users found. Generate a new key to start!</td></tr>`;
+        elements.userList.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-dim);">No users found. Generate a new key to start!</td></tr>`;
         return;
     }
 
@@ -85,13 +91,24 @@ function renderUsers() {
             </td>
             <td>${date}</td>
             <td>
+                <div class="session-indicator" onclick="openSessionManager(${user.id}, '${user.username}')">
+                    <div class="status-tag ${user.session_count > 0 ? 'active' : 'inactive'}">
+                        ${user.session_count > 0 ? 'Active' : 'Offline'}
+                    </div>
+                    <i class="fas fa-network-wired" style="font-size:14px; color: var(--secondary)"></i>
+                </div>
+            </td>
+            <td>
                 <span class="status-tag ${user.is_active ? 'active' : 'inactive'}">
                     ${user.is_active ? 'Active' : 'Disabled'}
                 </span>
             </td>
             <td>
                 <div style="display:flex; gap: 10px;">
-                    <button class="btn danger" style="padding: 8px 12px;" onclick="deleteUser(${user.id})">
+                    <button class="btn info" style="padding: 8px 12px;" onclick="openSessionManager(${user.id}, '${user.username}')" title="Manage Sessions">
+                        <i class="fas fa-list-ul"></i>
+                    </button>
+                    <button class="btn danger" style="padding: 8px 12px;" onclick="deleteUser(${user.id})" title="Delete User">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -103,8 +120,8 @@ function renderUsers() {
 
 function updateStats() {
     elements.totalUsers.innerText = users.length;
-    // Active sessions would ideally come from another endpoint
-    elements.activeSessions.innerText = 'Online';
+    const onlineCount = users.reduce((acc, user) => acc + (user.session_count || 0), 0);
+    elements.activeSessions.innerText = onlineCount;
 }
 
 // Create User
@@ -154,6 +171,76 @@ function openModal() {
 
 function closeModal() {
     elements.userModal.style.display = 'none';
+}
+
+// Session Manager
+let currentUserIdForSessions = null;
+
+async function openSessionManager(userId, username) {
+    currentUserIdForSessions = userId;
+    elements.sessionUserSub.innerText = `Managing sessions for character: ${username}`;
+    elements.sessionModal.style.display = 'flex';
+    loadSessions();
+}
+
+async function loadSessions() {
+    if (!currentUserIdForSessions) return;
+    elements.sessionList.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">Loading...</td></tr>';
+
+    try {
+        const response = await fetch(`${apiBase}/sessions/${currentUserIdForSessions}`);
+        const sessions = await response.json();
+
+        if (sessions.length === 0) {
+            elements.sessionList.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--text-dim);">No active sessions</td></tr>';
+            return;
+        }
+
+        elements.sessionList.innerHTML = sessions.map(s => {
+            const lastSeen = new Date(s.last_active).toLocaleTimeString();
+            return `
+                <tr>
+                    <td style="padding:12px;"><code>${s.ip_address}</code></td>
+                    <td style="padding:12px;">${lastSeen}</td>
+                    <td style="padding:12px;">
+                        <button class="btn danger" style="padding:5px 10px; font-size:12px;" onclick="kickSession(${s.id})">
+                            <i class="fas fa-times"></i> Kick
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function kickSession(sessionId) {
+    if (!confirm('Kick this character session?')) return;
+    try {
+        await fetch(`${apiBase}/sessions/${sessionId}`, { method: 'DELETE' });
+        loadSessions();
+        fetchUsers();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function clearAllSessions() {
+    if (!currentUserIdForSessions) return;
+    if (!confirm('Are you sure you want to clear ALL sessions for this user?')) return;
+
+    try {
+        await fetch(`${apiBase}/sessions/user/${currentUserIdForSessions}`, { method: 'DELETE' });
+        loadSessions();
+        fetchUsers();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function closeSessionModal() {
+    elements.sessionModal.style.display = 'none';
 }
 
 // Tab Switching
@@ -210,9 +297,13 @@ elements.createUserBtn.addEventListener('click', openModal);
 
 elements.closeModal.addEventListener('click', closeModal);
 elements.saveUser.addEventListener('click', saveUser);
+elements.closeSessionModal.addEventListener('click', closeSessionModal);
+elements.dismissSessionModal.addEventListener('click', closeSessionModal);
+if (elements.clearAllSessionsBtn) elements.clearAllSessionsBtn.addEventListener('click', clearAllSessions);
 
 window.onclick = function (event) {
     if (event.target == elements.userModal) closeModal();
+    if (event.target == elements.sessionModal) closeSessionModal();
 }
 
 // Initial Load
