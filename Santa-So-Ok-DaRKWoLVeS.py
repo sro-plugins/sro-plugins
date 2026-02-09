@@ -248,6 +248,124 @@ def _load_server_config():
         log('[%s] [Server] Config yükleme hatası: %s' % (pName, str(ex)))
         _server_license_key = ""
 
+def _validate_license():
+    """
+    Sunucuya lisans doğrulama isteği gönderir.
+    IP manipüle edilemez - external servislerden alınır.
+    
+    Returns:
+        dict: {"valid": True/False, "message": "..."} veya None (hata durumunda)
+    """
+    try:
+        license_key = _get_license_key()
+        
+        # Lisans key kontrolü
+        if not license_key:
+            log('[%s] [Server] Lisans anahtarı girilmemiş!' % pName)
+            return {"valid": False, "message": "Lisans anahtarı girilmemiş"}
+        
+        # IP'yi al (manipüle edilemez - external servislerden alınır)
+        user_ip = _fetch_user_external_ip()
+        if not user_ip:
+            log('[%s] [Server] IP adresi alınamadı!' % pName)
+            return {"valid": False, "message": "IP adresi alınamadı"}
+        
+        # API URL'i oluştur (query parametreleri ile)
+        api_url = 'https://vps.sro-plugins.cloud/api/validate?publicId=%s&ip=%s' % (
+            urllib.parse.quote(license_key),
+            urllib.parse.quote(user_ip)
+        )
+        
+        log('[%s] [Server] Lisans doğrulanıyor... (IP: %s)' % (pName, user_ip))
+        
+        # İstek gönder
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                'User-Agent': 'phBot-Santa-So-Ok-Plugin/' + pVersion,
+                'Accept': 'application/json'
+            }
+        )
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
+            response_data = response.read().decode('utf-8')
+            
+            # JSON yanıt parse et
+            try:
+                result = json.loads(response_data)
+            except:
+                # JSON değilse düz text olarak değerlendir
+                result = {"detail": response_data}
+            
+            # Sunucu response formatı: {"status": "ok", "message": "..."} -> başarılı
+            # Sunucu response formatı: {"detail": "..."} -> hata
+            if result.get("status") == "ok":
+                msg = result.get("message", "Authorized")
+                log('[%s] [Server] Lisans geçerli: %s' % (pName, msg))
+                return {"valid": True, "message": msg}
+            else:
+                msg = result.get("detail", result.get("message", "Lisans geçersiz"))
+                log('[%s] [Server] Lisans doğrulama başarısız: %s' % (pName, msg))
+                return {"valid": False, "message": msg}
+                
+    except urllib.error.HTTPError as ex:
+        error_msg = "HTTP %d" % ex.code
+        log('[%s] [Server] Lisans doğrulama hatası: %s' % (pName, error_msg))
+        return {"valid": False, "message": error_msg}
+    except Exception as ex:
+        error_msg = str(ex)
+        log('[%s] [Server] Lisans doğrulama hatası: %s' % (pName, error_msg))
+        return {"valid": False, "message": error_msg}
+
+def _validate_license_and_update_ui():
+    """Lisans doğrulama yapar ve UI'ı günceller (thread-safe) - init sırasında çağrılır"""
+    try:
+        # UI'ı kontrol ediliyor durumuna getir
+        QtBind.setText(gui, _lbl_server_status, 'Kontrol ediliyor...')
+        # Error mesajlarını temizle
+        QtBind.setText(gui, _lbl_error_msg1, '')
+        QtBind.setText(gui, _lbl_error_msg2, '')
+    except Exception:
+        pass
+    
+    # Lisans doğrula
+    result = _validate_license()
+    
+    if result and result.get("valid"):
+        # Başarılı - lisans durumunu güncelle ve butonları aktif et
+        _update_license_status(True)
+        try:
+            QtBind.setText(gui, _lbl_server_status, 'Sunucu: Bağlı - Geçerli')
+            # Error mesajlarını temizle
+            QtBind.setText(gui, _lbl_error_msg1, '')
+            QtBind.setText(gui, _lbl_error_msg2, '')
+            log('[%s] [Server] Lisans başarıyla doğrulandı!' % pName)
+        except Exception:
+            pass
+    else:
+        # Hata - lisans durumunu güncelle ve butonları pasif et
+        _update_license_status(False)
+        
+        # Hata - init sırasında geçersiz key'i temizle
+        global _server_license_key
+        _server_license_key = ""
+        _save_server_config()
+        
+        error_msg = result.get("message", "Bilinmeyen hata") if result else "Bağlantı hatası"
+        
+        # HTTP hataları veya bağlantı sorunları için "Bağlantı hatası"
+        if "HTTP" in error_msg or "timed out" in error_msg.lower() or "connection" in error_msg.lower():
+            error_msg = "Bağlantı hatası"
+        
+        try:
+            QtBind.setText(gui, _lbl_server_status, 'Sunucu: ' + error_msg)
+            
+            # Error açıklama mesajı göster
+            QtBind.setText(gui, _lbl_error_msg1, 'Sorun devam ederse,')
+            QtBind.setText(gui, _lbl_error_msg2, 'brkcnszgn@gmail.com')
+        except Exception:
+            pass
+
 def _download_garden_script(script_type="normal"):
     """GitHub'dan garden-dungeon script dosyasını indirir"""
     try:
@@ -596,13 +714,84 @@ def do_auto_update():
     t.start()
 
 def _save_license_key_clicked():
-    """Lisans anahtarını kaydet butonuna tıklandığında"""
+    """Lisans anahtarını kaydet butonuna tıklandığında - önce doğrular, başarılıysa kaydeder"""
     try:
         key = QtBind.text(gui, _tbx_license_key)
-        _set_license_key(key)
-        log('[%s] [Server] Lisans anahtarı kaydedildi.' % pName)
+        if not key or not key.strip():
+            log('[%s] [Server] Lisans anahtarı boş olamaz!' % pName)
+            return
+        
+        # Geçici olarak key'i set et (kaydetmeden önce doğrulama için)
+        global _server_license_key
+        temp_key = _server_license_key
+        _server_license_key = key.strip()
+        
+        # Doğrulama yap
+        threading.Thread(target=_validate_and_save_if_success, name=pName + '_validate_save', daemon=True).start()
     except Exception as ex:
         log('[%s] [Server] Lisans kaydetme hatası: %s' % (pName, str(ex)))
+
+def _validate_and_save_if_success():
+    """Lisans doğrular, başarılıysa kaydeder"""
+    try:
+        # UI'ı kontrol ediliyor durumuna getir
+        QtBind.setText(gui, _lbl_server_status, 'Sunucu: Kontrol ediliyor...')
+        QtBind.setText(gui, _lbl_error_msg1, '')
+        QtBind.setText(gui, _lbl_error_msg2, '')
+    except Exception:
+        pass
+    
+    # Lisans doğrula
+    result = _validate_license()
+    
+    if result and result.get("valid"):
+        # Başarılı - kaydet ve butonları aktif et
+        _save_server_config()
+        _update_license_status(True)
+        try:
+            QtBind.setText(gui, _lbl_server_status, 'Sunucu: Bağlı - Geçerli')
+            QtBind.setText(gui, _lbl_error_msg1, '')
+            QtBind.setText(gui, _lbl_error_msg2, '')
+            log('[%s] [Server] Lisans doğrulandı ve kaydedildi!' % pName)
+        except Exception:
+            pass
+    else:
+        # Hata - kaydetme ve butonları pasif et
+        _update_license_status(False)
+        global _server_license_key
+        _server_license_key = ""  # Geçersiz key'i temizle
+        
+        error_msg = result.get("message", "Bilinmeyen hata") if result else "Bağlantı hatası"
+        
+        # HTTP 401 gibi kodları "Bağlantı hatası" olarak göster
+        if "HTTP" in error_msg or "timed out" in error_msg.lower() or "connection" in error_msg.lower():
+            error_msg = "Bağlantı hatası"
+        
+        try:
+            QtBind.setText(gui, _lbl_server_status, 'Sunucu: ' + error_msg)
+            log('[%s] [Server] Lisans geçersiz, kaydedilmedi!' % pName)
+        except Exception:
+            pass
+
+def _clear_license_key_clicked():
+    """Temizle butonuna tıklandığında - kayıtlı lisans anahtarını siler"""
+    try:
+        global _server_license_key
+        _server_license_key = ""
+        _save_server_config()
+        
+        # Butonları pasif et
+        _update_license_status(False)
+        
+        # UI'ı temizle
+        QtBind.setText(gui, _tbx_license_key, '')
+        QtBind.setText(gui, _lbl_server_status, 'Sunucu: Bağlı Değil')
+        QtBind.setText(gui, _lbl_error_msg1, '')
+        QtBind.setText(gui, _lbl_error_msg2, '')
+        
+        log('[%s] [Server] Lisans anahtarı temizlendi' % pName)
+    except Exception as ex:
+        log('[%s] [Server] Temizleme hatası: %s' % (pName, str(ex)))
 
 def _refresh_ip_clicked():
     """IP yenile butonuna tıklandığında"""
@@ -627,9 +816,13 @@ def _fetch_and_update_ip_ui():
             pass
 
 def _init_server_credentials():
-    """Plugin başlatıldığında sunucu bilgilerini yükler ve IP'yi alır"""
+    """Plugin başlatıldığında sunucu bilgilerini yükler, IP'yi alır ve lisans doğrular"""
     # Config'i yükle
     _load_server_config()
+    
+    # Başlangıçta butonları pasif et (lisans yoksa)
+    if not _server_license_key:
+        _update_license_status(False)
     
     # UI'ya lisans key'i yükle
     try:
@@ -638,8 +831,19 @@ def _init_server_credentials():
     except Exception:
         pass
     
-    # IP'yi background'da fetch et
-    threading.Thread(target=_fetch_and_update_ip_ui, name=pName + '_init_ip', daemon=True).start()
+    # IP'yi fetch et ve lisans doğrula (background'da)
+    def _init_validate():
+        # Önce IP'yi al
+        _fetch_and_update_ip_ui()
+        # Lisans key varsa doğrula
+        if _server_license_key:
+            time.sleep(1)  # IP'nin UI'a yansıması için kısa bekleme
+            _validate_license_and_update_ui()
+        else:
+            # Lisans yoksa butonları pasif tut
+            _update_license_status(False)
+    
+    threading.Thread(target=_init_validate, name=pName + '_init_validate', daemon=True).start()
 
 NPC_STORAGE_SERVERNAMES = [
     'NPC_CH_WAREHOUSE_M', 'NPC_CH_WAREHOUSE_W', 'NPC_EU_WAREHOUSE',
@@ -678,6 +882,9 @@ def _jewel_loop():
     log('[%s] Jewel Box kırdırma durdu.' % pName)
 
 def jewel_start():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _jewel_thread
     with _jewel_lock:
         if _jewel_thread and _jewel_thread.is_alive():
@@ -689,6 +896,9 @@ def jewel_start():
     log('[%s] Jewel Box kırdırma başladı.' % pName)
 
 def jewel_stop():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _jewel_thread
     with _jewel_lock:
         _jewel_stop_event.set()
@@ -789,6 +999,9 @@ def _merge_loop():
     log('[%s] Birleştirme bitti.' % pName)
 
 def merge_start():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _merge_thread
     with _merge_lock:
         if _merge_thread and _merge_thread.is_alive():
@@ -800,6 +1013,9 @@ def merge_start():
     log('[%s] Birleştirme başladı.' % pName)
 
 def merge_stop():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _merge_thread
     with _merge_lock:
         _merge_stop_event.set()
@@ -882,6 +1098,9 @@ def _sort_loop():
     log('[%s] Sıralama bitti.' % pName)
 
 def sort_start():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _sort_thread
     with _sort_lock:
         if _sort_thread and _sort_thread.is_alive():
@@ -893,6 +1112,9 @@ def sort_start():
     log('[%s] Sıralama başladı.' % pName)
 
 def sort_stop():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _sort_thread
     with _sort_lock:
         _sort_stop_event.set()
@@ -1034,6 +1256,9 @@ def _bank_merge_loop():
     log('[%s] Banka birleştirme bitti.' % pName)
 
 def bank_merge_start():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _bank_merge_thread
     if not _open_storage_npc():
         return
@@ -1047,6 +1272,9 @@ def bank_merge_start():
     log('[%s] Banka birleştirme başladı.' % pName)
 
 def bank_merge_stop():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _bank_merge_thread
     with _bank_merge_lock:
         _bank_merge_stop_event.set()
@@ -1094,6 +1322,9 @@ def _bank_sort_loop():
     log('[%s] Banka sıralama bitti.' % pName)
 
 def bank_sort_start():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _bank_sort_thread
     if not _open_storage_npc():
         return
@@ -1107,6 +1338,9 @@ def bank_sort_start():
     log('[%s] Banka sıralama başladı.' % pName)
 
 def bank_sort_stop():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
     global _bank_sort_thread
     with _bank_sort_lock:
         _bank_sort_stop_event.set()
@@ -2699,6 +2933,31 @@ def _script_cmds_InjectPackets():
 
 gui = QtBind.init(__name__, pName)
 
+# Lisans kontrol sistemi
+_license_valid_cache = False
+_protected_buttons = {}  # {tab_number: [button_refs]}
+
+def _is_license_valid():
+    """Lisans geçerli mi kontrol eder"""
+    global _license_valid_cache
+    return _license_valid_cache
+
+def _update_license_status(is_valid):
+    """Lisans durumunu günceller ve butonları enable/disable eder"""
+    global _license_valid_cache
+    _license_valid_cache = is_valid
+    _update_all_buttons_state()
+
+def _update_all_buttons_state():
+    """Tüm korumalı butonların durumunu günceller"""
+    is_valid = _is_license_valid()
+    for tab_num, buttons in _protected_buttons.items():
+        for btn in buttons:
+            try:
+                QtBind.setEnabled(gui, btn, is_valid)
+            except:
+                pass
+
 TAB_OFFSCREEN = -3000
 _tab1_widgets = []
 _tab2_widgets = []
@@ -2920,8 +3179,13 @@ _jewel_x = _tab_bar_x + (_tab_bar_w - _jewel_w) // 2
 _jewel_container = QtBind.createList(gui, _jewel_x, _jewel_y, _jewel_w, _jewel_h)
 _add_tab1(_jewel_container, _jewel_x, _jewel_y)
 _add_tab1(QtBind.createLabel(gui, 'So-Ok Event Kullanma', _jewel_x + 70, _jewel_y + 8), _jewel_x + 70, _jewel_y + 8)
-_add_tab1(QtBind.createButton(gui, 'jewel_start', 'Başla', _jewel_x + 60, _jewel_y + 32), _jewel_x + 60, _jewel_y + 32)
-_add_tab1(QtBind.createButton(gui, 'jewel_stop', 'Durdur', _jewel_x + 140, _jewel_y + 32), _jewel_x + 140, _jewel_y + 32)
+_btn_jewel_start = QtBind.createButton(gui, 'jewel_start', 'Başla', _jewel_x + 60, _jewel_y + 32)
+_add_tab1(_btn_jewel_start, _jewel_x + 60, _jewel_y + 32)
+_btn_jewel_stop = QtBind.createButton(gui, 'jewel_stop', 'Durdur', _jewel_x + 140, _jewel_y + 32)
+_add_tab1(_btn_jewel_stop, _jewel_x + 140, _jewel_y + 32)
+
+# Tab 1 butonlarını koruma listesine ekle
+_protected_buttons[1] = [_btn_jewel_start, _btn_jewel_stop]
 
 _row2_y = _jewel_y + _jewel_h + 12
 _container_w = 280
@@ -2941,15 +3205,21 @@ _iy1 = _row2_y + 32
 _frame2 = QtBind.createList(gui, _inv_container_x + 12, _iy1, _container_w - 24, 50)
 _add_tab1(_frame2, _inv_container_x + 12, _iy1)
 _add_tab1(QtBind.createLabel(gui, 'Çantayı Birleştir', _inv_container_x + (_container_w - 100) // 2, _iy1 + 5), _inv_container_x + (_container_w - 100) // 2, _iy1 + 5)
-_add_tab1(QtBind.createButton(gui, 'merge_start', 'Başla', _inv_container_x + (_container_w - 160) // 2, _iy1 + 25), _inv_container_x + (_container_w - 160) // 2, _iy1 + 25)
-_add_tab1(QtBind.createButton(gui, 'merge_stop', 'Durdur', _inv_container_x + (_container_w - 160) // 2 + 80, _iy1 + 25), _inv_container_x + (_container_w - 160) // 2 + 80, _iy1 + 25)
+_btn_merge_start = QtBind.createButton(gui, 'merge_start', 'Başla', _inv_container_x + (_container_w - 160) // 2, _iy1 + 25)
+_add_tab1(_btn_merge_start, _inv_container_x + (_container_w - 160) // 2, _iy1 + 25)
+_btn_merge_stop = QtBind.createButton(gui, 'merge_stop', 'Durdur', _inv_container_x + (_container_w - 160) // 2 + 80, _iy1 + 25)
+_add_tab1(_btn_merge_stop, _inv_container_x + (_container_w - 160) // 2 + 80, _iy1 + 25)
+_protected_buttons[1].extend([_btn_merge_start, _btn_merge_stop])
 
 _iy2 = _iy1 + 58
 _frame3 = QtBind.createList(gui, _inv_container_x + 12, _iy2, _container_w - 24, 50)
 _add_tab1(_frame3, _inv_container_x + 12, _iy2)
 _add_tab1(QtBind.createLabel(gui, 'Çantayı Sırala', _inv_container_x + (_container_w - 90) // 2, _iy2 + 5), _inv_container_x + (_container_w - 90) // 2, _iy2 + 5)
-_add_tab1(QtBind.createButton(gui, 'sort_start', 'Başla', _inv_container_x + (_container_w - 160) // 2, _iy2 + 25), _inv_container_x + (_container_w - 160) // 2, _iy2 + 25)
-_add_tab1(QtBind.createButton(gui, 'sort_stop', 'Durdur', _inv_container_x + (_container_w - 160) // 2 + 80, _iy2 + 25), _inv_container_x + (_container_w - 160) // 2 + 80, _iy2 + 25)
+_btn_sort_start = QtBind.createButton(gui, 'sort_start', 'Başla', _inv_container_x + (_container_w - 160) // 2, _iy2 + 25)
+_add_tab1(_btn_sort_start, _inv_container_x + (_container_w - 160) // 2, _iy2 + 25)
+_btn_sort_stop = QtBind.createButton(gui, 'sort_stop', 'Durdur', _inv_container_x + (_container_w - 160) // 2 + 80, _iy2 + 25)
+_add_tab1(_btn_sort_stop, _inv_container_x + (_container_w - 160) // 2 + 80, _iy2 + 25)
+_protected_buttons[1].extend([_btn_sort_start, _btn_sort_stop])
 
 _bank_container = QtBind.createList(gui, _bank_container_x, _row2_y, _container_w, _container_h)
 _add_tab1(_bank_container, _bank_container_x, _row2_y)
@@ -2960,15 +3230,21 @@ _by1 = _row2_y + 46
 _store_merge_frame = QtBind.createList(gui, _bank_container_x + 12, _by1, _container_w - 24, 50)
 _add_tab1(_store_merge_frame, _bank_container_x + 12, _by1)
 _add_tab1(QtBind.createLabel(gui, 'Bankayı Birleştir', _bank_container_x + (_container_w - 105) // 2, _by1 + 5), _bank_container_x + (_container_w - 105) // 2, _by1 + 5)
-_add_tab1(QtBind.createButton(gui, 'bank_merge_start', 'Başla', _bank_container_x + (_container_w - 160) // 2, _by1 + 25), _bank_container_x + (_container_w - 160) // 2, _by1 + 25)
-_add_tab1(QtBind.createButton(gui, 'bank_merge_stop', 'Durdur', _bank_container_x + (_container_w - 160) // 2 + 80, _by1 + 25), _bank_container_x + (_container_w - 160) // 2 + 80, _by1 + 25)
+_btn_bank_merge_start = QtBind.createButton(gui, 'bank_merge_start', 'Başla', _bank_container_x + (_container_w - 160) // 2, _by1 + 25)
+_add_tab1(_btn_bank_merge_start, _bank_container_x + (_container_w - 160) // 2, _by1 + 25)
+_btn_bank_merge_stop = QtBind.createButton(gui, 'bank_merge_stop', 'Durdur', _bank_container_x + (_container_w - 160) // 2 + 80, _by1 + 25)
+_add_tab1(_btn_bank_merge_stop, _bank_container_x + (_container_w - 160) // 2 + 80, _by1 + 25)
+_protected_buttons[1].extend([_btn_bank_merge_start, _btn_bank_merge_stop])
 
 _by2 = _by1 + 58
 _store_sort_frame = QtBind.createList(gui, _bank_container_x + 12, _by2, _container_w - 24, 50)
 _add_tab1(_store_sort_frame, _bank_container_x + 12, _by2)
 _add_tab1(QtBind.createLabel(gui, 'Bankayı Sırala', _bank_container_x + (_container_w - 95) // 2, _by2 + 5), _bank_container_x + (_container_w - 95) // 2, _by2 + 5)
-_add_tab1(QtBind.createButton(gui, 'bank_sort_start', 'Başla', _bank_container_x + (_container_w - 160) // 2, _by2 + 25), _bank_container_x + (_container_w - 160) // 2, _by2 + 25)
-_add_tab1(QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _bank_container_x + (_container_w - 160) // 2 + 80, _by2 + 25), _bank_container_x + (_container_w - 160) // 2 + 80, _by2 + 25)
+_btn_bank_sort_start = QtBind.createButton(gui, 'bank_sort_start', 'Başla', _bank_container_x + (_container_w - 160) // 2, _by2 + 25)
+_add_tab1(_btn_bank_sort_start, _bank_container_x + (_container_w - 160) // 2, _by2 + 25)
+_btn_bank_sort_stop = QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _bank_container_x + (_container_w - 160) // 2 + 80, _by2 + 25)
+_add_tab1(_btn_bank_sort_stop, _bank_container_x + (_container_w - 160) // 2 + 80, _by2 + 25)
+_protected_buttons[1].extend([_btn_bank_sort_start, _btn_bank_sort_stop])
 
 # Tab 2 - Auto Dungeon
 _t2_y = _content_y + 10
@@ -4308,17 +4584,17 @@ _add_tab8(QtBind.createLabel(gui, 'Sürüm: v' + pVersion, _t3_x, _version_y), _
 
 _btn_y = _version_y + 26
 _add_tab8(QtBind.createButton(gui, 'check_update', 'Kontrol', _t3_x, _btn_y), _t3_x, _btn_y)
-_add_tab8(QtBind.createButton(gui, 'do_auto_update', 'Güncelle', _t3_x + 70, _btn_y), _t3_x + 70, _btn_y)
+_add_tab8(QtBind.createButton(gui, 'do_auto_update', 'Güncelle', _t3_x + 85, _btn_y), _t3_x + 85, _btn_y)
 
 _status_y = _btn_y + 30
-_update_label_ref = QtBind.createLabel(gui, '', _t3_x, _status_y)
+_update_label_ref = QtBind.createLabel(gui, 'Güncelleme kontrol ediliyor...                    ', _t3_x, _status_y)
 _add_tab8(_update_label_ref, _t3_x, _status_y)
 
 # Author ve Lisans Bilgileri (Sağ - Tek container)
-_right_section_x = _tab_bar_x + 450
+_right_section_x = _tab_bar_x + 425
 _right_section_y = _t3_y
-_right_section_w = 230
-_right_section_h = 180
+_right_section_w = 260
+_right_section_h = 210
 
 _right_container = QtBind.createList(gui, _right_section_x, _right_section_y, _right_section_w, _right_section_h)
 _add_tab8(_right_container, _right_section_x, _right_section_y)
@@ -4332,24 +4608,33 @@ _add_tab8(QtBind.createLabel(gui, 'V i S K i   DaRK_WoLVeS <3', _author_label_x 
 # Lisans Key
 _license_key_y = _author_label_y + 43
 _add_tab8(QtBind.createLabel(gui, 'Lisans Key:', _author_label_x, _license_key_y), _author_label_x, _license_key_y)
-_tbx_license_key = QtBind.createLineEdit(gui, "", _author_label_x, _license_key_y + 18, 210, 18)
+_tbx_license_key = QtBind.createLineEdit(gui, "", _author_label_x, _license_key_y + 18, 240, 18)
 _add_tab8(_tbx_license_key, _author_label_x, _license_key_y + 18)
 _btn_save_license = QtBind.createButton(gui, '_save_license_key_clicked', 'Kaydet', _author_label_x, _license_key_y + 39)
 _add_tab8(_btn_save_license, _author_label_x, _license_key_y + 39)
+_btn_clear_license = QtBind.createButton(gui, '_clear_license_key_clicked', 'Temizle', _author_label_x + 160, _license_key_y + 39)
+_add_tab8(_btn_clear_license, _author_label_x + 160, _license_key_y + 39)
 
 # IP Adresi
 _ip_y = _license_key_y + 71
 _add_tab8(QtBind.createLabel(gui, 'IP:', _author_label_x, _ip_y), _author_label_x, _ip_y)
 _lbl_user_ip = QtBind.createLabel(gui, 'Alınıyor...', _author_label_x + 25, _ip_y)
 _add_tab8(_lbl_user_ip, _author_label_x + 25, _ip_y)
-_btn_refresh_ip = QtBind.createButton(gui, '_refresh_ip_clicked', 'Yenile', _author_label_x + 120, _ip_y - 6)
-_add_tab8(_btn_refresh_ip, _author_label_x + 120, _ip_y - 6)
+_btn_refresh_ip = QtBind.createButton(gui, '_refresh_ip_clicked', 'Yenile', _author_label_x + 160, _ip_y - 6)
+_add_tab8(_btn_refresh_ip, _author_label_x + 160, _ip_y - 6)
 
 # Sunucu Durumu
 _server_status_y = _ip_y + 24
-_add_tab8(QtBind.createLabel(gui, 'Sunucu:', _author_label_x, _server_status_y), _author_label_x, _server_status_y)
-_lbl_server_status = QtBind.createLabel(gui, 'Bağlı Değil', _author_label_x + 55, _server_status_y)
-_add_tab8(_lbl_server_status, _author_label_x + 55, _server_status_y)
+# Label'ı en uzun olası metinle oluştur (sonra setText ile değiştirilecek)
+_lbl_server_status = QtBind.createLabel(gui, 'Sunucu: Kontrol ediliyor...          ', _author_label_x, _server_status_y)
+_add_tab8(_lbl_server_status, _author_label_x, _server_status_y)
+
+# Error mesajı (sadece hata durumunda görünür)
+_error_msg_y = _server_status_y + 18
+_lbl_error_msg1 = QtBind.createLabel(gui, '', _author_label_x, _error_msg_y)
+_add_tab8(_lbl_error_msg1, _author_label_x, _error_msg_y)
+_lbl_error_msg2 = QtBind.createLabel(gui, '', _author_label_x, _error_msg_y + 14)
+_add_tab8(_lbl_error_msg2, _author_label_x, _error_msg_y + 14)
 
 # Plugin Özellikleri (Güncelleme durumunun altında)
 _features_y = _status_y + 30
@@ -4363,8 +4648,8 @@ _add_tab8(QtBind.createLabel(gui, '• Auto Dungeon sistemi', _col1_x, _features
 _add_tab8(QtBind.createLabel(gui, '• Garden Dungeon otomatik', _col1_x, _features_y + 66), _col1_x, _features_y + 66)
 _add_tab8(QtBind.createLabel(gui, '• Auto Hwt sistemi', _col1_x, _features_y + 82), _col1_x, _features_y + 82)
 
-# Sağ sütun
-_col2_x = _t3_x + 300
+# Sağ sütun  
+_col2_x = _t3_x + 240
 _add_tab8(QtBind.createLabel(gui, '• Oto Kervan sistemi', _col2_x, _features_y + 18), _col2_x, _features_y + 18)
 _add_tab8(QtBind.createLabel(gui, '• Script Komutları', _col2_x, _features_y + 34), _col2_x, _features_y + 34)
 _add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı', _col2_x, _features_y + 50), _col2_x, _features_y + 50)
@@ -4443,8 +4728,18 @@ def handle_silkroad(opcode, data):
 def joined_game():
     loadConfigs()
     inv_cnt_loadConfigs()
-    # IP'yi güncelle (oyuna girişte)
-    threading.Thread(target=_fetch_and_update_ip_ui, name=pName + '_joined_ip', daemon=True).start()
+    
+    # IP'yi güncelle ve lisans doğrula (oyuna girişte)
+    def _joined_validate():
+        _fetch_and_update_ip_ui()
+        if _server_license_key:
+            time.sleep(1)
+            _validate_license_and_update_ui()
+        else:
+            # Lisans yoksa butonları pasif tut
+            _update_license_status(False)
+    
+    threading.Thread(target=_joined_validate, name=pName + '_joined_validate', daemon=True).start()
 
 def handle_chat(t, player, msg):
     _inv_cnt_handle_chat(t, player, msg)
@@ -4489,5 +4784,4 @@ if not os.path.exists(_inv_cnt_config_path):
 if inv_cnt_isJoined():
     inv_cnt_loadConfigs()
     log('[%s] [Envanter Sayacı] Config yüklendi (plugin init)' % pName)
-    return True
 
