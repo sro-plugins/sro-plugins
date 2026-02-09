@@ -153,7 +153,7 @@ def _download_garden_script(script_type="normal"):
     """GitHub'dan garden-dungeon script dosyasını indirir"""
     try:
         sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
-        
+
         # Script türüne göre dosya adı ve URL belirle
         if script_type == "wizz-cleric":
             script_filename = "garden-dungeon-wizz-cleric.txt"
@@ -161,41 +161,41 @@ def _download_garden_script(script_type="normal"):
         else:
             script_filename = "garden-dungeon.txt"
             download_url = GITHUB_GARDEN_SCRIPT_URL
-        
+
         script_path = os.path.join(sc_folder, script_filename)
-        
+
         log('[%s] [Garden-Auto] GitHub\'dan script indiriliyor... (Tür: %s)' % (pName, script_type))
         log('[%s] [Garden-Auto] URL: %s' % (pName, download_url))
-        
+
         # sc klasörü yoksa oluştur
         if not os.path.exists(sc_folder):
             os.makedirs(sc_folder)
             log('[%s] [Garden-Auto] sc klasörü oluşturuldu: %s' % (pName, sc_folder))
-        
+
         # GitHub'dan indir (cache bypass için timestamp ekle)
         import time
         cache_buster = int(time.time())
         url_with_cache_buster = download_url + '?v=' + str(cache_buster)
-        
+
         req = urllib.request.Request(
             url_with_cache_buster,
             headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
         )
-        
+
         with urllib.request.urlopen(req, timeout=15) as r:
             script_content = r.read()
-        
+
         content_length = len(script_content) if script_content else 0
         log('[%s] [Garden-Auto] İndirilen boyut: %d byte' % (pName, content_length))
-        
+
         if not script_content or content_length < 10:
             log('[%s] [Garden-Auto] İndirilen script geçersiz (çok kısa: %d byte)' % (pName, content_length))
             return False
-        
+
         # Dosyaya kaydet
         with open(script_path, 'wb') as f:
             f.write(script_content)
-        
+
         log('[%s] [Garden-Auto] Script başarıyla indirildi: %s (%d byte)' % (pName, script_path, content_length))
         return script_path
     except Exception as ex:
@@ -323,7 +323,7 @@ def _check_script_updates():
     """GitHub'daki script versiyonlarını kontrol eder ve gerekirse günceller"""
     try:
         log('[%s] [Script-Update] Garden Script güncellemeleri kontrol ediliyor...' % pName)
-        
+
         # GitHub'dan versions.json'ı indir (CDN cache bypass: no-cache + benzersiz query)
         cache_buster = str(int(time.time())) + '_' + str(id(object()))
         url_with_cache_buster = GITHUB_SCRIPT_VERSIONS_URL + '?v=' + cache_buster
@@ -335,33 +335,33 @@ def _check_script_updates():
                 'Pragma': 'no-cache',
             }
         )
-        
+
         with urllib.request.urlopen(req, timeout=15) as r:
             github_versions_data = r.read()
-        
+
         if not github_versions_data:
             log('[%s] [Script-Update] GitHub versions.json indirilemedi' % pName)
             return False
-        
+
         github_versions = json.loads(github_versions_data.decode('utf-8'))
         local_versions = _get_local_script_versions()
         sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
         updated_count = 0
-        
+
         # Karar: yerleşik veya son indirdiğimiz versiyon vs GitHub (indirdikten sonra kaydediyoruz, tekrar indirme olmasın)
         for script_name, github_info in github_versions.items():
             if isinstance(github_info, dict):
                 github_version = github_info.get("version", "0.0")
             else:
                 github_version = github_info
-            
+
             embedded_version = EMBEDDED_SCRIPT_VERSIONS.get(script_name, "0.0")
             local_info = local_versions.get(script_name, {})
             stored_version = local_info.get("version", "") if isinstance(local_info, dict) else ""
             current_version = stored_version if stored_version else embedded_version
-            
+
             script_path = os.path.join(sc_folder, script_name)
-            
+
             needs_update = False
             update_reason = ""
             if not os.path.exists(script_path):
@@ -370,7 +370,7 @@ def _check_script_updates():
             elif _version_less(_parse_version(current_version), _parse_version(github_version)):
                 needs_update = True
                 update_reason = "yeni versiyon (v%s -> v%s)" % (current_version, github_version)
-            
+
             if needs_update:
                 log('[%s] [Script-Update] %s güncelleniyor... (%s)' % (pName, script_name, update_reason))
                 if os.path.exists(script_path):
@@ -379,7 +379,7 @@ def _check_script_updates():
                         log('[%s] [Script-Update] Eski %s silindi' % (pName, script_name))
                     except Exception as ex:
                         log('[%s] [Script-Update] Eski dosya silinemedi: %s' % (pName, str(ex)))
-                
+
                 script_type = "wizz-cleric" if "wizz-cleric" in script_name else "normal"
                 download_result = _download_garden_script(script_type)
                 if download_result:
@@ -389,14 +389,14 @@ def _check_script_updates():
                     log('[%s] [Script-Update] %s başarıyla güncellendi (v%s)' % (pName, script_name, github_version))
                 else:
                     log('[%s] [Script-Update] %s güncellenemedi!' % (pName, script_name))
-        
+
         if updated_count > 0:
             log('[%s] [Script-Update] %d script güncellendi' % (pName, updated_count))
         else:
             log('[%s] [Script-Update] Tüm scriptler güncel' % pName)
-        
+
         return True
-        
+
     except Exception as ex:
         log('[%s] [Script-Update] Güncelleme kontrolü hatası: %s' % (pName, str(ex)))
         return False
@@ -976,32 +976,32 @@ def _garden_dungeon_loop():
     global _garden_dungeon_running
     try:
         script_path = _garden_dungeon_script_path
-        
+
         log('[%s] [Garden-Auto] Garden Dungeon başlatılıyor...' % pName)
-        
+
         # Script kontrolü
         if not script_path or not os.path.exists(script_path):
             log('[%s] [Garden-Auto] Script bulunamadı: %s' % (pName, script_path))
             _garden_dungeon_running = False
             return
-        
+
         # Her başlatmada mevcut pozisyonu al ve training area'yı güncelle
         pos = get_position()
         if not pos:
             log('[%s] [Garden-Auto] Pozisyon alınamadı!' % pName)
             _garden_dungeon_running = False
             return
-        
+
         # Training position'ı karakterin mevcut konumuna göre ayarla
         region = pos.get('region', 0)
         x = pos.get('x', 0)
         y = pos.get('y', 0)
         z = pos.get('z', 0)
-        
+
         set_training_position(region, x, y, z)
         set_training_radius(50.0)
         log('[%s] [Garden-Auto] Training position ayarlandı: (%d, %.1f, %.1f, %.1f)' % (pName, region, x, y, z))
-        
+
         # Script'i ayarla
         result = set_training_script(script_path)
         if result:
@@ -1010,18 +1010,18 @@ def _garden_dungeon_loop():
             log('[%s] [Garden-Auto] Training script ayarlanamadı!' % pName)
             _garden_dungeon_running = False
             return
-        
+
         # Kısa bir bekleme süresi (training area'nın hazır olması için)
         time.sleep(0.5)
-        
+
         start_bot()
         _garden_dungeon_running = True
         log('[%s] [Garden-Auto] Bot başlatıldı' % pName)
-        
+
         # Thread çalışırken bot'un durumunu kontrol et
         while not _garden_dungeon_stop_event.is_set():
             time.sleep(1)
-        
+
         log('[%s] [Garden-Auto] Garden Dungeon durduruluyor...' % pName)
         stop_bot()
         _garden_dungeon_running = False
@@ -1043,15 +1043,15 @@ def garden_dungeon_select_wizz_cleric():
 
 def garden_dungeon_start():
     global _garden_dungeon_thread, _garden_dungeon_running, _garden_dungeon_script_path, _garden_dungeon_script_type
-    
+
     # Textbox'tan script yolunu al ve temizle
     script_path_from_ui = QtBind.text(gui, tbxGardenScriptPath).strip()
-    
+
     # Tırnak işaretlerini temizle (baş ve sondaki " ve ' karakterlerini)
     if script_path_from_ui:
         # Başta ve sonda " veya ' varsa kaldır
         script_path_from_ui = script_path_from_ui.strip('"').strip("'").strip()
-    
+
     # Eğer textbox'ta bir şey varsa onu kullan
     if script_path_from_ui:
         _garden_dungeon_script_path = script_path_from_ui
@@ -1064,7 +1064,7 @@ def garden_dungeon_start():
         else:
             _garden_dungeon_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
             log('[%s] [Garden-Auto] Normal script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
-    
+
     # Training area "garden-auto" var mı kontrol et (script olmasa da çalışabilir)
     has_training_area = False
     try:
@@ -1073,17 +1073,17 @@ def garden_dungeon_start():
             has_training_area = True
     except Exception:
         pass
-    
+
     # Script dosyasının var olup olmadığını kontrol et (training area yoksa script şart)
     if not has_training_area and not os.path.exists(_garden_dungeon_script_path):
         # Varsayılan scriptlerden biri mi kontrol et
         default_normal = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
         default_wizz = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon-wizz-cleric.txt")
-        
+
         if _garden_dungeon_script_path in [default_normal, default_wizz]:
             log('[%s] [Garden-Auto] Script bulunamadı, GitHub\'dan indiriliyor...' % pName)
             QtBind.setText(gui, lblGardenScriptStatus, 'Durum: GitHub\'dan indiriliyor...')
-            
+
             downloaded_path = _download_garden_script(_garden_dungeon_script_type)
             if downloaded_path:
                 _garden_dungeon_script_path = downloaded_path
@@ -1098,7 +1098,7 @@ def garden_dungeon_start():
             log('[%s] [Garden-Auto] Özel script bulunamadı: %s' % (pName, _garden_dungeon_script_path))
             QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script bulunamadı! ✗')
             return
-    
+
     with _garden_dungeon_lock:
         if _garden_dungeon_thread and _garden_dungeon_thread.is_alive():
             log('[%s] [Garden-Auto] Garden Dungeon zaten çalışıyor.' % pName)
@@ -1107,7 +1107,7 @@ def garden_dungeon_start():
         _garden_dungeon_stop_event.clear()
         _garden_dungeon_thread = threading.Thread(target=_garden_dungeon_loop, name=pName + '_garden_dungeon', daemon=True)
         _garden_dungeon_thread.start()
-    
+
     QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Çalışıyor... ▶')
     log('[%s] [Garden-Auto] Garden Dungeon başlatıldı.' % pName)
 
@@ -4304,3 +4304,5 @@ if not os.path.exists(_inv_cnt_config_path):
 if inv_cnt_isJoined():
     inv_cnt_loadConfigs()
     log('[%s] [Envanter Sayacı] Config yüklendi (plugin init)' % pName)
+    return True
+

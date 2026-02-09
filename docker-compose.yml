@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  sro-manager:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - sro_files:/app/files
+    env_file:
+      - .env
+    restart: always
+
+volumes:
+  sro_files:
