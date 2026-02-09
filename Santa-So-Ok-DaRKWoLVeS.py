@@ -34,6 +34,7 @@ GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_R
 GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
 GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
 GITHUB_BANK_FEATURES_URL = 'https://raw.githubusercontent.com/%s/main/feature/bank_features.py' % GITHUB_REPO
+GITHUB_AUTO_BASE_DUNGEON_URL = 'https://raw.githubusercontent.com/%s/main/feature/auto_base_dungeon.py' % GITHUB_REPO
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
@@ -110,13 +111,9 @@ def _get_update_download_url():
 _update_label_ref = None
 _update_status_text = ''
 
-# Auto Dungeon global değişkenleri
-character_data = None
+# Auto Dungeon: itemUsedByPlugin ve dimensionalItemActivated packet hook için ana pluginde kalır
 itemUsedByPlugin = None
 dimensionalItemActivated = None
-lstMobsData = []
-lstIgnore = []
-lstOnlyCount = []
 
 # Garden Dungeon global değişkenleri
 _garden_dungeon_running = False
@@ -1124,13 +1121,15 @@ def sort_stop():
         _sort_thread = None
     log('[%s] Sıralama durduruldu.' % pName)
 
-# Banka özellikleri: GitHub'dan indirilip cache'lenir, buton tıklanınca exec ile çalıştırılır
+# Banka özellikleri: GitHub'dan indirilip cache'lenir, buton tıklanınca exec ile çalıştırılır (ana pluginde banka kodu yok)
 _bank_features_namespace = None
 
 def _get_bank_features_namespace():
     global _bank_features_namespace
     if _bank_features_namespace is not None:
+        log('[%s] [Banka] Modül zaten yüklü (cache kullanılıyor).' % pName)
         return _bank_features_namespace
+    log('[%s] [Banka] Modül cache\'de yok, GitHub\'dan indiriliyor: %s' % (pName, GITHUB_BANK_FEATURES_URL))
     try:
         req = urllib.request.Request(
             GITHUB_BANK_FEATURES_URL,
@@ -1138,6 +1137,7 @@ def _get_bank_features_namespace():
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
+        log('[%s] [Banka] İndirme tamamlandı (%d byte), exec ile yükleniyor...' % (pName, len(code)))
     except Exception as ex:
         log('[%s] Banka özellikleri indirilemedi: %s' % (pName, str(ex)))
         return None
@@ -1160,6 +1160,7 @@ def _get_bank_features_namespace():
     }
     try:
         exec(code, namespace)
+        log('[%s] [Banka] Modül yüklendi (exec tamamlandı), cache\'lendi.' % pName)
     except Exception as ex:
         log('[%s] Banka özellikleri yüklenemedi: %s' % (pName, str(ex)))
         return None
@@ -1167,28 +1168,176 @@ def _get_bank_features_namespace():
     return _bank_features_namespace
 
 def bank_merge_start():
+    log('[%s] [Banka] bank_merge_start çağrıldı (wrapper).' % pName)
     ns = _get_bank_features_namespace()
     if ns and 'bank_merge_start' in ns:
+        log('[%s] [Banka] Uzak bank_merge_start çalıştırılıyor.' % pName)
         ns['bank_merge_start']()
     else:
         log('[%s] Banka birleştirme kullanılamıyor.' % pName)
 
 def bank_merge_stop():
+    log('[%s] [Banka] bank_merge_stop çağrıldı (wrapper).' % pName)
     ns = _get_bank_features_namespace()
     if ns and 'bank_merge_stop' in ns:
+        log('[%s] [Banka] Uzak bank_merge_stop çalıştırılıyor.' % pName)
         ns['bank_merge_stop']()
 
 def bank_sort_start():
+    log('[%s] [Banka] bank_sort_start çağrıldı (wrapper).' % pName)
     ns = _get_bank_features_namespace()
     if ns and 'bank_sort_start' in ns:
+        log('[%s] [Banka] Uzak bank_sort_start çalıştırılıyor.' % pName)
         ns['bank_sort_start']()
     else:
         log('[%s] Banka sıralama kullanılamıyor.' % pName)
 
 def bank_sort_stop():
+    log('[%s] [Banka] bank_sort_stop çağrıldı (wrapper).' % pName)
     ns = _get_bank_features_namespace()
     if ns and 'bank_sort_stop' in ns:
+        log('[%s] [Banka] Uzak bank_sort_stop çalıştırılıyor.' % pName)
         ns['bank_sort_stop']()
+
+# Auto Dungeon (Tab 2): GitHub'dan indirilip exec ile çalıştırılır (ana pluginde Tab2 fonksiyon kodu yok)
+_auto_dungeon_namespace = None
+
+def _set_item_used_by_plugin(item):
+    global itemUsedByPlugin
+    itemUsedByPlugin = item
+
+def _get_dimensional_item_activated():
+    return dimensionalItemActivated
+
+def _get_auto_dungeon_namespace():
+    global _auto_dungeon_namespace
+    if _auto_dungeon_namespace is not None:
+        return _auto_dungeon_namespace
+    log('[%s] [Auto-Dungeon] Modül indiriliyor: %s' % (pName, GITHUB_AUTO_BASE_DUNGEON_URL))
+    try:
+        req = urllib.request.Request(
+            GITHUB_AUTO_BASE_DUNGEON_URL,
+            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            code = r.read().decode('utf-8')
+    except Exception as ex:
+        log('[%s] Auto Dungeon modülü indirilemedi: %s' % (pName, str(ex)))
+        return None
+    g = globals()
+    namespace = {
+        'gui': g['gui'], 'QtBind': QtBind, 'log': log, 'pName': pName,
+        'get_config_dir': get_config_dir, 'get_character_data': get_character_data,
+        'get_drops': get_drops, 'get_monsters': get_monsters, 'get_position': get_position,
+        'start_bot': start_bot, 'stop_bot': stop_bot, 'set_training_position': set_training_position,
+        'set_training_radius': set_training_radius, 'move_to': move_to,
+        'get_inventory': get_inventory, 'get_item': get_item, 'get_npcs': get_npcs,
+        'inject_joymax': inject_joymax, 'get_locale': get_locale, 'get_party': get_party,
+        'sqlite3': sqlite3, 'struct': struct, 'time': time, 'threading': threading,
+        'json': json, 'os': os,
+        'WAIT_DROPS_DELAY_MAX': WAIT_DROPS_DELAY_MAX, 'COUNT_MOBS_DELAY': COUNT_MOBS_DELAY,
+        '_is_license_valid': _is_license_valid,
+        'set_item_used_by_plugin': _set_item_used_by_plugin,
+        'get_dimensional_item_activated': _get_dimensional_item_activated,
+        'lstMobs': g.get('lstMobs'), 'tbxMobs': g.get('tbxMobs'), 'lstMonsterCounter': g.get('lstMonsterCounter'),
+        'cbxIgnoreGeneral': g.get('cbxIgnoreGeneral'), 'cbxOnlyCountGeneral': g.get('cbxOnlyCountGeneral'),
+        'cbxIgnoreChampion': g.get('cbxIgnoreChampion'), 'cbxOnlyCountChampion': g.get('cbxOnlyCountChampion'),
+        'cbxIgnoreGiant': g.get('cbxIgnoreGiant'), 'cbxOnlyCountGiant': g.get('cbxOnlyCountGiant'),
+        'cbxIgnoreTitan': g.get('cbxIgnoreTitan'), 'cbxOnlyCountTitan': g.get('cbxOnlyCountTitan'),
+        'cbxIgnoreStrong': g.get('cbxIgnoreStrong'), 'cbxOnlyCountStrong': g.get('cbxOnlyCountStrong'),
+        'cbxIgnoreElite': g.get('cbxIgnoreElite'), 'cbxOnlyCountElite': g.get('cbxOnlyCountElite'),
+        'cbxIgnoreUnique': g.get('cbxIgnoreUnique'), 'cbxOnlyCountUnique': g.get('cbxOnlyCountUnique'),
+        'cbxIgnoreParty': g.get('cbxIgnoreParty'), 'cbxOnlyCountParty': g.get('cbxOnlyCountParty'),
+        'cbxIgnoreChampionParty': g.get('cbxIgnoreChampionParty'), 'cbxOnlyCountChampionParty': g.get('cbxOnlyCountChampionParty'),
+        'cbxIgnoreGiantParty': g.get('cbxIgnoreGiantParty'), 'cbxOnlyCountGiantParty': g.get('cbxOnlyCountGiantParty'),
+        'cbxAcceptForgottenWorld': g.get('cbxAcceptForgottenWorld'),
+    }
+    try:
+        exec(code, namespace)
+    except Exception as ex:
+        log('[%s] Auto Dungeon modülü yüklenemedi: %s' % (pName, str(ex)))
+        return None
+    _auto_dungeon_namespace = namespace
+    return _auto_dungeon_namespace
+
+def _auto_dungeon_call(name, *args, **kwargs):
+    ns = _get_auto_dungeon_namespace()
+    if ns and name in ns:
+        fn = ns[name]
+        return fn(*args, **kwargs) if args or kwargs else fn()
+    return None
+
+def btnAddMob_clicked():
+    _auto_dungeon_call('btnAddMob_clicked')
+
+def btnRemMob_clicked():
+    _auto_dungeon_call('btnRemMob_clicked')
+
+def cbxIgnoreGeneral_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreGeneral_clicked', checked)
+def cbxOnlyCountGeneral_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountGeneral_clicked', checked)
+def cbxIgnoreChampion_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreChampion_clicked', checked)
+def cbxOnlyCountChampion_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountChampion_clicked', checked)
+def cbxIgnoreGiant_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreGiant_clicked', checked)
+def cbxOnlyCountGiant_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountGiant_clicked', checked)
+def cbxIgnoreTitan_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreTitan_clicked', checked)
+def cbxOnlyCountTitan_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountTitan_clicked', checked)
+def cbxIgnoreStrong_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreStrong_clicked', checked)
+def cbxOnlyCountStrong_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountStrong_clicked', checked)
+def cbxIgnoreElite_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreElite_clicked', checked)
+def cbxOnlyCountElite_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountElite_clicked', checked)
+def cbxIgnoreUnique_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreUnique_clicked', checked)
+def cbxOnlyCountUnique_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountUnique_clicked', checked)
+def cbxIgnoreParty_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreParty_clicked', checked)
+def cbxOnlyCountParty_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountParty_clicked', checked)
+def cbxIgnoreChampionParty_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreChampionParty_clicked', checked)
+def cbxOnlyCountChampionParty_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountChampionParty_clicked', checked)
+def cbxIgnoreGiantParty_clicked(checked):
+    _auto_dungeon_call('cbxIgnoreGiantParty_clicked', checked)
+def cbxOnlyCountGiantParty_clicked(checked):
+    _auto_dungeon_call('cbxOnlyCountGiantParty_clicked', checked)
+
+def cbxAcceptForgottenWorld_checked(checked):
+    _auto_dungeon_call('cbxAcceptForgottenWorld_checked', checked)
+
+def loadConfigs():
+    ns = _get_auto_dungeon_namespace()
+    if ns and 'loadConfigs' in ns:
+        ns['loadConfigs']()
+
+def AttackArea(args):
+    ns = _get_auto_dungeon_namespace()
+    if ns and 'AttackArea' in ns:
+        return ns['AttackArea'](args)
+    return 0
+
+def GoDimensional(args):
+    ns = _get_auto_dungeon_namespace()
+    if ns and 'GoDimensional' in ns:
+        return ns['GoDimensional'](args)
+    return 0
+
+def _call_remote_EnterToDimensional(name):
+    ns = _get_auto_dungeon_namespace()
+    if ns and 'EnterToDimensional' in ns:
+        ns['EnterToDimensional'](name)
 
 # ______________________________ Garden Dungeon Fonksiyonları ______________________________ #
 
@@ -2035,366 +2184,6 @@ def kervan_stop():
     QtBind.setText(gui, lblKervanStatus, 'Durum: Durduruldu ■')
     log('[%s] [Oto-Kervan] Durduruldu.' % pName)
 
-# ______________________________ Auto Dungeon Fonksiyonları ______________________________ #
-
-def getPath():
-    return get_config_dir() + pName + "\\"
-
-def getConfig():
-    return getPath() + character_data['server'] + "_" + character_data['name'] + ".json"
-
-def isJoined():
-    global character_data
-    character_data = get_character_data()
-    if not (character_data and "name" in character_data and character_data["name"]):
-        character_data = None
-    return character_data
-
-def ListContains(text, lst):
-    text = text.lower()
-    for i in range(len(lst)):
-        if lst[i].lower() == text:
-            return True
-    return False
-
-def GetDistance(ax, ay, bx, by):
-    return ((bx - ax) ** 2 + (by - ay) ** 2) ** (0.5)
-
-def GetFilterConnection():
-    path = get_config_dir() + character_data['server'] + '_' + character_data['name'] + '.db3'
-    return sqlite3.connect(path)
-
-def IsPickable(filterCursor, ItemID):
-    return filterCursor.execute('SELECT EXISTS(SELECT 1 FROM pickfilter WHERE id=? AND pick=1 LIMIT 1)', (ItemID,)).fetchone()[0]
-
-def WaitPickableDrops(filterCursor, waiting=0):
-    if waiting >= WAIT_DROPS_DELAY_MAX:
-        log('[%s] Dropları bekleme süresi doldu!' % pName)
-        return
-    drops = get_drops()
-    if drops:
-        drop = None
-        for key in drops:
-            value = drops[key]
-            if IsPickable(filterCursor, value['model']):
-                drop = value
-                break
-        if drop:
-            log('[%s] "%s" toplanması bekleniyor...' % (pName, drop['name']))
-            time.sleep(1.0)
-            WaitPickableDrops(filterCursor, waiting + 1)
-
-def getMobCount(position, radius):
-    QtBind.clear(gui, lstMonsterCounter)
-    QtBind.append(gui, lstMonsterCounter, 'İsim (Tür)')
-    count = 0
-    p = position if radius != None else None
-    monsters = get_monsters()
-    if monsters:
-        for key, mob in monsters.items():
-            if mob['type'] in lstIgnore:
-                continue
-            if len(lstOnlyCount) > 0:
-                if not mob['type'] in lstOnlyCount:
-                    continue
-            elif ListContains(mob['name'], lstMobsData):
-                continue
-            if radius != None:
-                if round(GetDistance(p['x'], p['y'], mob['x'], mob['y']), 2) > radius:
-                    continue
-            QtBind.append(gui, lstMonsterCounter, mob['name'] + ' (' + str(mob['type']) + ')')
-            count += 1
-    return count
-
-def AttackMobs(wait, isAttacking, position, radius):
-    count = getMobCount(position, radius)
-    if count > 0:
-        if not isAttacking:
-            start_bot()
-            log("[%s] Bu bölgede (%d) canavar öldürülüyor. Yarıçap: %s" % (pName, count, str(radius) if radius != None else "Max."))
-        threading.Timer(wait, AttackMobs, [wait, True, position, radius]).start()
-    else:
-        log("[%s] Tüm canavarlar öldürüldü!" % pName)
-        conn = GetFilterConnection()
-        cursor = conn.cursor()
-        WaitPickableDrops(cursor)
-        conn.close()
-        stop_bot()
-        set_training_position(0, 0, 0, 0)
-        log("[%s] Script konumuna geri dönülüyor..." % pName)
-        threading.Timer(2.5, move_to, [position['x'], position['y'], position['z']]).start()
-        threading.Timer(5.0, start_bot).start()
-
-def AttackArea(args):
-    radius = None
-    if len(args) >= 2:
-        radius = round(float(args[1]), 2)
-    p = get_position()
-    if getMobCount(p, radius) > 0:
-        stop_bot()
-        set_training_position(p['region'], p['x'], p['y'], p['z'])
-        if radius != None:
-            set_training_radius(radius)
-        else:
-            set_training_radius(100.0)
-        threading.Timer(0.001, AttackMobs, [COUNT_MOBS_DELAY, False, p, radius]).start()
-    else:
-        log("[%s] Bu bölgede canavar yok. Yarıçap: %s" % (pName, str(radius) if radius != None else "Max."))
-    return 0
-
-def GetDimensionalHole(Name):
-    searchByName = Name != ''
-    items = get_inventory()['items']
-    for slot, item in enumerate(items):
-        if item:
-            match = False
-            if searchByName:
-                match = (Name == item['name'])
-            else:
-                itemData = get_item(item['model'])
-                match = (itemData['tid1'] == 3 and itemData['tid2'] == 12 and itemData['tid3'] == 7)
-            if match:
-                item['slot'] = slot
-                return item
-    return None
-
-def GetDimensionalPillarUID(Name):
-    npcs = get_npcs()
-    if npcs:
-        for uid, npc in npcs.items():
-            item = get_item(npc['model'])
-            if item and item['name'] == Name:
-                return uid
-    return 0
-
-def EnterToDimensional(Name):
-    uid = GetDimensionalPillarUID(Name)
-    if uid:
-        log('[%s] Boyutsal delik seçiliyor...' % pName)
-        packet = struct.pack('I', uid)
-        inject_joymax(0x7045, packet, False)
-        time.sleep(1.0)
-        log('[%s] Boyutsal deliğe giriliyor...' % pName)
-        inject_joymax(0x704B, packet, False)
-        packet += struct.pack('H', 3)
-        inject_joymax(0x705A, packet, False)
-        threading.Timer(5.0, start_bot).start()
-        return
-    log('[%s] "%s" yakınınızda bulunamadı!' % (pName, Name))
-
-def GoDimensionalThread(Name):
-    if dimensionalItemActivated:
-        Name = dimensionalItemActivated['name']
-        log('[%s] %s hala açık!' % (pName, '"' + Name + '"' if Name else 'Boyutsal Delik'))
-        EnterToDimensional(Name)
-        return
-    item = GetDimensionalHole(Name)
-    if item:
-        log('[%s] "%s" kullanılıyor...' % (pName, item['name']))
-        p = struct.pack('B', item['slot'])
-        locale = get_locale()
-        if locale in [56, 18, 61]:
-            p += b'\x30\x0C\x0C\x07'
-        else:
-            p += b'\x6C\x3E'
-        global itemUsedByPlugin
-        itemUsedByPlugin = item
-        inject_joymax(0x704C, p, True)
-    else:
-        log('[%s] %s envanterinizde bulunamadı' % (pName, '"' + Name + '"' if Name else 'Boyutsal Delik'))
-
-def GoDimensional(args):
-    stop_bot()
-    name = ''
-    if len(args) > 1:
-        name = args[1]
-    threading.Timer(0.001, GoDimensionalThread, [name]).start()
-    return 0
-
-def btnAddMob_clicked():
-    global lstMobsData
-    text = QtBind.text(gui, tbxMobs)
-    if text and not ListContains(text, lstMobsData):
-        lstMobsData.append(text)
-        QtBind.append(gui, lstMobs, text)
-        QtBind.setText(gui, tbxMobs, "")
-        saveConfigs()
-        log('[%s] Canavar eklendi [%s]' % (pName, text))
-
-def btnRemMob_clicked():
-    global lstMobsData
-    selected = QtBind.text(gui, lstMobs)
-    if selected:
-        lstMobsData.remove(selected)
-        QtBind.remove(gui, lstMobs, selected)
-        saveConfigs()
-        log('[%s] Canavar kaldırıldı [%s]' % (pName, selected))
-
-def Checkbox_Checked(checked, gListName, mobType):
-    gListReference = globals()[gListName]
-    if checked:
-        gListReference.append(mobType)
-    else:
-        gListReference.remove(mobType)
-    saveConfigs()
-
-def cbxIgnoreGeneral_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 0)
-def cbxOnlyCountGeneral_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 0)
-
-def cbxIgnoreChampion_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 1)
-def cbxOnlyCountChampion_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 1)
-
-def cbxIgnoreGiant_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 4)
-def cbxOnlyCountGiant_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 4)
-
-def cbxIgnoreTitan_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 5)
-def cbxOnlyCountTitan_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 5)
-
-def cbxIgnoreStrong_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 6)
-def cbxOnlyCountStrong_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 6)
-
-def cbxIgnoreElite_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 7)
-def cbxOnlyCountElite_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 7)
-
-def cbxIgnoreUnique_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 8)
-def cbxOnlyCountUnique_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 8)
-
-def cbxIgnoreParty_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 16)
-def cbxOnlyCountParty_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 16)
-
-def cbxIgnoreChampionParty_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 17)
-def cbxOnlyCountChampionParty_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 17)
-
-def cbxIgnoreGiantParty_clicked(checked):
-    Checkbox_Checked(checked, "lstIgnore", 20)
-def cbxOnlyCountGiantParty_clicked(checked):
-    Checkbox_Checked(checked, "lstOnlyCount", 20)
-
-def cbxAcceptForgottenWorld_checked(checked):
-    saveConfigs()
-
-def loadDefaultConfig():
-    global lstMobsData, lstIgnore, lstOnlyCount
-    lstMobsData = []
-    QtBind.clear(gui, lstMobs)
-    lstIgnore = []
-    QtBind.setChecked(gui, cbxIgnoreGeneral, False)
-    QtBind.setChecked(gui, cbxIgnoreChampion, False)
-    QtBind.setChecked(gui, cbxIgnoreGiant, False)
-    QtBind.setChecked(gui, cbxIgnoreTitan, False)
-    QtBind.setChecked(gui, cbxIgnoreStrong, False)
-    QtBind.setChecked(gui, cbxIgnoreElite, False)
-    QtBind.setChecked(gui, cbxIgnoreUnique, False)
-    QtBind.setChecked(gui, cbxIgnoreParty, False)
-    QtBind.setChecked(gui, cbxIgnoreChampionParty, False)
-    QtBind.setChecked(gui, cbxIgnoreGiantParty, False)
-    lstOnlyCount = []
-    QtBind.setChecked(gui, cbxOnlyCountGeneral, False)
-    QtBind.setChecked(gui, cbxOnlyCountChampion, False)
-    QtBind.setChecked(gui, cbxOnlyCountGiant, False)
-    QtBind.setChecked(gui, cbxOnlyCountTitan, False)
-    QtBind.setChecked(gui, cbxOnlyCountStrong, False)
-    QtBind.setChecked(gui, cbxOnlyCountElite, False)
-    QtBind.setChecked(gui, cbxOnlyCountUnique, False)
-    QtBind.setChecked(gui, cbxOnlyCountParty, False)
-    QtBind.setChecked(gui, cbxOnlyCountChampionParty, False)
-    QtBind.setChecked(gui, cbxOnlyCountGiantParty, False)
-    QtBind.setChecked(gui, cbxAcceptForgottenWorld, False)
-
-def loadConfigs():
-    loadDefaultConfig()
-    if isJoined() and os.path.exists(getConfig()):
-        data = {}
-        with open(getConfig(), "r") as f:
-            data = json.load(f)
-        if "Ignore Names" in data:
-            global lstMobsData
-            lstMobsData = data["Ignore Names"]
-            for name in lstMobsData:
-                QtBind.append(gui, lstMobs, name)
-        if "Ignore Types" in data:
-            global lstIgnore
-            for t in data["Ignore Types"]:
-                if t == 8:
-                    QtBind.setChecked(gui, cbxIgnoreUnique, True)
-                elif t == 7:
-                    QtBind.setChecked(gui, cbxIgnoreElite, True)
-                elif t == 6:
-                    QtBind.setChecked(gui, cbxIgnoreStrong, True)
-                elif t == 5:
-                    QtBind.setChecked(gui, cbxIgnoreTitan, True)
-                elif t == 4:
-                    QtBind.setChecked(gui, cbxIgnoreGiant, True)
-                elif t == 1:
-                    QtBind.setChecked(gui, cbxIgnoreChampion, True)
-                elif t == 0:
-                    QtBind.setChecked(gui, cbxIgnoreGeneral, True)
-                elif t == 16:
-                    QtBind.setChecked(gui, cbxIgnoreParty, True)
-                elif t == 17:
-                    QtBind.setChecked(gui, cbxIgnoreChampionParty, True)
-                elif t == 20:
-                    QtBind.setChecked(gui, cbxIgnoreGiantParty, True)
-                else:
-                    continue
-                lstIgnore.append(t)
-        if "OnlyCount Types" in data:
-            global lstOnlyCount
-            for t in data["OnlyCount Types"]:
-                if t == 8:
-                    QtBind.setChecked(gui, cbxOnlyCountUnique, True)
-                elif t == 7:
-                    QtBind.setChecked(gui, cbxOnlyCountElite, True)
-                elif t == 6:
-                    QtBind.setChecked(gui, cbxOnlyCountStrong, True)
-                elif t == 5:
-                    QtBind.setChecked(gui, cbxOnlyCountTitan, True)
-                elif t == 4:
-                    QtBind.setChecked(gui, cbxOnlyCountGiant, True)
-                elif t == 1:
-                    QtBind.setChecked(gui, cbxOnlyCountChampion, True)
-                elif t == 0:
-                    QtBind.setChecked(gui, cbxOnlyCountGeneral, True)
-                elif t == 16:
-                    QtBind.setChecked(gui, cbxOnlyCountParty, True)
-                elif t == 17:
-                    QtBind.setChecked(gui, cbxOnlyCountChampionParty, True)
-                elif t == 20:
-                    QtBind.setChecked(gui, cbxOnlyCountGiantParty, True)
-                else:
-                    continue
-                lstOnlyCount.append(t)
-        if 'Accept ForgottenWorld' in data and data['Accept ForgottenWorld']:
-            QtBind.setChecked(gui, cbxAcceptForgottenWorld, True)
-
-def saveConfigs():
-    if isJoined():
-        data = {}
-        data['OnlyCount Types'] = lstOnlyCount
-        data['Ignore Types'] = lstIgnore
-        data['Ignore Names'] = lstMobsData
-        data['Accept ForgottenWorld'] = QtBind.isChecked(gui, cbxAcceptForgottenWorld)
-        with open(getConfig(), "w") as f:
-            f.write(json.dumps(data, indent=4, sort_keys=True))
-
 # ______________________________ Script Komutları (TR_ScriptCommands) ______________________________ #
 
 def _script_cmds_ResetSkip():
@@ -3199,6 +2988,12 @@ _add_tab2(lblMonsterCounter, _t2_right_x, _t2_y)
 lstMonsterCounter = QtBind.createList(gui, _t2_right_x, _t2_y + 23, 197, 237)
 _add_tab2(lstMonsterCounter, _t2_right_x, _t2_y + 23)
 QtBind.append(gui, lstMonsterCounter, 'İsim (Tür)')
+
+# Tab 2 butonlarını lisans korumasına ekle
+_protected_buttons[2] = [btnAddMob, btnRemMob, cbxIgnoreGeneral, cbxOnlyCountGeneral, cbxIgnoreChampion, cbxOnlyCountChampion,
+    cbxIgnoreGiant, cbxOnlyCountGiant, cbxIgnoreTitan, cbxOnlyCountTitan, cbxIgnoreStrong, cbxOnlyCountStrong,
+    cbxIgnoreElite, cbxOnlyCountElite, cbxIgnoreUnique, cbxOnlyCountUnique, cbxIgnoreParty, cbxOnlyCountParty,
+    cbxIgnoreChampionParty, cbxOnlyCountChampionParty, cbxIgnoreGiantParty, cbxOnlyCountGiantParty, cbxAcceptForgottenWorld]
 
 # Tab 3 - Garden Dungeon
 _t3_y = _content_y + 10
@@ -4518,9 +4313,10 @@ _init_server_credentials()
 threading.Thread(target=_check_update_thread, name=pName + '_update_auto', daemon=True).start()
 threading.Thread(target=_check_script_updates_thread, name=pName + '_script_update', daemon=True).start()
 
-# Auto Dungeon klasörünü oluştur
-if not os.path.exists(getPath()):
-    os.makedirs(getPath())
+# Auto Dungeon config klasörünü oluştur (getPath uzak modülde)
+_auto_dungeon_config_path = get_config_dir() + pName + "\\"
+if not os.path.exists(_auto_dungeon_config_path):
+    os.makedirs(_auto_dungeon_config_path)
     log('[%s] %s klasörü oluşturuldu' % (pName, pName))
 
 # ______________________________ Events ______________________________ #
@@ -4606,7 +4402,7 @@ def handle_joymax(opcode, data):
                     global dimensionalItemActivated
                     dimensionalItemActivated = None
                 threading.Timer(DIMENSIONAL_COOLDOWN_DELAY, DimensionalCooldown).start()
-                threading.Timer(1.0, EnterToDimensional, [itemUsedByPlugin['name']]).start()
+                threading.Timer(1.0, _call_remote_EnterToDimensional, [itemUsedByPlugin['name']]).start()
             else:
                 log('[%s] "%s" açılamadı' % (pName, itemUsedByPlugin['name']))
             itemUsedByPlugin = None
