@@ -35,6 +35,7 @@ GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
 GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
 GITHUB_BANK_FEATURES_URL = 'https://raw.githubusercontent.com/%s/main/feature/bank_features.py' % GITHUB_REPO
 GITHUB_AUTO_BASE_DUNGEON_URL = 'https://raw.githubusercontent.com/%s/main/feature/auto_base_dungeon.py' % GITHUB_REPO
+GITHUB_GARDEN_DUNGEON_URL = 'https://raw.githubusercontent.com/%s/main/feature/garden_dungeon.py' % GITHUB_REPO
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
@@ -114,14 +115,6 @@ _update_status_text = ''
 # Auto Dungeon: itemUsedByPlugin ve dimensionalItemActivated packet hook için ana pluginde kalır
 itemUsedByPlugin = None
 dimensionalItemActivated = None
-
-# Garden Dungeon global değişkenleri
-_garden_dungeon_running = False
-_garden_dungeon_script_path = ""
-_garden_dungeon_script_type = "normal"  # "normal" veya "wizz-cleric"
-_garden_dungeon_thread = None
-_garden_dungeon_stop_event = threading.Event()
-_garden_dungeon_lock = threading.Lock()
 
 # Oto Kervan global değişkenleri
 _caravan_script_list = []  # GitHub'dan gelen .txt dosya adları (liste sırası = gösterim sırası)
@@ -1339,158 +1332,65 @@ def _call_remote_EnterToDimensional(name):
     if ns and 'EnterToDimensional' in ns:
         ns['EnterToDimensional'](name)
 
-# ______________________________ Garden Dungeon Fonksiyonları ______________________________ #
+# Garden Dungeon (Tab 3): GitHub'dan indirilip exec ile çalıştırılır (ana pluginde Tab3 fonksiyon kodu yok)
+_garden_dungeon_namespace = None
 
-def _garden_dungeon_loop():
-    global _garden_dungeon_running
+def _get_garden_dungeon_namespace():
+    global _garden_dungeon_namespace
+    if _garden_dungeon_namespace is not None:
+        return _garden_dungeon_namespace
     try:
-        script_path = _garden_dungeon_script_path
-
-        log('[%s] [Garden-Auto] Garden Dungeon başlatılıyor...' % pName)
-
-        # Script kontrolü
-        if not script_path or not os.path.exists(script_path):
-            log('[%s] [Garden-Auto] Script bulunamadı: %s' % (pName, script_path))
-            _garden_dungeon_running = False
-            return
-
-        # Her başlatmada mevcut pozisyonu al ve training area'yı güncelle
-        pos = get_position()
-        if not pos:
-            log('[%s] [Garden-Auto] Pozisyon alınamadı!' % pName)
-            _garden_dungeon_running = False
-            return
-
-        # Training position'ı karakterin mevcut konumuna göre ayarla
-        region = pos.get('region', 0)
-        x = pos.get('x', 0)
-        y = pos.get('y', 0)
-        z = pos.get('z', 0)
-
-        set_training_position(region, x, y, z)
-        set_training_radius(50.0)
-        log('[%s] [Garden-Auto] Training position ayarlandı: (%d, %.1f, %.1f, %.1f)' % (pName, region, x, y, z))
-
-        # Script'i ayarla
-        result = set_training_script(script_path)
-        if result:
-            log('[%s] [Garden-Auto] Training script ayarlandı: %s' % (pName, script_path))
-        else:
-            log('[%s] [Garden-Auto] Training script ayarlanamadı!' % pName)
-            _garden_dungeon_running = False
-            return
-
-        # Kısa bir bekleme süresi (training area'nın hazır olması için)
-        time.sleep(0.5)
-
-        start_bot()
-        _garden_dungeon_running = True
-        log('[%s] [Garden-Auto] Bot başlatıldı' % pName)
-
-        # Thread çalışırken bot'un durumunu kontrol et
-        while not _garden_dungeon_stop_event.is_set():
-            time.sleep(1)
-
-        log('[%s] [Garden-Auto] Garden Dungeon durduruluyor...' % pName)
-        stop_bot()
-        _garden_dungeon_running = False
+        req = urllib.request.Request(
+            GITHUB_GARDEN_DUNGEON_URL,
+            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            code = r.read().decode('utf-8')
     except Exception as ex:
-        log('[%s] [Garden-Auto] Hata: %s' % (pName, str(ex)))
-        _garden_dungeon_running = False
+        log('[%s] Garden Dungeon modülü indirilemedi: %s' % (pName, str(ex)))
+        return None
+    g = globals()
+    namespace = {
+        'gui': g['gui'], 'QtBind': QtBind, 'log': log, 'pName': pName,
+        'get_position': get_position, 'set_training_position': set_training_position,
+        'set_training_radius': set_training_radius, 'set_training_script': set_training_script,
+        'start_bot': start_bot, 'stop_bot': stop_bot, 'get_training_area': get_training_area,
+        'os': os, 'time': time, 'threading': threading,
+        '_download_garden_script': _download_garden_script,
+        '_is_license_valid': _is_license_valid,
+        'plugin_dir': os.path.dirname(os.path.abspath(__file__)),
+        'tbxGardenScriptPath': g.get('tbxGardenScriptPath'),
+        'lblGardenScriptStatus': g.get('lblGardenScriptStatus'),
+    }
+    try:
+        exec(code, namespace)
+    except Exception as ex:
+        log('[%s] Garden Dungeon modülü yüklenemedi: %s' % (pName, str(ex)))
+        return None
+    _garden_dungeon_namespace = namespace
+    return _garden_dungeon_namespace
 
 def garden_dungeon_select_normal():
-    global _garden_dungeon_script_type
-    _garden_dungeon_script_type = "normal"
-    QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Normal script seçildi')
-    log('[%s] [Garden-Auto] Normal script seçildi' % pName)
+    ns = _get_garden_dungeon_namespace()
+    if ns and 'garden_dungeon_select_normal' in ns:
+        ns['garden_dungeon_select_normal']()
 
 def garden_dungeon_select_wizz_cleric():
-    global _garden_dungeon_script_type
-    _garden_dungeon_script_type = "wizz-cleric"
-    QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Wizz/Cleric script seçildi')
-    log('[%s] [Garden-Auto] Wizz/Cleric script seçildi' % pName)
+    ns = _get_garden_dungeon_namespace()
+    if ns and 'garden_dungeon_select_wizz_cleric' in ns:
+        ns['garden_dungeon_select_wizz_cleric']()
 
 def garden_dungeon_start():
-    global _garden_dungeon_thread, _garden_dungeon_running, _garden_dungeon_script_path, _garden_dungeon_script_type
-
-    # Textbox'tan script yolunu al ve temizle
-    script_path_from_ui = QtBind.text(gui, tbxGardenScriptPath).strip()
-
-    # Tırnak işaretlerini temizle (baş ve sondaki " ve ' karakterlerini)
-    if script_path_from_ui:
-        # Başta ve sonda " veya ' varsa kaldır
-        script_path_from_ui = script_path_from_ui.strip('"').strip("'").strip()
-
-    # Eğer textbox'ta bir şey varsa onu kullan
-    if script_path_from_ui:
-        _garden_dungeon_script_path = script_path_from_ui
-        log('[%s] [Garden-Auto] Özel script yolu: %s' % (pName, _garden_dungeon_script_path))
-    # Yoksa seçilen türe göre varsayılanı kullan
-    elif not _garden_dungeon_script_path:
-        if _garden_dungeon_script_type == "wizz-cleric":
-            _garden_dungeon_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon-wizz-cleric.txt")
-            log('[%s] [Garden-Auto] Wizz/Cleric script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
-        else:
-            _garden_dungeon_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
-            log('[%s] [Garden-Auto] Normal script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
-
-    # Training area "garden-auto" var mı kontrol et (script olmasa da çalışabilir)
-    has_training_area = False
-    try:
-        current_area = get_training_area()
-        if current_area and current_area.get('name') == 'garden-auto':
-            has_training_area = True
-    except Exception:
-        pass
-
-    # Script dosyasının var olup olmadığını kontrol et (training area yoksa script şart)
-    if not has_training_area and not os.path.exists(_garden_dungeon_script_path):
-        # Varsayılan scriptlerden biri mi kontrol et
-        default_normal = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon.txt")
-        default_wizz = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc", "garden-dungeon-wizz-cleric.txt")
-
-        if _garden_dungeon_script_path in [default_normal, default_wizz]:
-            log('[%s] [Garden-Auto] Script bulunamadı, GitHub\'dan indiriliyor...' % pName)
-            QtBind.setText(gui, lblGardenScriptStatus, 'Durum: GitHub\'dan indiriliyor...')
-
-            downloaded_path = _download_garden_script(_garden_dungeon_script_type)
-            if downloaded_path:
-                _garden_dungeon_script_path = downloaded_path
-                log('[%s] [Garden-Auto] Script başarıyla indirildi' % pName)
-                QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script indirildi ✓')
-            else:
-                log('[%s] [Garden-Auto] Script indirilemedi!' % pName)
-                QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script indirilemedi! ✗')
-                return
-        else:
-            # Özel script ise indirme, hata ver
-            log('[%s] [Garden-Auto] Özel script bulunamadı: %s' % (pName, _garden_dungeon_script_path))
-            QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Script bulunamadı! ✗')
-            return
-
-    with _garden_dungeon_lock:
-        if _garden_dungeon_thread and _garden_dungeon_thread.is_alive():
-            log('[%s] [Garden-Auto] Garden Dungeon zaten çalışıyor.' % pName)
-            QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Zaten çalışıyor...')
-            return
-        _garden_dungeon_stop_event.clear()
-        _garden_dungeon_thread = threading.Thread(target=_garden_dungeon_loop, name=pName + '_garden_dungeon', daemon=True)
-        _garden_dungeon_thread.start()
-
-    QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Çalışıyor... ▶')
-    log('[%s] [Garden-Auto] Garden Dungeon başlatıldı.' % pName)
+    ns = _get_garden_dungeon_namespace()
+    if ns and 'garden_dungeon_start' in ns:
+        ns['garden_dungeon_start']()
+    else:
+        log('[%s] Garden Dungeon kullanılamıyor.' % pName)
 
 def garden_dungeon_stop():
-    global _garden_dungeon_thread, _garden_dungeon_running
-    with _garden_dungeon_lock:
-        _garden_dungeon_stop_event.set()
-        if _garden_dungeon_thread and _garden_dungeon_thread.is_alive():
-            _garden_dungeon_thread.join(timeout=3)
-        _garden_dungeon_thread = None
-        _garden_dungeon_running = False
-    stop_bot()
-    QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Durduruldu ■')
-    log('[%s] [Garden-Auto] Garden Dungeon durduruldu.' % pName)
+    ns = _get_garden_dungeon_namespace()
+    if ns and 'garden_dungeon_stop' in ns:
+        ns['garden_dungeon_stop']()
 
 # ______________________________ Oto Kervan Fonksiyonları ______________________________ #
 
@@ -3024,13 +2924,17 @@ _add_tab3(tbxGardenScriptPath, _gd_title_x, _gd_script_y + 18)
 # Script türü seçim butonları (üstte)
 _gd_type_y = _gd_script_y + 48
 _gd_btn_center_x = _gd_container_x + (_gd_container_w - 170) // 2
-_add_tab3(QtBind.createButton(gui, 'garden_dungeon_select_wizz_cleric', 'Wizz/Cleric', _gd_btn_center_x, _gd_type_y), _gd_btn_center_x, _gd_type_y)
-_add_tab3(QtBind.createButton(gui, 'garden_dungeon_select_normal', 'Normal', _gd_btn_center_x + 85, _gd_type_y), _gd_btn_center_x + 85, _gd_type_y)
+_btn_garden_wizz = QtBind.createButton(gui, 'garden_dungeon_select_wizz_cleric', 'Wizz/Cleric', _gd_btn_center_x, _gd_type_y)
+_add_tab3(_btn_garden_wizz, _gd_btn_center_x, _gd_type_y)
+_btn_garden_normal = QtBind.createButton(gui, 'garden_dungeon_select_normal', 'Normal', _gd_btn_center_x + 85, _gd_type_y)
+_add_tab3(_btn_garden_normal, _gd_btn_center_x + 85, _gd_type_y)
 
 # Başla/Durdur butonları (altta, hizalı)
 _gd_btn_y = _gd_type_y + 30
-_add_tab3(QtBind.createButton(gui, 'garden_dungeon_start', '  Başla  ', _gd_btn_center_x, _gd_btn_y), _gd_btn_center_x, _gd_btn_y)
-_add_tab3(QtBind.createButton(gui, 'garden_dungeon_stop', ' Durdur ', _gd_btn_center_x + 85, _gd_btn_y), _gd_btn_center_x + 85, _gd_btn_y)
+_btn_garden_start = QtBind.createButton(gui, 'garden_dungeon_start', '  Başla  ', _gd_btn_center_x, _gd_btn_y)
+_add_tab3(_btn_garden_start, _gd_btn_center_x, _gd_btn_y)
+_btn_garden_stop = QtBind.createButton(gui, 'garden_dungeon_stop', ' Durdur ', _gd_btn_center_x + 85, _gd_btn_y)
+_add_tab3(_btn_garden_stop, _gd_btn_center_x + 85, _gd_btn_y)
 
 _gd_status_y = _gd_btn_y + 30
 lblGardenScriptStatus = QtBind.createLabel(gui, 'Durum: Hazır', _gd_title_x, _gd_status_y)
@@ -3038,6 +2942,9 @@ _add_tab3(lblGardenScriptStatus, _gd_title_x, _gd_status_y)
 
 _gd_note_y = _gd_status_y + 22
 _add_tab3(QtBind.createLabel(gui, 'Script türünü seç, sonra Başlat', _gd_title_x, _gd_note_y), _gd_title_x, _gd_note_y)
+
+# Tab 3 butonlarını lisans korumasına ekle
+_protected_buttons[3] = [_btn_garden_wizz, _btn_garden_normal, _btn_garden_start, _btn_garden_stop]
 
 # Tab 4 - Auto Hwt
 _hwt_container_w = 380
