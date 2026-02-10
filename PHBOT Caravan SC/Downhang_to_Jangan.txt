@@ -107,8 +107,9 @@ walk,4103,1227,0
 walk,4112,1217,0
 walk,4121,1206,0
 walk,4123,1203,0
-wait,5000
-teleport,Ferry Ticket Seller Tayun,Ferry Ticket Seller Doji
+walk,4123,1194,37
+wait,2000
+teleport,Ferry Ticket Seller Hageuk,Ferry Ticket Seller Chau
 wait,5000
 walk,4468,894,0
 walk,4476,883,0
