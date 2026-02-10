@@ -191,6 +191,8 @@ walk,5028,1101,0
 walk,5028,1115,0
 walk,5028,1121,0
 wait,5000
+teleport,Ferry Ticket Seller Doji,Ferry Ticket Seller Tayun
+wait,5000
 walk,5055,1684,0
 walk,5041,1684,0
 walk,5027,1684,0

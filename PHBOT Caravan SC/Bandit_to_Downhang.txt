@@ -92,6 +92,7 @@ walk,4472,883,0
 walk,4466,895,0
 walk,4460,907,0
 walk,4456,916,0
+teleport,Ferry Ticket Seller Chau,Ferry Ticket Seller Hageuk
 wait,5000
 walk,4134,1212,0
 walk,4126,1223,0
