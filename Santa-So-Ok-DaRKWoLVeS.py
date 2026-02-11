@@ -45,8 +45,8 @@ GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
 # Oto Kervan: GitHub'daki karavan scriptleri klasörü (API ile liste, raw ile indirme)
-# GitHub'da klasör yoksa veya 404 alırsa yerel "PHBOT Caravan SC" klasörü kullanılır (plugin yanında).
-GITHUB_CARAVAN_FOLDER = 'PHBOT Caravan SC'
+# GitHub'da klasör yoksa veya 404 alırsa yerel "caravan" klasörü kullanılır (plugin yanında).
+GITHUB_CARAVAN_FOLDER = 'caravan'
 GITHUB_CARAVAN_BRANCH = 'main'
 # API URL _fetch_caravan_script_list içinde quote ile oluşturulur (400 hatası önlemi)
 # Raw template: tek format çağrısında (repo, branch, filename)

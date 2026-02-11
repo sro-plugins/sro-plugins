@@ -7,7 +7,7 @@
 | Klasör / Dosya | Açıklama |
 |----------------|----------|
 | **Santa-So-Ok-DaRKWoLVeS.py** | Ana eklenti: So-Ok event, Oto Kervan, Auto Dungeon, Garden Script, güncelleme kontrolü |
-| **PHBOT Caravan SC/** | Oto Kervan için şehirler arası rota scriptleri (walk komutları) |
+| **caravan/** | Oto Kervan için şehirler arası rota scriptleri (walk komutları) |
 | **profile/** | Oto Kervan için örnek karavan profili (JSON) |
 | **sc/** | Garden Dungeon scriptleri ve sürüm bilgileri |
 | **create_release.py** | GitHub release oluşturma scripti |
@@ -27,14 +27,14 @@
 ### Kurulum
 
 1. `Santa-So-Ok-DaRKWoLVeS.py` dosyasını phBot’un **plugins** klasörüne kopyalayın.
-2. Opsiyonel: **PHBOT Caravan SC** ve **sc** klasörlerini eklenti dosyasıyla aynı dizine (veya phBot’un ilgili config/script dizinine) koyun; eklenti GitHub’dan da indirebilir.
+2. Opsiyonel: **caravan** ve **sc** klasörlerini eklenti dosyasıyla aynı dizine (veya phBot’un ilgili config/script dizinine) koyun; eklenti GitHub’dan da indirebilir.
 3. phBot’u başlatıp eklentiyi etkinleştirin.
 
 ### Oto Kervan
 
 - Ana pencerede karavan profili seçili olmalı (profil adında "karavan" geçmeli).
 - İlk açılışta karavan profili yoksa `Server_CharName.karavan.json` şablonu oluşturulur.
-- Rota scriptleri **PHBOT Caravan SC** içindeki `.txt` dosyalarından seçilir (Downhang–Hotan, Jangan–Alexandria, Samarkand vb.).
+- Rota scriptleri **caravan** içindeki `.txt` dosyalarından seçilir (Downhang–Hotan, Jangan–Alexandria, Samarkand vb.).
 
 ### Auto Dungeon
 

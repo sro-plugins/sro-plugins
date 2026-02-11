@@ -34,7 +34,7 @@ def _caravan_filename_to_display_name(filename):
     return from_name + ' --> ' + to_name
 
 def _fetch_caravan_script_list():
-    """GitHub API veya yerel klasör ile PHBOT Caravan SC .txt listesini döndürür."""
+    """GitHub API veya yerel klasör ile caravan .txt listesini döndürür."""
     path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
     api_url = 'https://api.github.com/repos/%s/contents/%s?ref=%s' % (
         GITHUB_REPO, path_encoded, GITHUB_CARAVAN_BRANCH
