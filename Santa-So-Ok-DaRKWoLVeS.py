@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 
 pName = 'DaRKWoLVeS Alet Çantası'
 PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
-pVersion = '1.5.1'
+pVersion = '1.6.0'
 
 MOVE_DELAY = 0.25
 
@@ -2593,13 +2593,15 @@ def _get_script_command_maker_namespace():
         return _script_command_maker_namespace
     code = None
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
-    local_path = os.path.join(plugin_dir, 'feature', 'script_command_maker.py')
-    if os.path.exists(local_path):
-        try:
-            with open(local_path, 'r', encoding='utf-8') as f:
-                code = f.read()
-        except Exception as ex:
-            log('[%s] [Script-Command] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
+        local_path = os.path.join(base, 'feature', 'script_command_maker.py')
+        if os.path.exists(local_path):
+            try:
+                with open(local_path, 'r', encoding='utf-8') as f:
+                    code = f.read()
+                break
+            except Exception as ex:
+                log('[%s] [Script-Command] Yerel modül okunamadı: %s' % (pName, str(ex)))
     if not code:
         try:
             req = urllib.request.Request(

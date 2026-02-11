@@ -1,3 +1,19 @@
+## v1.6.0 (Script-Command tab, TargetSupport, Sıralı Bless)
+
+### Yeni Sekmeler
+- **Tab9 TargetSupport**: xTargetSupport entegrasyonu, lisans korumalı
+- **Tab10 Sıralı Bless**: Bless Queue entegrasyonu, lisans korumalı, scroll desteği
+- **Tab11 Script-Command**: SROMaster Script & Chat Command Maker
+
+### İyileştirmeler
+- Sıralı Bless tasarımı orijinal Bless Queue yerleşimine uyumlu güncellendi
+- Yardım metinleri Türkçeye çevrildi
+- Tab9–Tab10 arası boşluk ayarları (5px → 3px → 1px → 0px)
+- Sıralı Bless buton genişliği 85px → 65px
+- Script-Command modülü: yerel bulunamazsa fallback path ile yükleme
+
+---
+
 ## v1.4.0 (Oto-Kervan, Garden Script, temizlik)
 
 ### Oto-Kervan
