@@ -1486,17 +1486,18 @@ _tab_bar_x = 10
 _tab_visible_width = 552
 _tab_scroll_offset = 0
 
-_tab_original_positions = [10, 125, 208, 303, 383, 463, 551, 643]
-_tab_widths = [115, 83, 95, 80, 80, 88, 92, 60]
+# Sıra: Hakkımda, Banka/Çanta, Auto Dungeon, Garden, Auto Hwt, Oto Kervan, Script, Envanter
+_tab_original_positions = [10, 90, 205, 288, 383, 463, 543, 631]
+_tab_widths = [80, 115, 83, 95, 80, 80, 88, 92]
 
-_tab_btn1 = QtBind.createButton(gui, '_show_tab1', 'Banka/Çanta Birleştir', 10, _tab_bar_y)
-_tab_btn2 = QtBind.createButton(gui, '_show_tab2', 'Auto Dungeon', 125, _tab_bar_y)
-_tab_btn3 = QtBind.createButton(gui, '_show_tab3', 'Garden Dungeon', 208, _tab_bar_y)
-_tab_btn4 = QtBind.createButton(gui, '_show_tab4', 'Auto Hwt', 303, _tab_bar_y)
-_tab_btn5 = QtBind.createButton(gui, '_show_tab5', 'Oto Kervan', 383, _tab_bar_y)
-_tab_btn6 = QtBind.createButton(gui, '_show_tab6', 'Script Komutları', 463, _tab_bar_y)
-_tab_btn7 = QtBind.createButton(gui, '_show_tab7', 'Envanter Sayacı', 551, _tab_bar_y)
-_tab_btn8 = QtBind.createButton(gui, '_show_tab8', 'Hakkımda', 643, _tab_bar_y)
+_tab_btn1 = QtBind.createButton(gui, '_show_tab1', 'Hakkımda', 10, _tab_bar_y)
+_tab_btn2 = QtBind.createButton(gui, '_show_tab2', 'Banka/Çanta Birleştir', 90, _tab_bar_y)
+_tab_btn3 = QtBind.createButton(gui, '_show_tab3', 'Auto Dungeon', 205, _tab_bar_y)
+_tab_btn4 = QtBind.createButton(gui, '_show_tab4', 'Garden Dungeon', 288, _tab_bar_y)
+_tab_btn5 = QtBind.createButton(gui, '_show_tab5', 'Auto Hwt', 383, _tab_bar_y)
+_tab_btn6 = QtBind.createButton(gui, '_show_tab6', 'Oto Kervan', 463, _tab_bar_y)
+_tab_btn7 = QtBind.createButton(gui, '_show_tab7', 'Script Komutları', 543, _tab_bar_y)
+_tab_btn8 = QtBind.createButton(gui, '_show_tab8', 'Envanter Sayacı', 631, _tab_bar_y)
 
 _tab_buttons = [_tab_btn1, _tab_btn2, _tab_btn3, _tab_btn4, _tab_btn5, _tab_btn6, _tab_btn7, _tab_btn8]
 
@@ -2179,6 +2180,29 @@ _add_tab8(QtBind.createLabel(gui, '• Oto Kervan sistemi', _col2_x, _features_y
 _add_tab8(QtBind.createLabel(gui, '• Script Komutları', _col2_x, _features_y + 34), _col2_x, _features_y + 34)
 _add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı', _col2_x, _features_y + 50), _col2_x, _features_y + 50)
 _add_tab8(QtBind.createLabel(gui, '• Otomatik güncelleme', _col2_x, _features_y + 66), _col2_x, _features_y + 66)
+
+# Hakkımda tab1'e alındı; diğer tablar bir kaydırıldı (tab1=Hakkımda, tab2=Banka, ... tab8=Envanter)
+_swap = _tab8_widgets
+_tab8_widgets = _tab7_widgets
+_tab7_widgets = _tab6_widgets
+_tab6_widgets = _tab5_widgets
+_tab5_widgets = _tab4_widgets
+_tab4_widgets = _tab3_widgets
+_tab3_widgets = _tab2_widgets
+_tab2_widgets = _tab1_widgets
+_tab1_widgets = _swap
+_new_pb = {
+    1: _protected_buttons.get(8, []),
+    2: _protected_buttons.get(1, []),
+    3: _protected_buttons.get(2, []),
+    4: _protected_buttons.get(3, []),
+    5: _protected_buttons.get(4, []),
+    6: _protected_buttons.get(5, []),
+    7: _protected_buttons.get(6, []),
+    8: _protected_buttons.get(7, []),
+}
+_protected_buttons.clear()
+_protected_buttons.update(_new_pb)
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
