@@ -42,6 +42,7 @@ GITHUB_CARAVAN_URL = 'https://raw.githubusercontent.com/%s/main/feature/caravan.
 GITHUB_SCRIPT_COMMANDS_URL = 'https://raw.githubusercontent.com/%s/main/feature/script_commands.py' % GITHUB_REPO
 GITHUB_INVENTORY_COUNTER_URL = 'https://raw.githubusercontent.com/%s/main/feature/inventory_counter.py' % GITHUB_REPO
 GITHUB_TARGET_SUPPORT_URL = 'https://raw.githubusercontent.com/%s/main/feature/target_support.py' % GITHUB_REPO
+GITHUB_BLESS_QUEUE_URL = 'https://raw.githubusercontent.com/%s/main/feature/bless_queue.py' % GITHUB_REPO
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
@@ -1348,6 +1349,7 @@ _tab6_widgets = []
 _tab7_widgets = []
 _tab8_widgets = []
 _tab9_widgets = []
+_tab10_widgets = []
 _current_tab = 1
 _tab_scroll_offset = 0
 
@@ -1368,6 +1370,7 @@ def _show_tab1():
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
     _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
     _tab_move(_tab1_widgets, False)
     _current_tab = 1
     _tab_apply_scroll()
@@ -1382,6 +1385,7 @@ def _show_tab2():
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
     _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
     _tab_move(_tab2_widgets, False)
     _current_tab = 2
     _tab_apply_scroll()
@@ -1396,6 +1400,7 @@ def _show_tab3():
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
     _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
     _tab_move(_tab3_widgets, False)
     _current_tab = 3
     _tab_apply_scroll()
@@ -1410,6 +1415,7 @@ def _show_tab4():
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
     _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
     _tab_move(_tab4_widgets, False)
     _current_tab = 4
     _tab_apply_scroll()
@@ -1424,6 +1430,7 @@ def _show_tab5():
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
     _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
     _tab_move(_tab5_widgets, False)
     _current_tab = 5
     _tab_apply_scroll()
@@ -1438,6 +1445,7 @@ def _show_tab6():
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
     _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
     _tab_move(_tab6_widgets, False)
     _current_tab = 6
     _tab_apply_scroll()
@@ -1470,6 +1478,7 @@ def _show_tab7():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab8_widgets, True)
     _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
     _tab_move(_tab7_widgets, False)
     _current_tab = 7
     _tab_apply_scroll()
@@ -1484,6 +1493,7 @@ def _show_tab8():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
     _tab_move(_tab8_widgets, False)
     _current_tab = 8
     _tab_apply_scroll()
@@ -1498,6 +1508,7 @@ def _show_tab9():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab10_widgets, True)
     _tab_move(_tab9_widgets, False)
     _current_tab = 9
     _tab_apply_scroll()
@@ -1511,15 +1522,33 @@ def _add_tab8(w, x, y):
 def _add_tab9(w, x, y):
     _tab9_widgets.append((w, x, y))
 
+def _show_tab10():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, False)
+    _current_tab = 10
+    _tab_apply_scroll()
+
+def _add_tab10(w, x, y):
+    _tab10_widgets.append((w, x, y))
+
 # Tab bar yapılandırması
 _tab_bar_y = 10
 _tab_bar_x = 10
 _tab_visible_width = 552
 _tab_scroll_offset = 0
 
-# Sıra: Hakkımda, Banka/Çanta, Auto Dungeon, Garden, Auto Hwt, Oto Kervan, Script, Envanter, TargetSupport
-_tab_original_positions = [10, 90, 205, 288, 383, 463, 543, 631, 723]
-_tab_widths = [80, 115, 83, 95, 80, 80, 88, 92, 100]
+# Sıra: Hakkımda, Banka/Çanta, Auto Dungeon, Garden, Auto Hwt, Oto Kervan, Script, Envanter, TargetSupport, Sıralı Bless
+_tab_original_positions = [10, 90, 205, 288, 383, 463, 543, 631, 723, 823]
+_tab_widths = [80, 115, 83, 95, 80, 80, 88, 92, 100, 85]
 
 _tab_btn1 = QtBind.createButton(gui, '_show_tab1', 'Hakkımda', 10, _tab_bar_y)
 _tab_btn2 = QtBind.createButton(gui, '_show_tab2', 'Banka/Çanta Birleştir', 90, _tab_bar_y)
@@ -1530,8 +1559,9 @@ _tab_btn6 = QtBind.createButton(gui, '_show_tab6', 'Oto Kervan', 463, _tab_bar_y
 _tab_btn7 = QtBind.createButton(gui, '_show_tab7', 'Script Komutları', 543, _tab_bar_y)
 _tab_btn8 = QtBind.createButton(gui, '_show_tab8', 'Envanter Sayacı', 631, _tab_bar_y)
 _tab_btn9 = QtBind.createButton(gui, '_show_tab9', 'TargetSupport', 723, _tab_bar_y)
+_tab_btn10 = QtBind.createButton(gui, '_show_tab10', 'Sıralı Bless', 823, _tab_bar_y)
 
-_tab_buttons = [_tab_btn1, _tab_btn2, _tab_btn3, _tab_btn4, _tab_btn5, _tab_btn6, _tab_btn7, _tab_btn8, _tab_btn9]
+_tab_buttons = [_tab_btn1, _tab_btn2, _tab_btn3, _tab_btn4, _tab_btn5, _tab_btn6, _tab_btn7, _tab_btn8, _tab_btn9, _tab_btn10]
 
 def _tab_apply_scroll():
     for i in range(len(_tab_buttons)):
@@ -2213,6 +2243,7 @@ _add_tab8(QtBind.createLabel(gui, '• Script Komutları', _col2_x, _features_y 
 _add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı', _col2_x, _features_y + 50), _col2_x, _features_y + 50)
 _add_tab8(QtBind.createLabel(gui, '• Otomatik güncelleme', _col2_x, _features_y + 66), _col2_x, _features_y + 66)
 _add_tab8(QtBind.createLabel(gui, '• TargetSupport', _col2_x, _features_y + 82), _col2_x, _features_y + 82)
+_add_tab8(QtBind.createLabel(gui, '• Sıralı Bless', _col2_x, _features_y + 98), _col2_x, _features_y + 98)
 
 # TargetSupport (Tab 9)
 _ts_x = _tab_bar_x + 20
@@ -2230,6 +2261,17 @@ _ts_btnAddLeader = QtBind.createButton(gui, 'ts_btnAddLeader_clicked', "  Ekle  
 _add_tab9(_ts_btnAddLeader, _ts_x + 107, _ts_y + 40)
 _ts_btnRemLeader = QtBind.createButton(gui, 'ts_btnRemLeader_clicked', "  Sil  ", _ts_x + 55, _ts_y + 121)
 _add_tab9(_ts_btnRemLeader, _ts_x + 55, _ts_y + 121)
+
+# TargetSupport - Sağ taraf: Özellikler
+_ts_features_x = _ts_x + 220
+_ts_features_y = _ts_y
+_add_tab9(QtBind.createLabel(gui, 'xTargetSupport Özellikleri', _ts_features_x, _ts_features_y), _ts_features_x, _ts_features_y)
+_add_tab9(QtBind.createLabel(gui, '• Liderin saldırdığı düşmana anında otomatik saldırır', _ts_features_x, _ts_features_y + 20), _ts_features_x, _ts_features_y + 20)
+_add_tab9(QtBind.createLabel(gui, '• Defensive: Liderinize saldırana otomatik döner', _ts_features_x, _ts_features_y + 36), _ts_features_x, _ts_features_y + 36)
+_add_tab9(QtBind.createLabel(gui, '• Birden fazla oyuncu lider olarak ayarlanabilir', _ts_features_x, _ts_features_y + 52), _ts_features_x, _ts_features_y + 52)
+_add_tab9(QtBind.createLabel(gui, '• Fortress War, Unique, Guild party senkron saldırı', _ts_features_x, _ts_features_y + 68), _ts_features_x, _ts_features_y + 68)
+_add_tab9(QtBind.createLabel(gui, '• TARGET ON / OFF ile chat üzerinden yönetim', _ts_features_x, _ts_features_y + 84), _ts_features_x, _ts_features_y + 84)
+_add_tab9(QtBind.createLabel(gui, '• Kapsamlı arayüz ve profil desteği', _ts_features_x, _ts_features_y + 100), _ts_features_x, _ts_features_y + 100)
 
 # TargetSupport modülü
 _target_support_namespace = None
@@ -2283,6 +2325,180 @@ def ts_btnRemLeader_clicked():
     if ns and 'ts_btnRemLeader_clicked' in ns:
         ns['ts_btnRemLeader_clicked']()
 
+# Sıralı Bless (Tab 10)
+_bq_x = _tab_bar_x + 10
+_bq_y = _content_y + 8
+_bq_list_w = 180
+_bq_list_h = 95
+_bq_pbx = _bq_x + _bq_list_w + 8
+_bq_bw = 75
+_bq_bh = 20
+_bq_bg = 3
+_bq_lx2 = _bq_pbx + _bq_bw + 10
+_bq_qbx = _bq_lx2 + _bq_list_w + 8
+
+_bq_cbEnable = QtBind.createCheckBox(gui, 'bq_cb_enable_changed', 'Aktif (bu istemci)', _bq_x, _bq_y)
+_add_tab10(_bq_cbEnable, _bq_x, _bq_y)
+_add_tab10(QtBind.createLabel(gui, 'Sıralı Bless v1.4', _bq_x + 250, _bq_y + 2), _bq_x + 250, _bq_y + 2)
+_bq_lstParty = QtBind.createList(gui, _bq_x, _bq_y + 35, _bq_list_w, _bq_list_h)
+_add_tab10(_bq_lstParty, _bq_x, _bq_y + 35)
+_bq_btnRefresh = QtBind.createButton(gui, 'bq_btn_refresh', 'Yenile', _bq_pbx, _bq_y + 33)
+_add_tab10(_bq_btnRefresh, _bq_pbx, _bq_y + 33)
+_bq_btnAddAll = QtBind.createButton(gui, 'bq_btn_add_all', 'Tümünü Ekle', _bq_pbx, _bq_y + 33 + (_bq_bh + _bq_bg))
+_add_tab10(_bq_btnAddAll, _bq_pbx, _bq_y + 33 + (_bq_bh + _bq_bg))
+_bq_btnAddSel = QtBind.createButton(gui, 'bq_btn_add_selected', 'Ekle →', _bq_pbx, _bq_y + 33 + 2 * (_bq_bh + _bq_bg))
+_add_tab10(_bq_btnAddSel, _bq_pbx, _bq_y + 33 + 2 * (_bq_bh + _bq_bg))
+_add_tab10(QtBind.createLabel(gui, 'Parti', _bq_x, _bq_y + 20), _bq_x, _bq_y + 20)
+_bq_lstQueue = QtBind.createList(gui, _bq_lx2, _bq_y + 35, _bq_list_w, _bq_list_h)
+_add_tab10(_bq_lstQueue, _bq_lx2, _bq_y + 35)
+_bq_btnSendQueue = QtBind.createButton(gui, 'bq_btn_send_queue', 'Sırayı Gönder', _bq_qbx, _bq_y + 33)
+_add_tab10(_bq_btnSendQueue, _bq_qbx, _bq_y + 33)
+_bq_btnRemSel = QtBind.createButton(gui, 'bq_btn_remove_selected', 'Sil', _bq_qbx, _bq_y + 33 + (_bq_bh + _bq_bg))
+_add_tab10(_bq_btnRemSel, _bq_qbx, _bq_y + 33 + (_bq_bh + _bq_bg))
+_bq_btnUp = QtBind.createButton(gui, 'bq_btn_queue_up', 'Yukarı', _bq_qbx, _bq_y + 33 + 2 * (_bq_bh + _bq_bg))
+_add_tab10(_bq_btnUp, _bq_qbx, _bq_y + 33 + 2 * (_bq_bh + _bq_bg))
+_bq_btnDown = QtBind.createButton(gui, 'bq_btn_queue_down', 'Aşağı', _bq_qbx, _bq_y + 33 + 3 * (_bq_bh + _bq_bg))
+_add_tab10(_bq_btnDown, _bq_qbx, _bq_y + 33 + 3 * (_bq_bh + _bq_bg))
+_bq_btnClearQ = QtBind.createButton(gui, 'bq_btn_clear_q', 'Tümünü Sil', _bq_qbx, _bq_y + 33 + 4 * (_bq_bh + _bq_bg))
+_add_tab10(_bq_btnClearQ, _bq_qbx, _bq_y + 33 + 4 * (_bq_bh + _bq_bg))
+_add_tab10(QtBind.createLabel(gui, 'Bless Kuyruğu', _bq_lx2, _bq_y + 20), _bq_lx2, _bq_y + 20)
+_bq_by = _bq_y + 35 + _bq_list_h + 8
+_add_tab10(QtBind.createLabel(gui, 'BlessID:', _bq_x, _bq_by + 2), _bq_x, _bq_by + 2)
+_bq_tbBlessId = QtBind.createLineEdit(gui, "0x2DF6", _bq_x + 55, _bq_by, 70, 18)
+_add_tab10(_bq_tbBlessId, _bq_x + 55, _bq_by)
+_bq_btnSaveBless = QtBind.createButton(gui, 'bq_btn_save_bless', 'Kaydet', _bq_x + 130, _bq_by - 1)
+_add_tab10(_bq_btnSaveBless, _bq_x + 130, _bq_by - 1)
+_bq_btnScanBless = QtBind.createButton(gui, 'bq_btn_scan_bless', 'Tara', _bq_x + 195, _bq_by - 1)
+_add_tab10(_bq_btnScanBless, _bq_x + 195, _bq_by - 1)
+_bq_btnStopBless = QtBind.createButton(gui, 'bq_btn_stop_bless', 'Durdur', _bq_x + 250, _bq_by - 1)
+_add_tab10(_bq_btnStopBless, _bq_x + 250, _bq_by - 1)
+_bq_cbSay = QtBind.createCheckBox(gui, 'bq_cb_say_changed', 'Partiye söyle', _bq_x, _bq_by + 25)
+_add_tab10(_bq_cbSay, _bq_x, _bq_by + 25)
+_bq_tx = _bq_lx2
+_add_tab10(QtBind.createLabel(gui, 'Spam:', _bq_tx, _bq_by + 2), _bq_tx, _bq_by + 2)
+_bq_tbSpam = QtBind.createLineEdit(gui, "2.5", _bq_tx + 40, _bq_by, 50, 18)
+_add_tab10(_bq_tbSpam, _bq_tx + 40, _bq_by)
+_add_tab10(QtBind.createLabel(gui, 'Skip:', _bq_tx + 100, _bq_by + 2), _bq_tx + 100, _bq_by + 2)
+_bq_tbSkip = QtBind.createLineEdit(gui, "15", _bq_tx + 140, _bq_by, 50, 18)
+_add_tab10(_bq_tbSkip, _bq_tx + 140, _bq_by)
+_add_tab10(QtBind.createLabel(gui, 'Süre:', _bq_tx, _bq_by + 25), _bq_tx, _bq_by + 25)
+_bq_tbDur = QtBind.createLineEdit(gui, "45", _bq_tx + 40, _bq_by + 23, 50, 18)
+_add_tab10(_bq_tbDur, _bq_tx + 40, _bq_by + 23)
+_bq_btnSaveTimers = QtBind.createButton(gui, 'bq_btn_save_timers', 'Kaydet', _bq_tx + 100, _bq_by + 22)
+_add_tab10(_bq_btnSaveTimers, _bq_tx + 100, _bq_by + 22)
+_add_tab10(QtBind.createLabel(gui, 'Cleric Silah:', _bq_x, _bq_by + 50), _bq_x, _bq_by + 50)
+_bq_cmbClericWeapon = QtBind.createCombobox(gui, _bq_x + 80, _bq_by + 48, 180, 18)
+_add_tab10(_bq_cmbClericWeapon, _bq_x + 80, _bq_by + 48)
+_add_tab10(QtBind.createLabel(gui, 'Ana Silah:', _bq_x, _bq_by + 72), _bq_x, _bq_by + 72)
+_bq_cmbMainWeapon = QtBind.createCombobox(gui, _bq_x + 80, _bq_by + 70, 180, 18)
+_add_tab10(_bq_cmbMainWeapon, _bq_x + 80, _bq_by + 70)
+_bq_btnWRefresh = QtBind.createButton(gui, 'bq_btn_wrefresh', 'Yenile', _bq_tx + 80, _bq_by + 48)
+_add_tab10(_bq_btnWRefresh, _bq_tx + 80, _bq_by + 48)
+_bq_btnWSave = QtBind.createButton(gui, 'bq_btn_wsave', 'Kaydet', _bq_tx + 150, _bq_by + 48)
+_add_tab10(_bq_btnWSave, _bq_tx + 150, _bq_by + 48)
+_bq_btnHelpEN = QtBind.createButton(gui, 'bq_btn_help_en', 'Yardım', _bq_qbx + 100, _bq_by - 1)
+_add_tab10(_bq_btnHelpEN, _bq_qbx + 100, _bq_by - 1)
+
+# Bless Queue modülü
+_bless_queue_namespace = None
+
+def _get_bless_queue_namespace():
+    global _bless_queue_namespace
+    if _bless_queue_namespace is not None:
+        return _bless_queue_namespace
+    code = None
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    local_path = os.path.join(plugin_dir, 'feature', 'bless_queue.py')
+    if os.path.exists(local_path):
+        try:
+            with open(local_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+        except Exception as ex:
+            log('[%s] [Sıralı Bless] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    if not code:
+        try:
+            req = urllib.request.Request(
+                GITHUB_BLESS_QUEUE_URL,
+                headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                code = r.read().decode('utf-8')
+        except Exception as ex:
+            log('[%s] [Sıralı Bless] Modül indirilemedi: %s' % (pName, str(ex)))
+            return None
+    import ctypes
+    namespace = {
+        'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
+        'get_config_dir': get_config_dir, 'get_character_data': get_character_data, 'get_party': get_party,
+        'get_position': get_position, 'get_inventory': get_inventory, 'get_skills': get_skills,
+        'inject_joymax': inject_joymax, 'struct': struct, 'os': os, 'json': json, 're': __import__('re'),
+        'math': __import__('math'), 'threading': threading, 'time': time, 'phBotChat': phBotChat, 'ctypes': ctypes,
+        'cbEnable': _bq_cbEnable, 'lstParty': _bq_lstParty, 'lstQueue': _bq_lstQueue,
+        'tbBlessId': _bq_tbBlessId, 'tbSpam': _bq_tbSpam, 'tbSkip': _bq_tbSkip, 'tbDur': _bq_tbDur,
+        'cbSay': _bq_cbSay, 'cmbClericWeapon': _bq_cmbClericWeapon, 'cmbMainWeapon': _bq_cmbMainWeapon,
+        'btnRefresh': _bq_btnRefresh, 'btnAddAll': _bq_btnAddAll, 'btnAddSel': _bq_btnAddSel,
+        'btnSendQueue': _bq_btnSendQueue, 'btnRemSel': _bq_btnRemSel, 'btnUp': _bq_btnUp, 'btnDown': _bq_btnDown,
+        'btnClearQ': _bq_btnClearQ, 'btnSaveBless': _bq_btnSaveBless, 'btnScanBless': _bq_btnScanBless,
+        'btnStopBless': _bq_btnStopBless, 'btnSaveTimers': _bq_btnSaveTimers,
+        'btnWRefresh': _bq_btnWRefresh, 'btnWSave': _bq_btnWSave, 'btnHelpEN': _bq_btnHelpEN,
+    }
+    try:
+        exec(code, namespace)
+        QtBind.setText(gui, _bq_tbBlessId, hex(int(namespace.get('BCFG', {}).get('bless_id', 11766) or 11766)))
+        QtBind.setChecked(gui, _bq_cbSay, bool(namespace.get('BCFG', {}).get('say_in_party', True)))
+    except Exception as ex:
+        log('[%s] [Sıralı Bless] Modül yüklenemedi: %s' % (pName, str(ex)))
+        return None
+    _bless_queue_namespace = namespace
+    return _bless_queue_namespace
+
+def _bq_ns_call(name, *args):
+    try:
+        ns = _get_bless_queue_namespace()
+        if ns is None or name not in ns:
+            return None
+        f = ns[name]
+        return f(*args) if args else f()
+    except Exception:
+        return None
+
+def bq_cb_enable_changed():
+    _bq_ns_call('cb_enable_changed', QtBind.isChecked(gui, _bq_cbEnable))
+
+def bq_cb_say_changed():
+    _bq_ns_call('cb_say_changed', QtBind.isChecked(gui, _bq_cbSay))
+
+def bq_btn_refresh():
+    _bq_ns_call('btn_refresh')
+def bq_btn_add_all():
+    _bq_ns_call('btn_add_all')
+def bq_btn_add_selected():
+    _bq_ns_call('btn_add_selected')
+def bq_btn_send_queue():
+    _bq_ns_call('btn_send_queue')
+def bq_btn_remove_selected():
+    _bq_ns_call('btn_remove_selected')
+def bq_btn_queue_up():
+    _bq_ns_call('btn_queue_up')
+def bq_btn_queue_down():
+    _bq_ns_call('btn_queue_down')
+def bq_btn_clear_q():
+    _bq_ns_call('btn_clear_q')
+def bq_btn_save_bless():
+    _bq_ns_call('btn_save_bless')
+def bq_btn_scan_bless():
+    _bq_ns_call('btn_scan_bless')
+def bq_btn_stop_bless():
+    _bq_ns_call('btn_stop_bless')
+def bq_btn_save_timers():
+    _bq_ns_call('btn_save_timers')
+def bq_btn_wrefresh():
+    _bq_ns_call('btn_wrefresh')
+def bq_btn_wsave():
+    _bq_ns_call('btn_wsave')
+def bq_btn_help_en():
+    _bq_ns_call('btn_help_en')
+
 # Hakkımda tab1'e alındı; diğer tablar bir kaydırıldı (tab1=Hakkımda, tab2=Banka, ... tab8=Envanter)
 _swap = _tab8_widgets
 _tab8_widgets = _tab7_widgets
@@ -2306,6 +2522,12 @@ _new_pb = {
 _protected_buttons.clear()
 _protected_buttons.update(_new_pb)
 _protected_buttons[9] = [_ts_cbxEnabled, _ts_cbxDefensive, _ts_tbxLeaders, _ts_lvwLeaders, _ts_btnAddLeader, _ts_btnRemLeader]
+_protected_buttons[10] = [
+    _bq_cbEnable, _bq_lstParty, _bq_lstQueue, _bq_tbBlessId, _bq_tbSpam, _bq_tbSkip, _bq_tbDur,
+    _bq_cbSay, _bq_cmbClericWeapon, _bq_cmbMainWeapon, _bq_btnRefresh, _bq_btnAddAll, _bq_btnAddSel,
+    _bq_btnSendQueue, _bq_btnRemSel, _bq_btnUp, _bq_btnDown, _bq_btnClearQ, _bq_btnSaveBless,
+    _bq_btnScanBless, _bq_btnStopBless, _bq_btnSaveTimers, _bq_btnWRefresh, _bq_btnWSave, _bq_btnHelpEN
+]
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
@@ -2315,6 +2537,7 @@ _tab_move(_tab6_widgets, True)
 _tab_move(_tab7_widgets, True)
 _tab_move(_tab8_widgets, True)
 _tab_move(_tab9_widgets, True)
+_tab_move(_tab10_widgets, True)
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
 
@@ -2350,6 +2573,7 @@ def handle_silkroad(opcode, data):
 def joined_game():
     loadConfigs()
     inv_cnt_loadConfigs()
+    _bq_ns_call('joined_game')
     ns = _get_target_support_namespace()
     if ns and 'ts_loadConfigs' in ns:
         ns['ts_loadConfigs']()
@@ -2368,13 +2592,17 @@ def joined_game():
 
 def handle_chat(t, player, msg):
     _inv_cnt_handle_chat(t, player, msg)
+    _bq_ns_call('handle_chat', t, player, msg)
     ns = _get_target_support_namespace()
     if ns and 'ts_handle_chat' in ns:
         ns['ts_handle_chat'](t, player, msg)
 
 def handle_joymax(opcode, data):
+    # Sıralı Bless: 0xB0BD bless cast
+    if opcode == 0xB0BD:
+        _bq_ns_call('handle_joymax', opcode, data)
     # TargetSupport: 0xB070 skill action
-    if opcode == 0xB070:
+    elif opcode == 0xB070:
         ns = _get_target_support_namespace()
         if ns and 'ts_handle_joymax' in ns:
             ns['ts_handle_joymax'](opcode, data)
