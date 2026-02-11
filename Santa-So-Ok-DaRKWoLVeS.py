@@ -41,6 +41,7 @@ GITHUB_AUTO_HWT_URL = 'https://raw.githubusercontent.com/%s/main/feature/auto_hw
 GITHUB_CARAVAN_URL = 'https://raw.githubusercontent.com/%s/main/feature/caravan.py' % GITHUB_REPO
 GITHUB_SCRIPT_COMMANDS_URL = 'https://raw.githubusercontent.com/%s/main/feature/script_commands.py' % GITHUB_REPO
 GITHUB_INVENTORY_COUNTER_URL = 'https://raw.githubusercontent.com/%s/main/feature/inventory_counter.py' % GITHUB_REPO
+GITHUB_TARGET_SUPPORT_URL = 'https://raw.githubusercontent.com/%s/main/feature/target_support.py' % GITHUB_REPO
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
@@ -1323,6 +1324,10 @@ def _update_license_status(is_valid):
     _license_valid_cache = is_valid
     _update_all_buttons_state()
 
+def cbxDoNothing():
+    """Checkbox tıklamasında boş callback (durum sadece okunur)"""
+    pass
+
 def _update_all_buttons_state():
     """Tüm korumalı butonların durumunu günceller"""
     is_valid = _is_license_valid()
@@ -1342,6 +1347,7 @@ _tab5_widgets = []
 _tab6_widgets = []
 _tab7_widgets = []
 _tab8_widgets = []
+_tab9_widgets = []
 _current_tab = 1
 _tab_scroll_offset = 0
 
@@ -1361,6 +1367,7 @@ def _show_tab1():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
     _tab_move(_tab1_widgets, False)
     _current_tab = 1
     _tab_apply_scroll()
@@ -1374,6 +1381,7 @@ def _show_tab2():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
     _tab_move(_tab2_widgets, False)
     _current_tab = 2
     _tab_apply_scroll()
@@ -1387,6 +1395,7 @@ def _show_tab3():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
     _tab_move(_tab3_widgets, False)
     _current_tab = 3
     _tab_apply_scroll()
@@ -1400,6 +1409,7 @@ def _show_tab4():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
     _tab_move(_tab4_widgets, False)
     _current_tab = 4
     _tab_apply_scroll()
@@ -1413,6 +1423,7 @@ def _show_tab5():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
     _tab_move(_tab5_widgets, False)
     _current_tab = 5
     _tab_apply_scroll()
@@ -1426,6 +1437,7 @@ def _show_tab6():
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
     _tab_move(_tab6_widgets, False)
     _current_tab = 6
     _tab_apply_scroll()
@@ -1457,6 +1469,7 @@ def _show_tab7():
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
     _tab_move(_tab7_widgets, False)
     _current_tab = 7
     _tab_apply_scroll()
@@ -1470,8 +1483,23 @@ def _show_tab8():
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
+    _tab_move(_tab9_widgets, True)
     _tab_move(_tab8_widgets, False)
     _current_tab = 8
+    _tab_apply_scroll()
+
+def _show_tab9():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, False)
+    _current_tab = 9
     _tab_apply_scroll()
 
 def _add_tab7(w, x, y):
@@ -1480,15 +1508,18 @@ def _add_tab7(w, x, y):
 def _add_tab8(w, x, y):
     _tab8_widgets.append((w, x, y))
 
+def _add_tab9(w, x, y):
+    _tab9_widgets.append((w, x, y))
+
 # Tab bar yapılandırması
 _tab_bar_y = 10
 _tab_bar_x = 10
 _tab_visible_width = 552
 _tab_scroll_offset = 0
 
-# Sıra: Hakkımda, Banka/Çanta, Auto Dungeon, Garden, Auto Hwt, Oto Kervan, Script, Envanter
-_tab_original_positions = [10, 90, 205, 288, 383, 463, 543, 631]
-_tab_widths = [80, 115, 83, 95, 80, 80, 88, 92]
+# Sıra: Hakkımda, Banka/Çanta, Auto Dungeon, Garden, Auto Hwt, Oto Kervan, Script, Envanter, TargetSupport
+_tab_original_positions = [10, 90, 205, 288, 383, 463, 543, 631, 723]
+_tab_widths = [80, 115, 83, 95, 80, 80, 88, 92, 100]
 
 _tab_btn1 = QtBind.createButton(gui, '_show_tab1', 'Hakkımda', 10, _tab_bar_y)
 _tab_btn2 = QtBind.createButton(gui, '_show_tab2', 'Banka/Çanta Birleştir', 90, _tab_bar_y)
@@ -1498,8 +1529,9 @@ _tab_btn5 = QtBind.createButton(gui, '_show_tab5', 'Auto Hwt', 383, _tab_bar_y)
 _tab_btn6 = QtBind.createButton(gui, '_show_tab6', 'Oto Kervan', 463, _tab_bar_y)
 _tab_btn7 = QtBind.createButton(gui, '_show_tab7', 'Script Komutları', 543, _tab_bar_y)
 _tab_btn8 = QtBind.createButton(gui, '_show_tab8', 'Envanter Sayacı', 631, _tab_bar_y)
+_tab_btn9 = QtBind.createButton(gui, '_show_tab9', 'TargetSupport', 723, _tab_bar_y)
 
-_tab_buttons = [_tab_btn1, _tab_btn2, _tab_btn3, _tab_btn4, _tab_btn5, _tab_btn6, _tab_btn7, _tab_btn8]
+_tab_buttons = [_tab_btn1, _tab_btn2, _tab_btn3, _tab_btn4, _tab_btn5, _tab_btn6, _tab_btn7, _tab_btn8, _tab_btn9]
 
 def _tab_apply_scroll():
     for i in range(len(_tab_buttons)):
@@ -2180,6 +2212,76 @@ _add_tab8(QtBind.createLabel(gui, '• Oto Kervan sistemi', _col2_x, _features_y
 _add_tab8(QtBind.createLabel(gui, '• Script Komutları', _col2_x, _features_y + 34), _col2_x, _features_y + 34)
 _add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı', _col2_x, _features_y + 50), _col2_x, _features_y + 50)
 _add_tab8(QtBind.createLabel(gui, '• Otomatik güncelleme', _col2_x, _features_y + 66), _col2_x, _features_y + 66)
+_add_tab8(QtBind.createLabel(gui, '• TargetSupport', _col2_x, _features_y + 82), _col2_x, _features_y + 82)
+
+# TargetSupport (Tab 9)
+_ts_x = _tab_bar_x + 20
+_ts_y = _content_y + 10
+_ts_cbxEnabled = QtBind.createCheckBox(gui, 'cbxDoNothing', 'Enabled', _ts_x, _ts_y)
+_add_tab9(_ts_cbxEnabled, _ts_x, _ts_y)
+_ts_cbxDefensive = QtBind.createCheckBox(gui, 'cbxDoNothing', 'Defensive Mode', _ts_x + 85, _ts_y)
+_add_tab9(_ts_cbxDefensive, _ts_x + 85, _ts_y)
+_add_tab9(QtBind.createLabel(gui, '* Lider listesi', _ts_x + 2, _ts_y + 25), _ts_x + 2, _ts_y + 25)
+_ts_tbxLeaders = QtBind.createLineEdit(gui, "", _ts_x, _ts_y + 41, 100, 20)
+_add_tab9(_ts_tbxLeaders, _ts_x, _ts_y + 41)
+_ts_lvwLeaders = QtBind.createList(gui, _ts_x, _ts_y + 62, 176, 60)
+_add_tab9(_ts_lvwLeaders, _ts_x, _ts_y + 62)
+_ts_btnAddLeader = QtBind.createButton(gui, 'ts_btnAddLeader_clicked', "  Ekle  ", _ts_x + 107, _ts_y + 40)
+_add_tab9(_ts_btnAddLeader, _ts_x + 107, _ts_y + 40)
+_ts_btnRemLeader = QtBind.createButton(gui, 'ts_btnRemLeader_clicked', "  Sil  ", _ts_x + 55, _ts_y + 121)
+_add_tab9(_ts_btnRemLeader, _ts_x + 55, _ts_y + 121)
+
+# TargetSupport modülü
+_target_support_namespace = None
+
+def _get_target_support_namespace():
+    global _target_support_namespace
+    if _target_support_namespace is not None:
+        return _target_support_namespace
+    code = None
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    local_path = os.path.join(plugin_dir, 'feature', 'target_support.py')
+    if os.path.exists(local_path):
+        try:
+            with open(local_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+        except Exception as ex:
+            log('[%s] [TargetSupport] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    if not code:
+        try:
+            req = urllib.request.Request(
+                GITHUB_TARGET_SUPPORT_URL,
+                headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                code = r.read().decode('utf-8')
+        except Exception as ex:
+            log('[%s] [TargetSupport] Modül indirilemedi: %s' % (pName, str(ex)))
+            return None
+    namespace = {
+        'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
+        'get_config_dir': get_config_dir, 'get_character_data': get_character_data, 'get_party': get_party,
+        'inject_joymax': inject_joymax, 'get_locale': get_locale, 'struct': struct, 'os': os, 'json': json,
+        '_ts_cbxEnabled': _ts_cbxEnabled, '_ts_cbxDefensive': _ts_cbxDefensive,
+        '_ts_tbxLeaders': _ts_tbxLeaders, '_ts_lvwLeaders': _ts_lvwLeaders,
+    }
+    try:
+        exec(code, namespace)
+    except Exception as ex:
+        log('[%s] [TargetSupport] Modül yüklenemedi: %s' % (pName, str(ex)))
+        return None
+    _target_support_namespace = namespace
+    return _target_support_namespace
+
+def ts_btnAddLeader_clicked():
+    ns = _get_target_support_namespace()
+    if ns and 'ts_btnAddLeader_clicked' in ns:
+        ns['ts_btnAddLeader_clicked']()
+
+def ts_btnRemLeader_clicked():
+    ns = _get_target_support_namespace()
+    if ns and 'ts_btnRemLeader_clicked' in ns:
+        ns['ts_btnRemLeader_clicked']()
 
 # Hakkımda tab1'e alındı; diğer tablar bir kaydırıldı (tab1=Hakkımda, tab2=Banka, ... tab8=Envanter)
 _swap = _tab8_widgets
@@ -2203,6 +2305,7 @@ _new_pb = {
 }
 _protected_buttons.clear()
 _protected_buttons.update(_new_pb)
+_protected_buttons[9] = [_ts_cbxEnabled, _ts_cbxDefensive, _ts_tbxLeaders, _ts_lvwLeaders, _ts_btnAddLeader, _ts_btnRemLeader]
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
@@ -2211,6 +2314,7 @@ _tab_move(_tab5_widgets, True)
 _tab_move(_tab6_widgets, True)
 _tab_move(_tab7_widgets, True)
 _tab_move(_tab8_widgets, True)
+_tab_move(_tab9_widgets, True)
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
 
@@ -2246,6 +2350,9 @@ def handle_silkroad(opcode, data):
 def joined_game():
     loadConfigs()
     inv_cnt_loadConfigs()
+    ns = _get_target_support_namespace()
+    if ns and 'ts_loadConfigs' in ns:
+        ns['ts_loadConfigs']()
     
     # IP'yi güncelle ve lisans doğrula (oyuna girişte)
     def _joined_validate():
@@ -2261,10 +2368,18 @@ def joined_game():
 
 def handle_chat(t, player, msg):
     _inv_cnt_handle_chat(t, player, msg)
+    ns = _get_target_support_namespace()
+    if ns and 'ts_handle_chat' in ns:
+        ns['ts_handle_chat'](t, player, msg)
 
 def handle_joymax(opcode, data):
+    # TargetSupport: 0xB070 skill action
+    if opcode == 0xB070:
+        ns = _get_target_support_namespace()
+        if ns and 'ts_handle_joymax' in ns:
+            ns['ts_handle_joymax'](opcode, data)
     # SERVER_DIMENSIONAL_INVITATION_REQUEST
-    if opcode == 0x751A:
+    elif opcode == 0x751A:
         if QtBind.isChecked(gui, cbxAcceptForgottenWorld):
             packet = data[:4]
             packet += b'\x00\x00\x00\x00'
@@ -2303,4 +2418,7 @@ _char = get_character_data()
 if _char and _char.get('name'):
     inv_cnt_loadConfigs()
     log('[%s] [Envanter Sayacı] Config yüklendi (plugin init)' % pName)
+    ns = _get_target_support_namespace()
+    if ns and 'ts_loadConfigs' in ns:
+        ns['ts_loadConfigs']()
 
