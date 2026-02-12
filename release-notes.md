@@ -3,7 +3,7 @@
 ### Yeni Sekmeler
 - **Tab9 TargetSupport**: xTargetSupport entegrasyonu, lisans korumalı
 - **Tab10 Sıralı Bless**: Bless Queue entegrasyonu, lisans korumalı, scroll desteği
-- **Tab11 Script-Command**: SROMaster Script & Chat Command Maker
+- **Tab11 Script-Command**: SROManager Script & Chat Command Maker
 
 ### İyileştirmeler
 - Sıralı Bless tasarımı orijinal Bless Queue yerleşimine uyumlu güncellendi

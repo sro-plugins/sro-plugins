@@ -42,7 +42,7 @@ def _fetch_caravan_script_list():
     try:
         req = urllib.request.Request(
             api_url,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0', 'Accept': 'application/vnd.github.v3+json'}
+            headers={'User-Agent': 'phBot-SROManager/1.0', 'Accept': 'application/vnd.github.v3+json'}
         )
         with urllib.request.urlopen(req, timeout=12) as r:
             data = json.loads(r.read().decode('utf-8'))
@@ -81,7 +81,7 @@ def _download_caravan_script(filename):
         script_path = os.path.join(folder, filename)
         path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
         url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, filename)
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
+        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
         with urllib.request.urlopen(req, timeout=15) as r:
             content = r.read()
         if not content or len(content) < 10:
@@ -293,7 +293,7 @@ def _caravan_download_profile_db3(save_path):
         try:
             path_encoded = urllib.parse.quote(folder, safe='')
             url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, GITHUB_CARAVAN_PROFILE_DB3_FILENAME)
-            req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
+            req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
             with urllib.request.urlopen(req, timeout=15) as r:
                 data = r.read()
             if data:
@@ -422,7 +422,7 @@ def _caravan_download_profile_json(save_path):
     try:
         folder_enc = urllib.parse.quote(GITHUB_CARAVAN_PROFILE_FOLDER, safe='')
         url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, folder_enc, GITHUB_CARAVAN_PROFILE_JSON_FILENAME)
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok/1.0'})
+        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
         with urllib.request.urlopen(req, timeout=15) as r:
             data = r.read()
         if data:

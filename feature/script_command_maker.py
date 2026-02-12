@@ -323,14 +323,14 @@ def handle_chat(t, sender, message):
         return False
     return True
 
-def sromaster(args):
+def sromanager(args):
     if not _scm_check_license():
         return 500
     try:
         if not args:
             return 500
         a0 = str(args[0]).strip().lower()
-        if a0 == "sromaster":
+        if a0 == "sromanager":
             key = " ".join(str(x) for x in args[1:])
         else:
             key = " ".join(str(x) for x in args)
@@ -339,12 +339,12 @@ def sromaster(args):
         mapping = _find_mapping_by_script(key)
         if mapping:
             _inject_packet_from_mapping(mapping)
-            log(f"[{pName}] sromaster executed: {key}")
+            log(f"[{pName}] sromanager executed: {key}")
         else:
-            log(f"[{pName}] sromaster key not found: {key}")
+            log(f"[{pName}] sromanager key not found: {key}")
         return 500
     except Exception as e:
-        log(f"[{pName}] sromaster() error: {e}")
+        log(f"[{pName}] sromanager() error: {e}")
         return 500
 
 def handle_silkroad(opcode, data):

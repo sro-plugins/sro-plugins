@@ -31,7 +31,7 @@ url = f'https://api.github.com/repos/{GITHUB_REPO}/releases'
 headers = {
     'Authorization': f'token {GITHUB_TOKEN}',
     'Accept': 'application/vnd.github.v3+json',
-    'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'
+    'User-Agent': 'phBot-SROManager/1.0'
 }
 
 req = urllib.request.Request(
@@ -49,17 +49,17 @@ try:
         
         # Asset yükleme URL'i
         upload_url = result['upload_url'].replace('{?name,label}', '')
-        print(f"\nŞimdi Santa-So-Ok-DaRKWoLVeS.py dosyasını asset olarak yüklüyoruz...")
+        print(f"\nŞimdi sromanager.py dosyasını asset olarak yüklüyoruz...")
         
         # Dosyayı yükle
-        with open('Santa-So-Ok-DaRKWoLVeS.py', 'rb') as f:
+        with open('sromanager.py', 'rb') as f:
             file_data = f.read()
         
         upload_headers = headers.copy()
         upload_headers['Content-Type'] = 'application/octet-stream'
         
         upload_req = urllib.request.Request(
-            upload_url + '?name=Santa-So-Ok-DaRKWoLVeS.py',
+            upload_url + '?name=sromanager.py',
             data=file_data,
             headers=upload_headers,
             method='POST'

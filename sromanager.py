@@ -18,8 +18,8 @@ import signal
 import subprocess
 from datetime import datetime, timedelta
 
-pName = 'DaRKWoLVeS Alet Çantası'
-PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
+pName = 'SROManager'
+PLUGIN_FILENAME = 'sromanager.py'
 pVersion = '1.6.0'
 
 MOVE_DELAY = 0.25
@@ -87,7 +87,7 @@ def _fetch_github_latest():
     try:
         req = urllib.request.Request(
             GITHUB_API_LATEST,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read().decode('utf-8'))
@@ -102,7 +102,7 @@ def _get_update_download_url():
     try:
         req = urllib.request.Request(
             GITHUB_API_LATEST,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read().decode('utf-8'))
@@ -159,7 +159,7 @@ def _fetch_user_external_ip():
         try:
             req = urllib.request.Request(
                 service_url,
-                headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
             )
             with urllib.request.urlopen(req, timeout=8) as r:
                 ip = r.read().decode('utf-8').strip()
@@ -260,7 +260,7 @@ def _validate_license():
         req = urllib.request.Request(
             api_url,
             headers={
-                'User-Agent': 'phBot-Santa-So-Ok-Plugin/' + pVersion,
+                'User-Agent': 'phBot-SROManager/' + pVersion,
                 'Accept': 'application/json'
             }
         )
@@ -374,7 +374,7 @@ def _download_garden_script(script_type="normal"):
 
         req = urllib.request.Request(
             url_with_cache_buster,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
 
         with urllib.request.urlopen(req, timeout=15) as r:
@@ -409,7 +409,7 @@ def _download_caravan_script(filename):
         script_path = os.path.join(folder, filename)
         path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
         url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, filename)
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
+        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
         with urllib.request.urlopen(req, timeout=15) as r:
             content = r.read()
         if not content or len(content) < 10:
@@ -468,7 +468,7 @@ def _check_script_updates():
         req = urllib.request.Request(
             url_with_cache_buster,
             headers={
-                'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0',
+                'User-Agent': 'phBot-SROManager/1.0',
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
             }
@@ -599,7 +599,7 @@ def _do_auto_update_thread():
                 pass
         log('[%s] Güncelleme indiriliyor...' % pName)
         download_url = _get_update_download_url()
-        req = urllib.request.Request(download_url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
+        req = urllib.request.Request(download_url, headers={'User-Agent': 'phBot-SROManager/1.0'})
         with urllib.request.urlopen(req, timeout=15) as r:
             new_content = r.read()
         if not new_content or len(new_content) < 500:
@@ -783,7 +783,7 @@ def _get_jewel_merge_sort_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_JEWEL_MERGE_SORT_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -839,7 +839,7 @@ def _get_bank_features_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_BANK_FEATURES_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -925,7 +925,7 @@ def _get_auto_dungeon_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_AUTO_BASE_DUNGEON_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1057,7 +1057,7 @@ def _get_garden_dungeon_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_GARDEN_DUNGEON_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1117,7 +1117,7 @@ def _get_auto_hwt_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_AUTO_HWT_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1146,7 +1146,7 @@ def _get_caravan_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_CARAVAN_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1210,7 +1210,7 @@ def _get_script_commands_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_SCRIPT_COMMANDS_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1309,11 +1309,11 @@ def ChangeBotOption(args):
 def CustomNPC(args):
     return _sc_ns_call('CustomNPC', args)
 
-def sromaster(args):
+def sromanager(args):
     """Script-Command: Chat/Script -> paket eşlemesi (uzaktan modül)"""
     ns = _get_script_command_maker_namespace()
-    if ns and 'sromaster' in ns:
-        return ns['sromaster'](args)
+    if ns and 'sromanager' in ns:
+        return ns['sromanager'](args)
     return 500
 
 gui = QtBind.init(__name__, pName)
@@ -1585,7 +1585,7 @@ _tab_visible_width = 552
 _tab_scroll_offset = 0
 
 # Sıra: Hakkımda, Banka/Çanta, Auto Dungeon, Garden, Auto Hwt, Oto Kervan, Script, Envanter, TargetSupport, Sıralı Bless, Script-Command
-_tab_original_positions = [10, 90, 205, 288, 383, 463, 543, 631, 723, 808, 873]
+_tab_original_positions = [10, 90, 205, 288, 383, 463, 543, 631, 723, 807, 887]
 _tab_widths = [80, 115, 83, 95, 80, 80, 88, 92, 85, 65, 115]
 
 _tab_btn1 = QtBind.createButton(gui, '_show_tab1', 'Hakkımda', 10, _tab_bar_y)
@@ -1597,8 +1597,8 @@ _tab_btn6 = QtBind.createButton(gui, '_show_tab6', 'Oto Kervan', 463, _tab_bar_y
 _tab_btn7 = QtBind.createButton(gui, '_show_tab7', 'Script Komutları', 543, _tab_bar_y)
 _tab_btn8 = QtBind.createButton(gui, '_show_tab8', 'Envanter Sayacı', 631, _tab_bar_y)
 _tab_btn9 = QtBind.createButton(gui, '_show_tab9', 'TargetSupport', 723, _tab_bar_y)
-_tab_btn10 = QtBind.createButton(gui, '_show_tab10', 'Sıralı Bless', 808, _tab_bar_y)
-_tab_btn11 = QtBind.createButton(gui, '_show_tab11', 'Script - Command', 873, _tab_bar_y)
+_tab_btn10 = QtBind.createButton(gui, '_show_tab10', 'Sıralı Bless', 807, _tab_bar_y)
+_tab_btn11 = QtBind.createButton(gui, '_show_tab11', 'Script - Command', 887, _tab_bar_y)
 
 _tab_buttons = [_tab_btn1, _tab_btn2, _tab_btn3, _tab_btn4, _tab_btn5, _tab_btn6, _tab_btn7, _tab_btn8, _tab_btn9, _tab_btn10, _tab_btn11]
 
@@ -2022,7 +2022,7 @@ _protected_buttons[6] = [_script_cmds_SaveName, _script_cmds_RecordBtn, _script_
     _script_cmds_cbxShowPackets]
 
 # Tab 7 - Envanter Sayacı (TR_InventoryCounter) - mantık GitHub'dan uzaktan yüklenir
-_inv_cnt_name = 'Santa-So-Ok-DaRKWoLVeS_EnvanterSayaci'
+_inv_cnt_name = 'sromanager_EnvanterSayaci'
 
 _ic_x = _tab_bar_x + 15
 _ic_y = _content_y + 8
@@ -2090,7 +2090,7 @@ def _get_inventory_counter_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_INVENTORY_COUNTER_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -2332,7 +2332,7 @@ def _get_target_support_namespace():
         try:
             req = urllib.request.Request(
                 GITHUB_TARGET_SUPPORT_URL,
-                headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
             )
             with urllib.request.urlopen(req, timeout=15) as r:
                 code = r.read().decode('utf-8')
@@ -2460,7 +2460,7 @@ def _get_bless_queue_namespace():
         try:
             req = urllib.request.Request(
                 GITHUB_BLESS_QUEUE_URL,
-                headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
             )
             with urllib.request.urlopen(req, timeout=15) as r:
                 code = r.read().decode('utf-8')
@@ -2541,7 +2541,7 @@ def bq_btn_wrefresh():
     _bq_ns_call('btn_wrefresh')
 def bq_btn_wsave():
     _bq_ns_call('btn_wsave')
-# Script & Chat Command Maker (Tab 11) - SROMaster Command Maker
+# Script & Chat Command Maker (Tab 11) - SROManager Command Maker
 _scm_x = _tab_bar_x + 15
 _scm_y = _content_y + 10
 _add_tab11(QtBind.createLabel(gui, 'Script - Chat Command Maker', _scm_x, _scm_y), _scm_x, _scm_y)
@@ -2584,6 +2584,8 @@ _scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 130, 2
 _add_tab11(_scm_tbLeader, _scm_x + 55, _scm_y + 224)
 _scm_lblStatus = QtBind.createLabel(gui, 'Hazır', _scm_x, _scm_y + 248)
 _add_tab11(_scm_lblStatus, _scm_x, _scm_y + 248)
+_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_help_clicked', 'Yardım', _scm_x + 680, _scm_y)
+_add_tab11(_scm_btnHelp, _scm_x + 680, _scm_y)
 
 _script_command_maker_namespace = None
 
@@ -2606,7 +2608,7 @@ def _get_script_command_maker_namespace():
         try:
             req = urllib.request.Request(
                 GITHUB_SCRIPT_COMMAND_MAKER_URL,
-                headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
             )
             with urllib.request.urlopen(req, timeout=15) as r:
                 code = r.read().decode('utf-8')
@@ -2644,6 +2646,40 @@ def _scm_ns_call(name, *args):
         return f(*args) if args else f()
     except Exception:
         return None
+
+def scm_btn_help_clicked():
+    try:
+        text = (
+            "Script - Chat Command Maker (SROManager)\r\n"
+            "============================================\r\n\r\n"
+            "Bu modül Chat komutları ile Silkroad paketlerini eşleştirir.\r\n"
+            "Oyunda bir şey yaptığınızda giden paketleri yakalayıp, "
+            "belirlediğiniz Chat veya Script komutlarıyla yeniden çalıştırabilirsiniz.\r\n\r\n"
+            "Alanlar:\r\n"
+            "- Chat   : Oyunda parti sohbetinde yazacağınız komut (örn: bless)\r\n"
+            "- Script : phBot script komutu (örn: sromanager bless)\r\n"
+            "- Opcode : Paket opcode (örn: 0xB0BD)\r\n"
+            "- Data   : Paket hex verisi (örn: 01 02 03)\r\n\r\n"
+            "KAYDET butonu:\r\n"
+            "Chat + Opcode (ve isteğe Data) girip Kaydet'e basın. "
+            "Bu eşleme JSON dosyasına kaydedilir:\r\n"
+            "  Config/SROManager/script_command_Server_Karakter.json\r\n"
+            "Lider alanına parti liderinin adını yazın; sadece o kişi Chat komutlarını tetikleyebilir.\r\n\r\n"
+            "SROManager:\r\n"
+            "Script komutunda 'sromanager <anahtar>' yazarsanız, phBot script panelinden "
+            "ör. sromanager bless çağrıldığında o eşleme çalışır (paket enjekte edilir).\r\n\r\n"
+            "Adımlar:\r\n"
+            "1) 'Tüm C2S paketlerini göster' işaretleyin\r\n"
+            "2) Oyunda yapmak istediğiniz işlemi yapın (log'dan opcode/data kopyalayın)\r\n"
+            "3) Chat + Script + Opcode + Data girin, Kaydet\r\n"
+            "4) Lider adını yazın (Chat için) veya sromanager kullanın (Script için)"
+        )
+        ctypes.windll.user32.MessageBoxW(None, str(text), "%s — Script-Command Yardım" % pName, 0x40)
+    except Exception as ex:
+        try:
+            log('[%s] Script-Command yardım penceresi açılamadı: %s' % (pName, str(ex)))
+        except Exception:
+            pass
 
 def scm_ui_save():
     _scm_ns_call('ui_save')

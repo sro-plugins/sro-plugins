@@ -6,14 +6,14 @@
 
 | Klasör / Dosya | Açıklama |
 |----------------|----------|
-| **Santa-So-Ok-DaRKWoLVeS.py** | Ana eklenti: So-Ok event, Oto Kervan, Auto Dungeon, Garden Script, güncelleme kontrolü |
+| **sromanager.py** | Ana eklenti: So-Ok event, Oto Kervan, Auto Dungeon, Garden Script, güncelleme kontrolü |
 | **caravan/** | Oto Kervan için şehirler arası rota scriptleri (walk komutları) |
 | **profile/** | Oto Kervan için örnek karavan profili (JSON) |
 | **sc/** | Garden Dungeon scriptleri ve sürüm bilgileri |
 | **create_release.py** | GitHub release oluşturma scripti |
 | **release-notes.md** | Sürüm notları |
 
-## Santa-So-Ok-DaRKWoLVeS Eklentisi
+## SROManager Eklentisi
 
 ### Özellikler
 
@@ -26,7 +26,7 @@
 
 ### Kurulum
 
-1. `Santa-So-Ok-DaRKWoLVeS.py` dosyasını phBot’un **plugins** klasörüne kopyalayın.
+1. `sromanager.py` dosyasını phBot’un **plugins** klasörüne kopyalayın.
 2. Opsiyonel: **caravan** ve **sc** klasörlerini eklenti dosyasıyla aynı dizine (veya phBot’un ilgili config/script dizinine) koyun; eklenti GitHub’dan da indirebilir.
 3. phBot’u başlatıp eklentiyi etkinleştirin.
 
