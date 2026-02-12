@@ -20,8 +20,8 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.6.0',
-    'name': 'v1.6.0 - Script-Command tab, TargetSupport, Sıralı Bless',
+    'tag_name': 'v1.7.0',
+    'name': 'v1.7.0 - SROManager: plugin adı ve dosya yeniden adlandırıldı',
     'body': release_notes,
     'draft': False,
     'prerelease': False

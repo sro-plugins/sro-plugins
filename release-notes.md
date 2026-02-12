@@ -1,3 +1,14 @@
+## v1.7.0 (SROManager: plugin adı ve dosya yeniden adlandırıldı)
+
+### Değişiklikler
+- **Plugin adı:** DaRKWoLVeS Alet Çantası → SROManager
+- **Dosya adı:** Santa-So-Ok-DaRKWoLVeS.py → sromanager.py
+- **sromaster → sromanager:** Script komutu ve referanslar güncellendi
+- Config klasörü: `Config/SROManager/`
+- User-Agent: phBot-SROManager/1.0
+
+---
+
 ## v1.6.0 (Script-Command tab, TargetSupport, Sıralı Bless)
 
 ### Yeni Sekmeler

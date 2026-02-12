@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.6.0'
+pVersion = '1.7.0'
 
 MOVE_DELAY = 0.25
 
