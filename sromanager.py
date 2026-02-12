@@ -12,6 +12,9 @@ import os
 import shutil
 import urllib.request
 import urllib.parse
+import base64
+import hmac
+import hashlib
 import sqlite3
 import struct
 import signal
@@ -127,7 +130,8 @@ dimensionalItemActivated = None
 # Script Komutları (Tab 6) path - namespace'te kullanılmak üzere loader'da enjekte edilir
 _script_cmds_path = get_config_dir()[:-7]  # phBot ana klasör yolu
 
-# Sunucu İletişimi (Server Communication) global değişkenleri
+# Sunucu İletişimi (Server Communication)
+SERVER_BASE_URL = 'https://vps.sro-plugins.cloud'
 _server_license_key = ""  # Kullanıcının lisans anahtarı
 _server_user_ip = ""  # Kullanıcının external IP adresi
 _server_ip_fetch_lock = threading.Lock()
@@ -180,6 +184,34 @@ def _fetch_user_external_ip():
     else:
         log('[%s] [Server] IP adresi alınamadı!' % pName)
         return None
+
+def _create_signed_headers(license_key, user_ip, endpoint=""):
+    """
+    Sunucu istekleri için imzalı payload ve header'ları oluşturur.
+    Sunucu bu header'ları doğrulayarak manipüle edilmemiş plugin'den geldiğini kontrol edebilir.
+    Payload: license, ip, timestamp, nonce, endpoint (benzersiz)
+    Signature: HMAC-SHA256(payload_json, license_key)
+    """
+    try:
+        ts = int(time.time())
+        nonce = os.urandom(16).hex()
+        payload = {
+            "license": (license_key or ""),
+            "ip": (user_ip or ""),
+            "ts": ts,
+            "nonce": nonce,
+            "endpoint": endpoint
+        }
+        payload_json = json.dumps(payload, sort_keys=True)
+        payload_b64 = base64.b64encode(payload_json.encode()).decode()
+        secret = (license_key or "none").encode()
+        signature = hmac.new(secret, payload_json.encode(), hashlib.sha256).hexdigest()
+        return {
+            "X-SROMANAGER-Payload": payload_b64,
+            "X-SROMANAGER-Signature": signature,
+        }
+    except Exception:
+        return {}
 
 def _get_license_key():
     """Config'den lisans anahtarını okur"""
@@ -256,14 +288,15 @@ def _validate_license():
         
         log('[%s] [Server] Lisans doğrulanıyor... (IP: %s)' % (pName, user_ip))
         
-        # İstek gönder
-        req = urllib.request.Request(
-            api_url,
-            headers={
-                'User-Agent': 'phBot-SROManager/' + pVersion,
-                'Accept': 'application/json'
-            }
-        )
+        # İmzalı payload header'ları (sunucu doğrulama için)
+        signed_headers = _create_signed_headers(license_key, user_ip, endpoint="validate")
+        headers = {
+            'User-Agent': 'phBot-SROManager/' + pVersion,
+            'Accept': 'application/json',
+            **signed_headers
+        }
+        log('[%s] [Server] Gönderilen header\'lar: %s' % (pName, headers))
+        req = urllib.request.Request(api_url, headers=headers)
         
         with urllib.request.urlopen(req, timeout=10) as response:
             response_data = response.read().decode('utf-8')
