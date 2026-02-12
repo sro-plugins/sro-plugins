@@ -1,0 +1,30 @@
+---
+description: Python kodlama standartları (phBot eklentileri)
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python Standartları
+
+- **Loglama**: phBot için `log('[%s] Mesaj' % pName)` formatını kullan; `pName` eklenti adı değişkenidir.
+- **Sabitler**: Eklenti adı, dosya adı, sürüm, gecikmeler ve URL’ler dosyanın üst kısımlarında büyük harfli sabitler olarak tanımlansın.
+- **Threading**: `threading` kullanırken paylaşılan durum için `threading.Lock()` ve güvenli durdurma için `threading.Event()` tercih edilsin.
+- **Hata yönetimi**: `try/except` kullanırken log at veya kullanıcıya anlamlı mesaj ver; boş `except` kullanma.
+- **Docstring**: Modül/klas seviyesinde veya karmaşık fonksiyonlarda kısa Türkçe/İngilizce docstring kullanılabilir.
+
+## Örnek
+
+```python
+# Log
+log('[%s] [Garden-Auto] Script indirildi.' % pName)
+
+# Sabitler (üstte)
+pName = 'SROManager'
+MOVE_DELAY = 0.25
+
+# Hata
+try:
+    data = load_config()
+except Exception as ex:
+    log('[%s] Config yükleme hatası: %s' % (pName, str(ex)))
+```

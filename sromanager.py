@@ -18,9 +18,9 @@ import signal
 import subprocess
 from datetime import datetime, timedelta
 
-pName = 'DaRKWoLVeS Alet Çantası'
-PLUGIN_FILENAME = 'Santa-So-Ok-DaRKWoLVeS.py'
-pVersion = '1.5.1'
+pName = 'SROManager'
+PLUGIN_FILENAME = 'sromanager.py'
+pVersion = '1.7.0'
 
 MOVE_DELAY = 0.25
 
@@ -41,12 +41,15 @@ GITHUB_AUTO_HWT_URL = 'https://raw.githubusercontent.com/%s/main/feature/auto_hw
 GITHUB_CARAVAN_URL = 'https://raw.githubusercontent.com/%s/main/feature/caravan.py' % GITHUB_REPO
 GITHUB_SCRIPT_COMMANDS_URL = 'https://raw.githubusercontent.com/%s/main/feature/script_commands.py' % GITHUB_REPO
 GITHUB_INVENTORY_COUNTER_URL = 'https://raw.githubusercontent.com/%s/main/feature/inventory_counter.py' % GITHUB_REPO
+GITHUB_TARGET_SUPPORT_URL = 'https://raw.githubusercontent.com/%s/main/feature/target_support.py' % GITHUB_REPO
+GITHUB_BLESS_QUEUE_URL = 'https://raw.githubusercontent.com/%s/main/feature/bless_queue.py' % GITHUB_REPO
+GITHUB_SCRIPT_COMMAND_MAKER_URL = 'https://raw.githubusercontent.com/%s/main/feature/script_command_maker.py' % GITHUB_REPO
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
 # Oto Kervan: GitHub'daki karavan scriptleri klasörü (API ile liste, raw ile indirme)
-# GitHub'da klasör yoksa veya 404 alırsa yerel "PHBOT Caravan SC" klasörü kullanılır (plugin yanında).
-GITHUB_CARAVAN_FOLDER = 'PHBOT Caravan SC'
+# GitHub'da klasör yoksa veya 404 alırsa yerel "caravan" klasörü kullanılır (plugin yanında).
+GITHUB_CARAVAN_FOLDER = 'caravan'
 GITHUB_CARAVAN_BRANCH = 'main'
 # API URL _fetch_caravan_script_list içinde quote ile oluşturulur (400 hatası önlemi)
 # Raw template: tek format çağrısında (repo, branch, filename)
@@ -84,7 +87,7 @@ def _fetch_github_latest():
     try:
         req = urllib.request.Request(
             GITHUB_API_LATEST,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read().decode('utf-8'))
@@ -99,7 +102,7 @@ def _get_update_download_url():
     try:
         req = urllib.request.Request(
             GITHUB_API_LATEST,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read().decode('utf-8'))
@@ -156,7 +159,7 @@ def _fetch_user_external_ip():
         try:
             req = urllib.request.Request(
                 service_url,
-                headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
             )
             with urllib.request.urlopen(req, timeout=8) as r:
                 ip = r.read().decode('utf-8').strip()
@@ -257,7 +260,7 @@ def _validate_license():
         req = urllib.request.Request(
             api_url,
             headers={
-                'User-Agent': 'phBot-Santa-So-Ok-Plugin/' + pVersion,
+                'User-Agent': 'phBot-SROManager/' + pVersion,
                 'Accept': 'application/json'
             }
         )
@@ -371,7 +374,7 @@ def _download_garden_script(script_type="normal"):
 
         req = urllib.request.Request(
             url_with_cache_buster,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
 
         with urllib.request.urlopen(req, timeout=15) as r:
@@ -406,7 +409,7 @@ def _download_caravan_script(filename):
         script_path = os.path.join(folder, filename)
         path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
         url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, filename)
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
+        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
         with urllib.request.urlopen(req, timeout=15) as r:
             content = r.read()
         if not content or len(content) < 10:
@@ -465,7 +468,7 @@ def _check_script_updates():
         req = urllib.request.Request(
             url_with_cache_buster,
             headers={
-                'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0',
+                'User-Agent': 'phBot-SROManager/1.0',
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
             }
@@ -596,7 +599,7 @@ def _do_auto_update_thread():
                 pass
         log('[%s] Güncelleme indiriliyor...' % pName)
         download_url = _get_update_download_url()
-        req = urllib.request.Request(download_url, headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'})
+        req = urllib.request.Request(download_url, headers={'User-Agent': 'phBot-SROManager/1.0'})
         with urllib.request.urlopen(req, timeout=15) as r:
             new_content = r.read()
         if not new_content or len(new_content) < 500:
@@ -780,7 +783,7 @@ def _get_jewel_merge_sort_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_JEWEL_MERGE_SORT_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -836,7 +839,7 @@ def _get_bank_features_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_BANK_FEATURES_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -922,7 +925,7 @@ def _get_auto_dungeon_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_AUTO_BASE_DUNGEON_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1054,7 +1057,7 @@ def _get_garden_dungeon_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_GARDEN_DUNGEON_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1114,7 +1117,7 @@ def _get_auto_hwt_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_AUTO_HWT_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1143,7 +1146,7 @@ def _get_caravan_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_CARAVAN_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1207,7 +1210,7 @@ def _get_script_commands_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_SCRIPT_COMMANDS_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -1306,6 +1309,13 @@ def ChangeBotOption(args):
 def CustomNPC(args):
     return _sc_ns_call('CustomNPC', args)
 
+def sromanager(args):
+    """Script-Command: Chat/Script -> paket eşlemesi (uzaktan modül)"""
+    ns = _get_script_command_maker_namespace()
+    if ns and 'sromanager' in ns:
+        return ns['sromanager'](args)
+    return 500
+
 gui = QtBind.init(__name__, pName)
 
 # Lisans kontrol sistemi
@@ -1322,6 +1332,10 @@ def _update_license_status(is_valid):
     global _license_valid_cache
     _license_valid_cache = is_valid
     _update_all_buttons_state()
+
+def cbxDoNothing():
+    """Checkbox tıklamasında boş callback (durum sadece okunur)"""
+    pass
 
 def _update_all_buttons_state():
     """Tüm korumalı butonların durumunu günceller"""
@@ -1342,6 +1356,9 @@ _tab5_widgets = []
 _tab6_widgets = []
 _tab7_widgets = []
 _tab8_widgets = []
+_tab9_widgets = []
+_tab10_widgets = []
+_tab11_widgets = []
 _current_tab = 1
 _tab_scroll_offset = 0
 
@@ -1361,6 +1378,9 @@ def _show_tab1():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, True)
     _tab_move(_tab1_widgets, False)
     _current_tab = 1
     _tab_apply_scroll()
@@ -1374,6 +1394,9 @@ def _show_tab2():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, True)
     _tab_move(_tab2_widgets, False)
     _current_tab = 2
     _tab_apply_scroll()
@@ -1387,6 +1410,9 @@ def _show_tab3():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, True)
     _tab_move(_tab3_widgets, False)
     _current_tab = 3
     _tab_apply_scroll()
@@ -1400,6 +1426,9 @@ def _show_tab4():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, True)
     _tab_move(_tab4_widgets, False)
     _current_tab = 4
     _tab_apply_scroll()
@@ -1413,6 +1442,9 @@ def _show_tab5():
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, True)
     _tab_move(_tab5_widgets, False)
     _current_tab = 5
     _tab_apply_scroll()
@@ -1426,6 +1458,9 @@ def _show_tab6():
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab7_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, True)
     _tab_move(_tab6_widgets, False)
     _current_tab = 6
     _tab_apply_scroll()
@@ -1457,6 +1492,9 @@ def _show_tab7():
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, True)
     _tab_move(_tab7_widgets, False)
     _current_tab = 7
     _tab_apply_scroll()
@@ -1470,8 +1508,27 @@ def _show_tab8():
     _tab_move(_tab5_widgets, True)
     _tab_move(_tab6_widgets, True)
     _tab_move(_tab7_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, True)
     _tab_move(_tab8_widgets, False)
     _current_tab = 8
+    _tab_apply_scroll()
+
+def _show_tab9():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, True)
+    _tab_move(_tab9_widgets, False)
+    _current_tab = 9
     _tab_apply_scroll()
 
 def _add_tab7(w, x, y):
@@ -1480,25 +1537,70 @@ def _add_tab7(w, x, y):
 def _add_tab8(w, x, y):
     _tab8_widgets.append((w, x, y))
 
+def _add_tab9(w, x, y):
+    _tab9_widgets.append((w, x, y))
+
+def _show_tab10():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab11_widgets, True)
+    _tab_move(_tab10_widgets, False)
+    _current_tab = 10
+    _tab_apply_scroll()
+
+def _show_tab11():
+    global _current_tab
+    _tab_move(_tab1_widgets, True)
+    _tab_move(_tab2_widgets, True)
+    _tab_move(_tab3_widgets, True)
+    _tab_move(_tab4_widgets, True)
+    _tab_move(_tab5_widgets, True)
+    _tab_move(_tab6_widgets, True)
+    _tab_move(_tab7_widgets, True)
+    _tab_move(_tab8_widgets, True)
+    _tab_move(_tab9_widgets, True)
+    _tab_move(_tab10_widgets, True)
+    _tab_move(_tab11_widgets, False)
+    _current_tab = 11
+    _tab_apply_scroll()
+
+def _add_tab10(w, x, y):
+    _tab10_widgets.append((w, x, y))
+
+def _add_tab11(w, x, y):
+    _tab11_widgets.append((w, x, y))
+
 # Tab bar yapılandırması
 _tab_bar_y = 10
 _tab_bar_x = 10
 _tab_visible_width = 552
 _tab_scroll_offset = 0
 
-_tab_original_positions = [10, 125, 208, 303, 383, 463, 551, 643]
-_tab_widths = [115, 83, 95, 80, 80, 88, 92, 60]
+# Sıra: Hakkımda, Banka/Çanta, Auto Dungeon, Garden, Auto Hwt, Oto Kervan, Script, Envanter, TargetSupport, Sıralı Bless, Script-Command
+_tab_original_positions = [10, 90, 205, 288, 383, 463, 543, 631, 723, 807, 887]
+_tab_widths = [80, 115, 83, 95, 80, 80, 88, 92, 85, 65, 115]
 
-_tab_btn1 = QtBind.createButton(gui, '_show_tab1', 'Banka/Çanta Birleştir', 10, _tab_bar_y)
-_tab_btn2 = QtBind.createButton(gui, '_show_tab2', 'Auto Dungeon', 125, _tab_bar_y)
-_tab_btn3 = QtBind.createButton(gui, '_show_tab3', 'Garden Dungeon', 208, _tab_bar_y)
-_tab_btn4 = QtBind.createButton(gui, '_show_tab4', 'Auto Hwt', 303, _tab_bar_y)
-_tab_btn5 = QtBind.createButton(gui, '_show_tab5', 'Oto Kervan', 383, _tab_bar_y)
-_tab_btn6 = QtBind.createButton(gui, '_show_tab6', 'Script Komutları', 463, _tab_bar_y)
-_tab_btn7 = QtBind.createButton(gui, '_show_tab7', 'Envanter Sayacı', 551, _tab_bar_y)
-_tab_btn8 = QtBind.createButton(gui, '_show_tab8', 'Hakkımda', 643, _tab_bar_y)
+_tab_btn1 = QtBind.createButton(gui, '_show_tab1', 'Hakkımda', 10, _tab_bar_y)
+_tab_btn2 = QtBind.createButton(gui, '_show_tab2', 'Banka/Çanta Birleştir', 90, _tab_bar_y)
+_tab_btn3 = QtBind.createButton(gui, '_show_tab3', 'Auto Dungeon', 205, _tab_bar_y)
+_tab_btn4 = QtBind.createButton(gui, '_show_tab4', 'Garden Dungeon', 288, _tab_bar_y)
+_tab_btn5 = QtBind.createButton(gui, '_show_tab5', 'Auto Hwt', 383, _tab_bar_y)
+_tab_btn6 = QtBind.createButton(gui, '_show_tab6', 'Oto Kervan', 463, _tab_bar_y)
+_tab_btn7 = QtBind.createButton(gui, '_show_tab7', 'Script Komutları', 543, _tab_bar_y)
+_tab_btn8 = QtBind.createButton(gui, '_show_tab8', 'Envanter Sayacı', 631, _tab_bar_y)
+_tab_btn9 = QtBind.createButton(gui, '_show_tab9', 'TargetSupport', 723, _tab_bar_y)
+_tab_btn10 = QtBind.createButton(gui, '_show_tab10', 'Sıralı Bless', 807, _tab_bar_y)
+_tab_btn11 = QtBind.createButton(gui, '_show_tab11', 'Script - Command', 887, _tab_bar_y)
 
-_tab_buttons = [_tab_btn1, _tab_btn2, _tab_btn3, _tab_btn4, _tab_btn5, _tab_btn6, _tab_btn7, _tab_btn8]
+_tab_buttons = [_tab_btn1, _tab_btn2, _tab_btn3, _tab_btn4, _tab_btn5, _tab_btn6, _tab_btn7, _tab_btn8, _tab_btn9, _tab_btn10, _tab_btn11]
 
 def _tab_apply_scroll():
     for i in range(len(_tab_buttons)):
@@ -1544,7 +1646,7 @@ _tab_apply_scroll()
 _content_y = _tab_bar_y + 28
 _content_container_h = 270
 _tab_bar_w = 700
-QtBind.createList(gui, _tab_bar_x, _content_y, _tab_bar_w, _content_container_h)
+# Ana içerik container'ı oluşturulmadı (stroke yok) - orijinal Bless Queue gibi
 
 _jewel_y = _content_y + 12
 _jewel_w = 280
@@ -1920,7 +2022,7 @@ _protected_buttons[6] = [_script_cmds_SaveName, _script_cmds_RecordBtn, _script_
     _script_cmds_cbxShowPackets]
 
 # Tab 7 - Envanter Sayacı (TR_InventoryCounter) - mantık GitHub'dan uzaktan yüklenir
-_inv_cnt_name = 'Santa-So-Ok-DaRKWoLVeS_EnvanterSayaci'
+_inv_cnt_name = 'sromanager_EnvanterSayaci'
 
 _ic_x = _tab_bar_x + 15
 _ic_y = _content_y + 8
@@ -1988,7 +2090,7 @@ def _get_inventory_counter_namespace():
     try:
         req = urllib.request.Request(
             GITHUB_INVENTORY_COUNTER_URL,
-            headers={'User-Agent': 'phBot-Santa-So-Ok-Plugin/1.0'}
+            headers={'User-Agent': 'phBot-SROManager/1.0'}
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.read().decode('utf-8')
@@ -2179,6 +2281,512 @@ _add_tab8(QtBind.createLabel(gui, '• Oto Kervan sistemi', _col2_x, _features_y
 _add_tab8(QtBind.createLabel(gui, '• Script Komutları', _col2_x, _features_y + 34), _col2_x, _features_y + 34)
 _add_tab8(QtBind.createLabel(gui, '• Envanter Sayacı', _col2_x, _features_y + 50), _col2_x, _features_y + 50)
 _add_tab8(QtBind.createLabel(gui, '• Otomatik güncelleme', _col2_x, _features_y + 66), _col2_x, _features_y + 66)
+_add_tab8(QtBind.createLabel(gui, '• TargetSupport', _col2_x, _features_y + 82), _col2_x, _features_y + 82)
+_add_tab8(QtBind.createLabel(gui, '• Sıralı Bless', _col2_x, _features_y + 98), _col2_x, _features_y + 98)
+
+# TargetSupport (Tab 9)
+_ts_x = _tab_bar_x + 20
+_ts_y = _content_y + 10
+_ts_cbxEnabled = QtBind.createCheckBox(gui, 'cbxDoNothing', 'Enabled', _ts_x, _ts_y)
+_add_tab9(_ts_cbxEnabled, _ts_x, _ts_y)
+_ts_cbxDefensive = QtBind.createCheckBox(gui, 'cbxDoNothing', 'Defensive Mode', _ts_x + 85, _ts_y)
+_add_tab9(_ts_cbxDefensive, _ts_x + 85, _ts_y)
+_add_tab9(QtBind.createLabel(gui, '* Lider listesi', _ts_x + 2, _ts_y + 25), _ts_x + 2, _ts_y + 25)
+_ts_tbxLeaders = QtBind.createLineEdit(gui, "", _ts_x, _ts_y + 41, 100, 20)
+_add_tab9(_ts_tbxLeaders, _ts_x, _ts_y + 41)
+_ts_lvwLeaders = QtBind.createList(gui, _ts_x, _ts_y + 62, 176, 60)
+_add_tab9(_ts_lvwLeaders, _ts_x, _ts_y + 62)
+_ts_btnAddLeader = QtBind.createButton(gui, 'ts_btnAddLeader_clicked', "  Ekle  ", _ts_x + 107, _ts_y + 40)
+_add_tab9(_ts_btnAddLeader, _ts_x + 107, _ts_y + 40)
+_ts_btnRemLeader = QtBind.createButton(gui, 'ts_btnRemLeader_clicked', "  Sil  ", _ts_x + 55, _ts_y + 121)
+_add_tab9(_ts_btnRemLeader, _ts_x + 55, _ts_y + 121)
+
+# TargetSupport - Sağ taraf: Özellikler
+_ts_features_x = _ts_x + 220
+_ts_features_y = _ts_y
+_add_tab9(QtBind.createLabel(gui, 'xTargetSupport Özellikleri', _ts_features_x, _ts_features_y), _ts_features_x, _ts_features_y)
+_add_tab9(QtBind.createLabel(gui, '• Liderin saldırdığı düşmana anında otomatik saldırır', _ts_features_x, _ts_features_y + 20), _ts_features_x, _ts_features_y + 20)
+_add_tab9(QtBind.createLabel(gui, '• Defensive: Liderinize saldırana otomatik döner', _ts_features_x, _ts_features_y + 36), _ts_features_x, _ts_features_y + 36)
+_add_tab9(QtBind.createLabel(gui, '• Birden fazla oyuncu lider olarak ayarlanabilir', _ts_features_x, _ts_features_y + 52), _ts_features_x, _ts_features_y + 52)
+_add_tab9(QtBind.createLabel(gui, '• Fortress War, Unique, Guild party senkron saldırı', _ts_features_x, _ts_features_y + 68), _ts_features_x, _ts_features_y + 68)
+_add_tab9(QtBind.createLabel(gui, '• TARGET ON / OFF ile chat üzerinden yönetim', _ts_features_x, _ts_features_y + 84), _ts_features_x, _ts_features_y + 84)
+_add_tab9(QtBind.createLabel(gui, '• Kapsamlı arayüz ve profil desteği', _ts_features_x, _ts_features_y + 100), _ts_features_x, _ts_features_y + 100)
+
+# TargetSupport modülü
+_target_support_namespace = None
+
+def _get_target_support_namespace():
+    global _target_support_namespace
+    if _target_support_namespace is not None:
+        return _target_support_namespace
+    code = None
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    local_path = os.path.join(plugin_dir, 'feature', 'target_support.py')
+    if os.path.exists(local_path):
+        try:
+            with open(local_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+        except Exception as ex:
+            log('[%s] [TargetSupport] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    if not code:
+        try:
+            req = urllib.request.Request(
+                GITHUB_TARGET_SUPPORT_URL,
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                code = r.read().decode('utf-8')
+        except Exception as ex:
+            log('[%s] [TargetSupport] Modül indirilemedi: %s' % (pName, str(ex)))
+            return None
+    namespace = {
+        'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
+        'get_config_dir': get_config_dir, 'get_character_data': get_character_data, 'get_party': get_party,
+        'inject_joymax': inject_joymax, 'get_locale': get_locale, 'struct': struct, 'os': os, 'json': json,
+        '_ts_cbxEnabled': _ts_cbxEnabled, '_ts_cbxDefensive': _ts_cbxDefensive,
+        '_ts_tbxLeaders': _ts_tbxLeaders, '_ts_lvwLeaders': _ts_lvwLeaders,
+    }
+    try:
+        exec(code, namespace)
+    except Exception as ex:
+        log('[%s] [TargetSupport] Modül yüklenemedi: %s' % (pName, str(ex)))
+        return None
+    _target_support_namespace = namespace
+    return _target_support_namespace
+
+def ts_btnAddLeader_clicked():
+    ns = _get_target_support_namespace()
+    if ns and 'ts_btnAddLeader_clicked' in ns:
+        ns['ts_btnAddLeader_clicked']()
+
+def ts_btnRemLeader_clicked():
+    ns = _get_target_support_namespace()
+    if ns and 'ts_btnRemLeader_clicked' in ns:
+        ns['ts_btnRemLeader_clicked']()
+
+# Sıralı Bless (Tab 10) - Bless Queue v1.4.3 layout, ekrana sığacak şekilde (LIST_H=105)
+# Orijinal: LX1=10, LIST_W=220, LIST_H=120, LY=35, SHIFT_Y=20, PBX=240, LX2=340, QBX=570
+_bq_x0 = _tab_bar_x
+_bq_y0 = _content_y
+_bq_LW = 220
+_bq_LH = 105
+_bq_LY = 35
+_bq_SY = 20
+_bq_LX1 = _bq_x0 + 10
+_bq_PBX = _bq_LX1 + _bq_LW + 10
+_bq_LX2 = _bq_PBX + 85 + 15
+_bq_QBX = _bq_LX2 + _bq_LW + 10
+_bq_BH = 22
+_bq_BG = 4
+_bq_BY = _bq_y0 + (_bq_LY + _bq_LH + 10) + _bq_SY
+
+_bq_cbEnable = QtBind.createCheckBox(gui, 'bq_cb_enable_changed', 'Aktif (bu istemci)', _bq_x0 + 10, _bq_y0 + 10)
+_add_tab10(_bq_cbEnable, _bq_x0 + 10, _bq_y0 + 10)
+_add_tab10(QtBind.createLabel(gui, 'Sıralı Bless v1.4', _bq_x0 + 240, _bq_y0 + 12), _bq_x0 + 240, _bq_y0 + 12)
+_add_tab10(QtBind.createLabel(gui, 'Parti', _bq_LX1, _bq_y0 + (_bq_LY - 15) + _bq_SY), _bq_LX1, _bq_y0 + (_bq_LY - 15) + _bq_SY)
+_bq_lstParty = QtBind.createList(gui, _bq_LX1, _bq_y0 + _bq_LY + _bq_SY, _bq_LW, _bq_LH)
+_add_tab10(_bq_lstParty, _bq_LX1, _bq_y0 + _bq_LY + _bq_SY)
+_bq_btnRefresh = QtBind.createButton(gui, 'bq_btn_refresh', 'Yenile', _bq_PBX, _bq_y0 + (_bq_LY + 0 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(_bq_btnRefresh, _bq_PBX, _bq_y0 + (_bq_LY + 0 * (_bq_BH + _bq_BG)) + _bq_SY)
+_bq_btnAddAll = QtBind.createButton(gui, 'bq_btn_add_all', 'Tümünü Ekle', _bq_PBX, _bq_y0 + (_bq_LY + 1 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(_bq_btnAddAll, _bq_PBX, _bq_y0 + (_bq_LY + 1 * (_bq_BH + _bq_BG)) + _bq_SY)
+_bq_btnAddSel = QtBind.createButton(gui, 'bq_btn_add_selected', 'Ekle →', _bq_PBX, _bq_y0 + (_bq_LY + 2 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(_bq_btnAddSel, _bq_PBX, _bq_y0 + (_bq_LY + 2 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(QtBind.createLabel(gui, 'Bless Kuyruğu', _bq_LX2, _bq_y0 + (_bq_LY - 15) + _bq_SY), _bq_LX2, _bq_y0 + (_bq_LY - 15) + _bq_SY)
+_bq_lstQueue = QtBind.createList(gui, _bq_LX2, _bq_y0 + _bq_LY + _bq_SY, _bq_LW, _bq_LH)
+_add_tab10(_bq_lstQueue, _bq_LX2, _bq_y0 + _bq_LY + _bq_SY)
+_bq_btnSendQueue = QtBind.createButton(gui, 'bq_btn_send_queue', 'Sırayı Gönder', _bq_QBX, _bq_y0 + (_bq_LY + 0 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(_bq_btnSendQueue, _bq_QBX, _bq_y0 + (_bq_LY + 0 * (_bq_BH + _bq_BG)) + _bq_SY)
+_bq_btnRemSel = QtBind.createButton(gui, 'bq_btn_remove_selected', 'Sil', _bq_QBX, _bq_y0 + (_bq_LY + 1 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(_bq_btnRemSel, _bq_QBX, _bq_y0 + (_bq_LY + 1 * (_bq_BH + _bq_BG)) + _bq_SY)
+_bq_btnUp = QtBind.createButton(gui, 'bq_btn_queue_up', 'Yukarı', _bq_QBX, _bq_y0 + (_bq_LY + 2 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(_bq_btnUp, _bq_QBX, _bq_y0 + (_bq_LY + 2 * (_bq_BH + _bq_BG)) + _bq_SY)
+_bq_btnDown = QtBind.createButton(gui, 'bq_btn_queue_down', 'Aşağı', _bq_QBX, _bq_y0 + (_bq_LY + 3 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(_bq_btnDown, _bq_QBX, _bq_y0 + (_bq_LY + 3 * (_bq_BH + _bq_BG)) + _bq_SY)
+_bq_btnClearQ = QtBind.createButton(gui, 'bq_btn_clear_q', 'Tümünü Sil', _bq_QBX, _bq_y0 + (_bq_LY + 4 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(_bq_btnClearQ, _bq_QBX, _bq_y0 + (_bq_LY + 4 * (_bq_BH + _bq_BG)) + _bq_SY)
+_add_tab10(QtBind.createLabel(gui, 'BlessID:', _bq_x0 + 10, _bq_BY + 2), _bq_x0 + 10, _bq_BY + 2)
+_bq_tbBlessId = QtBind.createLineEdit(gui, "0x2DF6", _bq_x0 + 60, _bq_BY, 80, 20)
+_add_tab10(_bq_tbBlessId, _bq_x0 + 60, _bq_BY)
+_bq_btnSaveBless = QtBind.createButton(gui, 'bq_btn_save_bless', 'Kaydet', _bq_x0 + 145, _bq_BY - 1)
+_add_tab10(_bq_btnSaveBless, _bq_x0 + 145, _bq_BY - 1)
+_bq_btnScanBless = QtBind.createButton(gui, 'bq_btn_scan_bless', 'Tara', _bq_x0 + 200, _bq_BY - 1)
+_add_tab10(_bq_btnScanBless, _bq_x0 + 200, _bq_BY - 1)
+_bq_btnStopBless = QtBind.createButton(gui, 'bq_btn_stop_bless', 'Durdur', _bq_x0 + 255, _bq_BY - 1)
+_add_tab10(_bq_btnStopBless, _bq_x0 + 255, _bq_BY - 1)
+_bq_cbSay = QtBind.createCheckBox(gui, 'bq_cb_say_changed', 'Partiye söyle', _bq_x0 + 10, _bq_BY + 28)
+_add_tab10(_bq_cbSay, _bq_x0 + 10, _bq_BY + 28)
+_add_tab10(QtBind.createLabel(gui, 'Spam:', _bq_LX2, _bq_BY + 2), _bq_LX2, _bq_BY + 2)
+_bq_tbSpam = QtBind.createLineEdit(gui, "2.5", _bq_LX2 + 45, _bq_BY, 55, 20)
+_add_tab10(_bq_tbSpam, _bq_LX2 + 45, _bq_BY)
+_add_tab10(QtBind.createLabel(gui, 'Skip:', _bq_LX2 + 110, _bq_BY + 2), _bq_LX2 + 110, _bq_BY + 2)
+_bq_tbSkip = QtBind.createLineEdit(gui, "15", _bq_LX2 + 155, _bq_BY, 55, 20)
+_add_tab10(_bq_tbSkip, _bq_LX2 + 155, _bq_BY)
+_add_tab10(QtBind.createLabel(gui, 'Süre:', _bq_LX2, _bq_BY + 28), _bq_LX2, _bq_BY + 28)
+_bq_tbDur = QtBind.createLineEdit(gui, "45", _bq_LX2 + 45, _bq_BY + 26, 55, 20)
+_add_tab10(_bq_tbDur, _bq_LX2 + 45, _bq_BY + 26)
+_bq_btnSaveTimers = QtBind.createButton(gui, 'bq_btn_save_timers', 'Kaydet', _bq_LX2 + 110, _bq_BY + 25)
+_add_tab10(_bq_btnSaveTimers, _bq_LX2 + 110, _bq_BY + 25)
+_add_tab10(QtBind.createLabel(gui, 'Cleric Silah:', _bq_x0 + 10, _bq_y0 + 218), _bq_x0 + 10, _bq_y0 + 218)
+_bq_cmbClericWeapon = QtBind.createCombobox(gui, _bq_x0 + 100, _bq_y0 + 216, 220, 20)
+_add_tab10(_bq_cmbClericWeapon, _bq_x0 + 100, _bq_y0 + 216)
+_add_tab10(QtBind.createLabel(gui, 'Ana Silah:', _bq_x0 + 10, _bq_y0 + 248), _bq_x0 + 10, _bq_y0 + 248)
+_bq_cmbMainWeapon = QtBind.createCombobox(gui, _bq_x0 + 100, _bq_y0 + 246, 220, 20)
+_add_tab10(_bq_cmbMainWeapon, _bq_x0 + 100, _bq_y0 + 246)
+_bq_btnWRefresh = QtBind.createButton(gui, 'bq_btn_wrefresh', 'Yenile', _bq_x0 + 350, _bq_y0 + 226)
+_add_tab10(_bq_btnWRefresh, _bq_x0 + 350, _bq_y0 + 226)
+_bq_btnWSave = QtBind.createButton(gui, 'bq_btn_wsave', 'Kaydet', _bq_x0 + 450, _bq_y0 + 226)
+_add_tab10(_bq_btnWSave, _bq_x0 + 450, _bq_y0 + 226)
+_bq_btnHelpEN = QtBind.createButton(gui, 'bq_btn_help_en', 'Yardım', _bq_x0 + 520, _bq_y0 + 8)
+_add_tab10(_bq_btnHelpEN, _bq_x0 + 520, _bq_y0 + 8)
+
+# Bless Queue modülü
+_bless_queue_namespace = None
+
+def _get_bless_queue_namespace():
+    global _bless_queue_namespace
+    if _bless_queue_namespace is not None:
+        return _bless_queue_namespace
+    code = None
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    local_path = os.path.join(plugin_dir, 'feature', 'bless_queue.py')
+    if os.path.exists(local_path):
+        try:
+            with open(local_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+        except Exception as ex:
+            log('[%s] [Sıralı Bless] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    if not code:
+        try:
+            req = urllib.request.Request(
+                GITHUB_BLESS_QUEUE_URL,
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                code = r.read().decode('utf-8')
+        except Exception as ex:
+            log('[%s] [Sıralı Bless] Modül indirilemedi: %s' % (pName, str(ex)))
+            return None
+    import ctypes
+    namespace = {
+        'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
+        'get_config_dir': get_config_dir, 'get_character_data': get_character_data, 'get_party': get_party,
+        'get_position': get_position, 'get_inventory': get_inventory, 'get_skills': get_skills,
+        'inject_joymax': inject_joymax, 'struct': struct, 'os': os, 'json': json, 're': __import__('re'),
+        'math': __import__('math'), 'threading': threading, 'time': time, 'phBotChat': phBotChat, 'ctypes': ctypes,
+        'cbEnable': _bq_cbEnable, 'lstParty': _bq_lstParty, 'lstQueue': _bq_lstQueue,
+        'tbBlessId': _bq_tbBlessId, 'tbSpam': _bq_tbSpam, 'tbSkip': _bq_tbSkip, 'tbDur': _bq_tbDur,
+        'cbSay': _bq_cbSay, 'cmbClericWeapon': _bq_cmbClericWeapon, 'cmbMainWeapon': _bq_cmbMainWeapon,
+        'btnRefresh': _bq_btnRefresh, 'btnAddAll': _bq_btnAddAll, 'btnAddSel': _bq_btnAddSel,
+        'btnSendQueue': _bq_btnSendQueue, 'btnRemSel': _bq_btnRemSel, 'btnUp': _bq_btnUp, 'btnDown': _bq_btnDown,
+        'btnClearQ': _bq_btnClearQ, 'btnSaveBless': _bq_btnSaveBless, 'btnScanBless': _bq_btnScanBless,
+        'btnStopBless': _bq_btnStopBless, 'btnSaveTimers': _bq_btnSaveTimers,
+        'btnWRefresh': _bq_btnWRefresh, 'btnWSave': _bq_btnWSave, 'btnHelpEN': _bq_btnHelpEN,
+    }
+    try:
+        exec(code, namespace)
+        bcfg = namespace.get('BCFG') or {}
+        QtBind.setText(gui, _bq_tbBlessId, hex(int(bcfg.get('bless_id', 11766) or 11766)))
+        QtBind.setChecked(gui, _bq_cbSay, bool(bcfg.get('say_in_party', True)))
+        QtBind.setText(gui, _bq_tbSpam, str(float(bcfg.get('spam_interval_s', 2.5) or 2.5)))
+        QtBind.setText(gui, _bq_tbSkip, str(float(bcfg.get('skip_turn_s', 15) or 15)))
+        QtBind.setText(gui, _bq_tbDur, str(int(bcfg.get('duration_s', 45) or 45)))
+    except Exception as ex:
+        log('[%s] [Sıralı Bless] Modül yüklenemedi: %s' % (pName, str(ex)))
+        return None
+    _bless_queue_namespace = namespace
+    return _bless_queue_namespace
+
+def _bq_ns_call(name, *args):
+    try:
+        ns = _get_bless_queue_namespace()
+        if ns is None or name not in ns:
+            return None
+        f = ns[name]
+        return f(*args) if args else f()
+    except Exception:
+        return None
+
+def bq_cb_enable_changed():
+    _bq_ns_call('cb_enable_changed', QtBind.isChecked(gui, _bq_cbEnable))
+
+def bq_cb_say_changed():
+    _bq_ns_call('cb_say_changed', QtBind.isChecked(gui, _bq_cbSay))
+
+def bq_btn_refresh():
+    _bq_ns_call('btn_refresh')
+def bq_btn_add_all():
+    _bq_ns_call('btn_add_all')
+def bq_btn_add_selected():
+    _bq_ns_call('btn_add_selected')
+def bq_btn_send_queue():
+    _bq_ns_call('btn_send_queue')
+def bq_btn_remove_selected():
+    _bq_ns_call('btn_remove_selected')
+def bq_btn_queue_up():
+    _bq_ns_call('btn_queue_up')
+def bq_btn_queue_down():
+    _bq_ns_call('btn_queue_down')
+def bq_btn_clear_q():
+    _bq_ns_call('btn_clear_q')
+def bq_btn_save_bless():
+    _bq_ns_call('btn_save_bless')
+def bq_btn_scan_bless():
+    _bq_ns_call('btn_scan_bless')
+def bq_btn_stop_bless():
+    _bq_ns_call('btn_stop_bless')
+def bq_btn_save_timers():
+    _bq_ns_call('btn_save_timers')
+def bq_btn_wrefresh():
+    _bq_ns_call('btn_wrefresh')
+def bq_btn_wsave():
+    _bq_ns_call('btn_wsave')
+# Script & Chat Command Maker (Tab 11) - SROManager Command Maker
+_scm_x = _tab_bar_x + 15
+_scm_y = _content_y + 10
+_add_tab11(QtBind.createLabel(gui, 'Script - Chat Command Maker', _scm_x, _scm_y), _scm_x, _scm_y)
+_add_tab11(QtBind.createLabel(gui, 'Chat:', _scm_x, _scm_y + 26), _scm_x, _scm_y + 26)
+_scm_tbChat = QtBind.createLineEdit(gui, "", _scm_x + 45, _scm_y + 22, 130, 20)
+_add_tab11(_scm_tbChat, _scm_x + 45, _scm_y + 22)
+_add_tab11(QtBind.createLabel(gui, 'Script:', _scm_x + 195, _scm_y + 26), _scm_x + 195, _scm_y + 26)
+_scm_tbScript = QtBind.createLineEdit(gui, "", _scm_x + 245, _scm_y + 22, 240, 20)
+_add_tab11(_scm_tbScript, _scm_x + 245, _scm_y + 22)
+_add_tab11(QtBind.createLabel(gui, 'Opcode:', _scm_x, _scm_y + 52), _scm_x, _scm_y + 52)
+_scm_tbOpcode = QtBind.createLineEdit(gui, "0x", _scm_x + 55, _scm_y + 48, 130, 20)
+_add_tab11(_scm_tbOpcode, _scm_x + 55, _scm_y + 48)
+_add_tab11(QtBind.createLabel(gui, 'Data:', _scm_x + 195, _scm_y + 52), _scm_x + 195, _scm_y + 52)
+_scm_tbData = QtBind.createLineEdit(gui, "", _scm_x + 245, _scm_y + 48, 240, 20)
+_add_tab11(_scm_tbData, _scm_x + 245, _scm_y + 48)
+_scm_btnSave = QtBind.createButton(gui, 'scm_ui_save', 'Kaydet', _scm_x + 500, _scm_y + 22)
+_add_tab11(_scm_btnSave, _scm_x + 500, _scm_y + 22)
+_scm_btnLoad = QtBind.createButton(gui, 'scm_ui_load', 'Yükle', _scm_x + 560, _scm_y + 22)
+_add_tab11(_scm_btnLoad, _scm_x + 560, _scm_y + 22)
+_scm_btnRemove = QtBind.createButton(gui, 'scm_ui_remove', 'Sil', _scm_x + 620, _scm_y + 22)
+_add_tab11(_scm_btnRemove, _scm_x + 620, _scm_y + 22)
+_scm_btnEdit = QtBind.createButton(gui, 'scm_ui_edit', 'Düzenle', _scm_x + 500, _scm_y + 48)
+_add_tab11(_scm_btnEdit, _scm_x + 500, _scm_y + 48)
+_add_tab11(QtBind.createLabel(gui, 'Eşlemeler:', _scm_x, _scm_y + 78), _scm_x, _scm_y + 78)
+_scm_lstMap = QtBind.createList(gui, _scm_x, _scm_y + 93, 670, 72)
+_add_tab11(_scm_lstMap, _scm_x, _scm_y + 93)
+_scm_cbLog = QtBind.createCheckBox(gui, 'scm_ui_log', 'Tüm C2S paketlerini göster', _scm_x, _scm_y + 172)
+_add_tab11(_scm_cbLog, _scm_x, _scm_y + 172)
+_add_tab11(QtBind.createLabel(gui, 'Gizle opcode:', _scm_x + 205, _scm_y + 172), _scm_x + 205, _scm_y + 172)
+_scm_tbHide = QtBind.createLineEdit(gui, "0x", _scm_x + 295, _scm_y + 168, 70, 20)
+_add_tab11(_scm_tbHide, _scm_x + 295, _scm_y + 168)
+_scm_btnHideAdd = QtBind.createButton(gui, 'scm_ui_hide_add', '+', _scm_x + 370, _scm_y + 167)
+_add_tab11(_scm_btnHideAdd, _scm_x + 370, _scm_y + 167)
+_scm_btnHideDel = QtBind.createButton(gui, 'scm_ui_hide_del', '-', _scm_x + 370, _scm_y + 192)
+_add_tab11(_scm_btnHideDel, _scm_x + 370, _scm_y + 192)
+_scm_lstHide = QtBind.createList(gui, _scm_x + 490, _scm_y + 168, 190, 52)
+_add_tab11(_scm_lstHide, _scm_x + 490, _scm_y + 168)
+_add_tab11(QtBind.createLabel(gui, 'Lider:', _scm_x, _scm_y + 228), _scm_x, _scm_y + 228)
+_scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 130, 20)
+_add_tab11(_scm_tbLeader, _scm_x + 55, _scm_y + 224)
+_scm_lblStatus = QtBind.createLabel(gui, 'Hazır', _scm_x, _scm_y + 248)
+_add_tab11(_scm_lblStatus, _scm_x, _scm_y + 248)
+_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_help_clicked', 'Yardım', _scm_x + 680, _scm_y)
+_add_tab11(_scm_btnHelp, _scm_x + 680, _scm_y)
+
+_script_command_maker_namespace = None
+
+def _get_script_command_maker_namespace():
+    global _script_command_maker_namespace
+    if _script_command_maker_namespace is not None:
+        return _script_command_maker_namespace
+    code = None
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
+        local_path = os.path.join(base, 'feature', 'script_command_maker.py')
+        if os.path.exists(local_path):
+            try:
+                with open(local_path, 'r', encoding='utf-8') as f:
+                    code = f.read()
+                break
+            except Exception as ex:
+                log('[%s] [Script-Command] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    if not code:
+        try:
+            req = urllib.request.Request(
+                GITHUB_SCRIPT_COMMAND_MAKER_URL,
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                code = r.read().decode('utf-8')
+        except Exception as ex:
+            log('[%s] [Script-Command] Modül indirilemedi: %s' % (pName, str(ex)))
+            return None
+    namespace = {
+        'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
+        'get_config_dir': get_config_dir, 'get_character_data': get_character_data,
+        'inject_joymax': inject_joymax, 'os': os, 'json': json, 're': __import__('re'), 'time': time,
+        'tbChat': _scm_tbChat, 'tbScript': _scm_tbScript, 'tbOpcode': _scm_tbOpcode, 'tbData': _scm_tbData,
+        'tbLeader': _scm_tbLeader, 'tbHide': _scm_tbHide, 'lstMap': _scm_lstMap, 'lstHide': _scm_lstHide,
+        'btnSave': _scm_btnSave, 'btnLoad': _scm_btnLoad, 'btnRemove': _scm_btnRemove, 'btnEdit': _scm_btnEdit,
+        'btnHideAdd': _scm_btnHideAdd, 'btnHideDel': _scm_btnHideDel, 'cbLog': _scm_cbLog, 'lblStatus': _scm_lblStatus,
+    }
+    try:
+        exec(code, namespace)
+        if '_load_cfg' in namespace:
+            namespace['_load_cfg']()
+        namespace['_refresh_lists']()
+        QtBind.setChecked(gui, _scm_cbLog, namespace.get('_cfg', {}).get('log_all_c2s', False))
+        QtBind.setText(gui, _scm_tbLeader, namespace.get('_cfg', {}).get('leader', ''))
+    except Exception as ex:
+        log('[%s] [Script-Command] Modül yüklenemedi: %s' % (pName, str(ex)))
+        return None
+    _script_command_maker_namespace = namespace
+    return _script_command_maker_namespace
+
+def _scm_ns_call(name, *args):
+    try:
+        ns = _get_script_command_maker_namespace()
+        if ns is None or name not in ns:
+            return None
+        f = ns[name]
+        return f(*args) if args else f()
+    except Exception:
+        return None
+
+def scm_btn_help_clicked():
+    try:
+        text = (
+            "Script - Chat Command Maker (SROManager)\r\n"
+            "============================================\r\n\r\n"
+            "Bu modül Chat komutları ile Silkroad paketlerini eşleştirir.\r\n"
+            "Oyunda bir şey yaptığınızda giden paketleri yakalayıp, "
+            "belirlediğiniz Chat veya Script komutlarıyla yeniden çalıştırabilirsiniz.\r\n\r\n"
+            "Alanlar:\r\n"
+            "- Chat   : Oyunda parti sohbetinde yazacağınız komut (örn: bless)\r\n"
+            "- Script : phBot script komutu (örn: sromanager bless)\r\n"
+            "- Opcode : Paket opcode (örn: 0xB0BD)\r\n"
+            "- Data   : Paket hex verisi (örn: 01 02 03)\r\n\r\n"
+            "KAYDET butonu:\r\n"
+            "Chat + Opcode (ve isteğe Data) girip Kaydet'e basın. "
+            "Bu eşleme JSON dosyasına kaydedilir:\r\n"
+            "  Config/SROManager/script_command_Server_Karakter.json\r\n"
+            "Lider alanına parti liderinin adını yazın; sadece o kişi Chat komutlarını tetikleyebilir.\r\n\r\n"
+            "SROManager:\r\n"
+            "Script komutunda 'sromanager <anahtar>' yazarsanız, phBot script panelinden "
+            "ör. sromanager bless çağrıldığında o eşleme çalışır (paket enjekte edilir).\r\n\r\n"
+            "Adımlar:\r\n"
+            "1) 'Tüm C2S paketlerini göster' işaretleyin\r\n"
+            "2) Oyunda yapmak istediğiniz işlemi yapın (log'dan opcode/data kopyalayın)\r\n"
+            "3) Chat + Script + Opcode + Data girin, Kaydet\r\n"
+            "4) Lider adını yazın (Chat için) veya sromanager kullanın (Script için)"
+        )
+        ctypes.windll.user32.MessageBoxW(None, str(text), "%s — Script-Command Yardım" % pName, 0x40)
+    except Exception as ex:
+        try:
+            log('[%s] Script-Command yardım penceresi açılamadı: %s' % (pName, str(ex)))
+        except Exception:
+            pass
+
+def scm_ui_save():
+    _scm_ns_call('ui_save')
+def scm_ui_load():
+    _scm_ns_call('ui_load')
+def scm_ui_remove():
+    _scm_ns_call('ui_remove')
+def scm_ui_edit():
+    _scm_ns_call('ui_edit')
+def scm_ui_log(checked):
+    _scm_ns_call('ui_log', checked)
+def scm_ui_hide_add():
+    _scm_ns_call('ui_hide_add')
+def scm_ui_hide_del():
+    _scm_ns_call('ui_hide_del')
+
+def bq_btn_help_en():
+    if not _is_license_valid():
+        return
+    try:
+        import ctypes
+        text = (
+            "Bless Kuyruğu — Nasıl kullanılır (Oyuncu Kılavuzu)\r\n"
+            "===============================================\r\n"
+            "\r\n"
+            "Lider / Sahip:\r\n"
+            "- Parti Lideri oyun içi sohbette duyuruları okuyamaz AMA plugin ona otomatik bless atar.\r\n"
+            "- 'Sırayı Gönder' tuşuna basan oyuncu otomatik olarak Lider olur.\r\n"
+            "- Sadece TEK kişi basmalıdır.\r\n"
+            "\r\n"
+            "Kurulum (Karakter başına bir kez kaydedilir):\r\n"
+            "1) YENİLE tuşuna basın\r\n"
+            "   - Parti listesini ve silah listesini günceller.\r\n"
+            "2) Cleric üyelerini sıraya ekleyin\r\n"
+            "   - Üyeyi seçin -> 'Ekle →' (ilk boş slota eklenir)\r\n"
+            "   - Veya 'Tümünü Ekle' tuşuna basın\r\n"
+            "3) Sırayı düzenleyin\r\n"
+            "   - Slot #1 önce bless atar, sonra #2, sonra #3...\r\n"
+            "   - Sırayı değiştirmek için YUKARI / AŞAĞI kullanın\r\n"
+            "4) TARA tuşuna basın\r\n"
+            "   - Bless becerinizi otomatik bulur\r\n"
+            "5) Silahları seçin (ÖNEMLİ)\r\n"
+            "   - Cleric silahı = Bless atmak için silahı otomatik Cleric silahına geçirir\r\n"
+            "   - Ana silah     = Bless attıktan sonra Ana Silaha geri geçer\r\n"
+            "   - Sonra KAYDET tuşuna basın\r\n"
+            "\r\n"
+            "Zamanlayıcılar:\r\n"
+            "- SÜRE  = Bless ne kadar süre aktif kalır\r\n"
+            "- SPAM  = Parti sohbetinde hatırlatmaların ne sıklıkta tekrarlanacağı\r\n"
+            "- SKIP  = Bir oyuncuyu atlamadan önce maksimum bekleme süresi (AFK/yok)\r\n"
+            "\r\n"
+            "Başlatma:\r\n"
+            "- Lider 'Sırayı Gönder' tuşuna basar\r\n"
+            "- Plugin oyuncuları sıraya göre çağırır\r\n"
+            "- İsminiz çağrıldığında: hazır olun, plugin sizin için atacak\r\n"
+            "\r\n"
+            "Butonlar (kısa anlam):\r\n"
+            "- Yenile    : parti + silahları güncelle\r\n"
+            "- Ekle →   : seçili üyeyi ilk boş slota ekle\r\n"
+            "- Tümünü Ekle : tüm parti üyelerini ekle\r\n"
+            "- Yukarı/Aşağı : sıra düzenini değiştir\r\n"
+            "- Sil      : seçili slot/üyeyi kaldır\r\n"
+            "- Tümünü Sil  : sıra listesini temizle\r\n"
+            "- Kaydet   : ayarları ve zamanlayıcıları kaydet\r\n"
+            "- Durdur   : duyuruları/zamanlayıcıları durdur\r\n"
+        )
+        ctypes.windll.user32.MessageBoxW(None, str(text), "%s — Yardım" % pName, 0x40)
+    except Exception as ex:
+        try:
+            log('[%s] Yardım penceresi açılamadı: %s' % (pName, str(ex)))
+        except Exception:
+            pass
+
+# Hakkımda tab1'e alındı; diğer tablar bir kaydırıldı (tab1=Hakkımda, tab2=Banka, ... tab8=Envanter)
+_swap = _tab8_widgets
+_tab8_widgets = _tab7_widgets
+_tab7_widgets = _tab6_widgets
+_tab6_widgets = _tab5_widgets
+_tab5_widgets = _tab4_widgets
+_tab4_widgets = _tab3_widgets
+_tab3_widgets = _tab2_widgets
+_tab2_widgets = _tab1_widgets
+_tab1_widgets = _swap
+_new_pb = {
+    1: _protected_buttons.get(8, []),
+    2: _protected_buttons.get(1, []),
+    3: _protected_buttons.get(2, []),
+    4: _protected_buttons.get(3, []),
+    5: _protected_buttons.get(4, []),
+    6: _protected_buttons.get(5, []),
+    7: _protected_buttons.get(6, []),
+    8: _protected_buttons.get(7, []),
+}
+_protected_buttons.clear()
+_protected_buttons.update(_new_pb)
+_protected_buttons[9] = [_ts_cbxEnabled, _ts_cbxDefensive, _ts_tbxLeaders, _ts_lvwLeaders, _ts_btnAddLeader, _ts_btnRemLeader]
+_protected_buttons[10] = [
+    _bq_cbEnable, _bq_lstParty, _bq_lstQueue, _bq_tbBlessId, _bq_tbSpam, _bq_tbSkip, _bq_tbDur,
+    _bq_cbSay, _bq_cmbClericWeapon, _bq_cmbMainWeapon, _bq_btnRefresh, _bq_btnAddAll, _bq_btnAddSel,
+    _bq_btnSendQueue, _bq_btnRemSel, _bq_btnUp, _bq_btnDown, _bq_btnClearQ, _bq_btnSaveBless,
+    _bq_btnScanBless, _bq_btnStopBless, _bq_btnSaveTimers, _bq_btnWRefresh, _bq_btnWSave, _bq_btnHelpEN
+]
+_protected_buttons[11] = [
+    _scm_tbChat, _scm_tbScript, _scm_tbOpcode, _scm_tbData, _scm_tbLeader, _scm_tbHide,
+    _scm_lstMap, _scm_lstHide, _scm_btnSave, _scm_btnLoad, _scm_btnRemove, _scm_btnEdit,
+    _scm_btnHideAdd, _scm_btnHideDel, _scm_cbLog
+]
 
 _tab_move(_tab2_widgets, True)
 _tab_move(_tab3_widgets, True)
@@ -2187,6 +2795,9 @@ _tab_move(_tab5_widgets, True)
 _tab_move(_tab6_widgets, True)
 _tab_move(_tab7_widgets, True)
 _tab_move(_tab8_widgets, True)
+_tab_move(_tab9_widgets, True)
+_tab_move(_tab10_widgets, True)
+_tab_move(_tab11_widgets, True)
 
 log('[%s] v%s yüklendi.' % (pName, pVersion))
 
@@ -2209,11 +2820,17 @@ def event_loop():
     ns = _get_script_commands_namespace()
     if ns and '_script_cmds_event_tick' in ns:
         ns['_script_cmds_event_tick']()
+    scm_ns = _get_script_command_maker_namespace()
+    if scm_ns and 'event_loop' in scm_ns:
+        scm_ns['event_loop']()
 
 def handle_silkroad(opcode, data):
-    """Script Komutları: Özel NPC paket kaydı (uzaktan modül)"""
+    """Script Komutları: paket kaydı; Script-Command: C2S log"""
     if data is None:
         return True
+    scm_ns = _get_script_command_maker_namespace()
+    if scm_ns and 'handle_silkroad' in scm_ns:
+        scm_ns['handle_silkroad'](opcode, data)
     ns = _get_script_commands_namespace()
     if ns and '_script_cmds_packet_hook' in ns:
         return ns['_script_cmds_packet_hook'](opcode, data)
@@ -2222,6 +2839,10 @@ def handle_silkroad(opcode, data):
 def joined_game():
     loadConfigs()
     inv_cnt_loadConfigs()
+    _bq_ns_call('joined_game')
+    ns = _get_target_support_namespace()
+    if ns and 'ts_loadConfigs' in ns:
+        ns['ts_loadConfigs']()
     
     # IP'yi güncelle ve lisans doğrula (oyuna girişte)
     def _joined_validate():
@@ -2237,10 +2858,25 @@ def joined_game():
 
 def handle_chat(t, player, msg):
     _inv_cnt_handle_chat(t, player, msg)
+    _bq_ns_call('handle_chat', t, player, msg)
+    r = _scm_ns_call('handle_chat', t, player, msg)
+    if r is False:
+        return False
+    ns = _get_target_support_namespace()
+    if ns and 'ts_handle_chat' in ns:
+        ns['ts_handle_chat'](t, player, msg)
 
 def handle_joymax(opcode, data):
+    # Sıralı Bless: 0xB0BD bless cast
+    if opcode == 0xB0BD:
+        _bq_ns_call('handle_joymax', opcode, data)
+    # TargetSupport: 0xB070 skill action
+    elif opcode == 0xB070:
+        ns = _get_target_support_namespace()
+        if ns and 'ts_handle_joymax' in ns:
+            ns['ts_handle_joymax'](opcode, data)
     # SERVER_DIMENSIONAL_INVITATION_REQUEST
-    if opcode == 0x751A:
+    elif opcode == 0x751A:
         if QtBind.isChecked(gui, cbxAcceptForgottenWorld):
             packet = data[:4]
             packet += b'\x00\x00\x00\x00'
@@ -2279,4 +2915,7 @@ _char = get_character_data()
 if _char and _char.get('name'):
     inv_cnt_loadConfigs()
     log('[%s] [Envanter Sayacı] Config yüklendi (plugin init)' % pName)
+    ns = _get_target_support_namespace()
+    if ns and 'ts_loadConfigs' in ns:
+        ns['ts_loadConfigs']()
 

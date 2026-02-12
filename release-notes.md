@@ -1,3 +1,30 @@
+## v1.7.0 (SROManager: plugin adı ve dosya yeniden adlandırıldı)
+
+### Değişiklikler
+- **Plugin adı:** DaRKWoLVeS Alet Çantası → SROManager
+- **Dosya adı:** Santa-So-Ok-DaRKWoLVeS.py → sromanager.py
+- **sromaster → sromanager:** Script komutu ve referanslar güncellendi
+- Config klasörü: `Config/SROManager/`
+- User-Agent: phBot-SROManager/1.0
+
+---
+
+## v1.6.0 (Script-Command tab, TargetSupport, Sıralı Bless)
+
+### Yeni Sekmeler
+- **Tab9 TargetSupport**: xTargetSupport entegrasyonu, lisans korumalı
+- **Tab10 Sıralı Bless**: Bless Queue entegrasyonu, lisans korumalı, scroll desteği
+- **Tab11 Script-Command**: SROManager Script & Chat Command Maker
+
+### İyileştirmeler
+- Sıralı Bless tasarımı orijinal Bless Queue yerleşimine uyumlu güncellendi
+- Yardım metinleri Türkçeye çevrildi
+- Tab9–Tab10 arası boşluk ayarları (5px → 3px → 1px → 0px)
+- Sıralı Bless buton genişliği 85px → 65px
+- Script-Command modülü: yerel bulunamazsa fallback path ile yükleme
+
+---
+
 ## v1.4.0 (Oto-Kervan, Garden Script, temizlik)
 
 ### Oto-Kervan

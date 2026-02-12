@@ -257,7 +257,7 @@
             "New Training Area": {
                 "Data": [],
                 "Enabled": true,
-                "Path": "C:/Users/Burakcan/AppData/Local/Programs/phBot Testing/Config/Santa-So-Ok-DaRKWoLVeS\\caravan_current.txt",
+                "Path": "C:/Users/Burakcan/AppData/Local/Programs/phBot Testing/Config/SROManager\\caravan_current.txt",
                 "Pick Radius": 50,
                 "Polygon": [],
                 "Radius": 600,

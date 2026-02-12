@@ -1,0 +1,34 @@
+---
+description: Bu projeye özel geliştirme ve push kuralları (yazar, phBot, senior dev, performans/UI)
+alwaysApply: true
+---
+
+# Proje Özel Kuralları
+
+Bu kurallar **sadece bu proje** (sro-plugins-repo) için geçerlidir ve her kodlama/analiz işleminde uygulanmalıdır.
+
+## 1. phBot API ve Plugin Tabanlı Geliştirme
+
+- Kod yazarken **phBot API** ve **phBot plugin örnekleri / kullanımları** esas alınacak.
+- Python tarafında **tasarımsal olarak doğru** analiz ve kod yazılacak; phBot ortamına uygun pattern’ler kullanılacak.
+- Belirsizlik durumunda mevcut proje kodundaki (örn. `sromanager.py`) phBot kullanımları referans alınacak.
+
+## 2. Push / Yazar Bilgisi
+
+- Kodu push ederken **yazar bilgisi** her zaman:
+  - **İsim:** Burakcan Sezgin  
+  - **E-posta:** brkcnszgn@gmail.com  
+- Commit’ler bu kimlikle atılacak (git `user.name` / `user.email` veya repo ayarları buna göre kullanılacak).
+- **Asla** commit mesajına veya commit'e `Co-authored-by: Cursor` veya `cursoragent@cursor.com` eklenmeyecek; commit'te sadece Burakcan Sezgin yazar olarak görünecek.
+- **ZORUNLU (git commit):** Çalıştırılan hiçbir git commit komutunda `--trailer "Co-authored-by: ..."` veya `Co-authored-by` / `cursoragent@cursor.com` geçmeyecek. Örnek doğru komut: `git commit -m "mesaj" --author="Burakcan Sezgin <brkcnszgn@gmail.com>"` (trailer yok).
+
+## 3. Kıdemli Geliştirici ve phBot Geliştiricisi Perspektifi
+
+- İstekler **Python senior developer** ve **phBot geliştiricisi** bakış açısıyla değerlendirilecek.
+- Okunabilirlik, sürdürülebilirlik, hata yönetimi ve phBot best practice’leri dikkate alınacak.
+- Gereksiz karmaşıklıktan kaçınılacak; çözümler phBot ekosistemine uygun tutulacak.
+
+## 4. Performans ve UI Kuralları
+
+- **Performans:** Gereksiz döngü, bloklayan işlem ve ağır UI güncellemelerinden kaçınılacak; threading/async kullanımı phBot yapısına uygun olacak.
+- **UI:** Gözü yoracak, dağınık veya tutarsız arayüzlerden kaçınılacak. Renk, font ve layout tutarlı ve okunabilir olacak.
