@@ -1810,118 +1810,118 @@ _btn_bank_sort_stop = QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _bank
 _add_tab1(_btn_bank_sort_stop, _bank_container_x + (_container_w - 160) // 2 + 80, _by2 + 25)
 _protected_buttons[1].extend([_btn_bank_sort_start, _btn_bank_sort_stop])
 
-# Tab 2 - Auto Dungeon
-_t2_y = _content_y + 10
-_t2_x = _tab_bar_x + 20
+# Tab 2 - Auto Dungeon (xAutoDungeon UI tasarımı)
+_t2_y = _content_y + 6
+_t2_x = _tab_bar_x + 31
 
-# Sol taraf - Canavar isimleri
-lblMobs = QtBind.createLabel(gui, '#  Sayılmayacak canavar adları  #\n#       Canavar Sayacından       #', _t2_x, _t2_y)
+# Sol - Add monster names to ignore (xAutoDungeon layout)
+lblMobs = QtBind.createLabel(gui, '#   Add monster names to ignore    #\n#          from Monster Counter         #', _t2_x, _t2_y)
 _add_tab2(lblMobs, _t2_x, _t2_y)
-tbxMobs = QtBind.createLineEdit(gui, "", _t2_x, _t2_y + 35, 100, 20)
-_add_tab2(tbxMobs, _t2_x, _t2_y + 35)
-lstMobs = QtBind.createList(gui, _t2_x, _t2_y + 56, 176, 170)
-_add_tab2(lstMobs, _t2_x, _t2_y + 56)
-btnAddMob = QtBind.createButton(gui, 'btnAddMob_clicked', "    Ekle    ", _t2_x + 101, _t2_y + 34)
-_add_tab2(btnAddMob, _t2_x + 101, _t2_y + 34)
-btnRemMob = QtBind.createButton(gui, 'btnRemMob_clicked', "   Kaldır   ", _t2_x + 49, _t2_y + 226)
-_add_tab2(btnRemMob, _t2_x + 49, _t2_y + 226)
+tbxMobs = QtBind.createLineEdit(gui, "", _t2_x, _t2_y + 29, 100, 20)
+_add_tab2(tbxMobs, _t2_x, _t2_y + 29)
+lstMobs = QtBind.createList(gui, _t2_x, _t2_y + 50, 176, 203)
+_add_tab2(lstMobs, _t2_x, _t2_y + 50)
+btnAddMob = QtBind.createButton(gui, 'btnAddMob_clicked', "    Add    ", _t2_x + 101, _t2_y + 28)
+_add_tab2(btnAddMob, _t2_x + 101, _t2_y + 28)
+btnRemMob = QtBind.createButton(gui, 'btnRemMob_clicked', "     Remove     ", _t2_x + 49, _t2_y + 253)
+_add_tab2(btnRemMob, _t2_x + 49, _t2_y + 253)
 
-# Orta - Canavar Sayacı tercihleri
-_t2_mid_x = _t2_x + 210
-lblPreferences = QtBind.createLabel(gui, '#  Canavar Sayacı tercihleri  #', _t2_mid_x, _t2_y)
+# Orta - Monster Counter preferences (xAutoDungeon layout)
+_t2_mid_x = _t2_x + 209
+lblPreferences = QtBind.createLabel(gui, '#             Monster Counter preferences            #', _t2_mid_x, _t2_y)
 _add_tab2(lblPreferences, _t2_mid_x, _t2_y)
 
 _y = _t2_y + 26
 lblGeneral = QtBind.createLabel(gui, 'General (0)', _t2_mid_x, _y)
 _add_tab2(lblGeneral, _t2_mid_x, _y)
-cbxIgnoreGeneral = QtBind.createCheckBox(gui, 'cbxIgnoreGeneral_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreGeneral = QtBind.createCheckBox(gui, 'cbxIgnoreGeneral_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreGeneral, _t2_mid_x + 105, _y)
-cbxOnlyCountGeneral = QtBind.createCheckBox(gui, 'cbxOnlyCountGeneral_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountGeneral = QtBind.createCheckBox(gui, 'cbxOnlyCountGeneral_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountGeneral, _t2_mid_x + 165, _y)
 
 _y += 20
 lblChampion = QtBind.createLabel(gui, 'Champion (1)', _t2_mid_x, _y)
 _add_tab2(lblChampion, _t2_mid_x, _y)
-cbxIgnoreChampion = QtBind.createCheckBox(gui, 'cbxIgnoreChampion_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreChampion = QtBind.createCheckBox(gui, 'cbxIgnoreChampion_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreChampion, _t2_mid_x + 105, _y)
-cbxOnlyCountChampion = QtBind.createCheckBox(gui, 'cbxOnlyCountChampion_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountChampion = QtBind.createCheckBox(gui, 'cbxOnlyCountChampion_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountChampion, _t2_mid_x + 165, _y)
 
 _y += 20
 lblGiant = QtBind.createLabel(gui, 'Giant (4)', _t2_mid_x, _y)
 _add_tab2(lblGiant, _t2_mid_x, _y)
-cbxIgnoreGiant = QtBind.createCheckBox(gui, 'cbxIgnoreGiant_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreGiant = QtBind.createCheckBox(gui, 'cbxIgnoreGiant_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreGiant, _t2_mid_x + 105, _y)
-cbxOnlyCountGiant = QtBind.createCheckBox(gui, 'cbxOnlyCountGiant_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountGiant = QtBind.createCheckBox(gui, 'cbxOnlyCountGiant_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountGiant, _t2_mid_x + 165, _y)
 
 _y += 20
 lblTitan = QtBind.createLabel(gui, 'Titan (5)', _t2_mid_x, _y)
 _add_tab2(lblTitan, _t2_mid_x, _y)
-cbxIgnoreTitan = QtBind.createCheckBox(gui, 'cbxIgnoreTitan_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreTitan = QtBind.createCheckBox(gui, 'cbxIgnoreTitan_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreTitan, _t2_mid_x + 105, _y)
-cbxOnlyCountTitan = QtBind.createCheckBox(gui, 'cbxOnlyCountTitan_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountTitan = QtBind.createCheckBox(gui, 'cbxOnlyCountTitan_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountTitan, _t2_mid_x + 165, _y)
 
 _y += 20
 lblStrong = QtBind.createLabel(gui, 'Strong (6)', _t2_mid_x, _y)
 _add_tab2(lblStrong, _t2_mid_x, _y)
-cbxIgnoreStrong = QtBind.createCheckBox(gui, 'cbxIgnoreStrong_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreStrong = QtBind.createCheckBox(gui, 'cbxIgnoreStrong_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreStrong, _t2_mid_x + 105, _y)
-cbxOnlyCountStrong = QtBind.createCheckBox(gui, 'cbxOnlyCountStrong_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountStrong = QtBind.createCheckBox(gui, 'cbxOnlyCountStrong_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountStrong, _t2_mid_x + 165, _y)
 
 _y += 20
 lblElite = QtBind.createLabel(gui, 'Elite (7)', _t2_mid_x, _y)
 _add_tab2(lblElite, _t2_mid_x, _y)
-cbxIgnoreElite = QtBind.createCheckBox(gui, 'cbxIgnoreElite_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreElite = QtBind.createCheckBox(gui, 'cbxIgnoreElite_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreElite, _t2_mid_x + 105, _y)
-cbxOnlyCountElite = QtBind.createCheckBox(gui, 'cbxOnlyCountElite_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountElite = QtBind.createCheckBox(gui, 'cbxOnlyCountElite_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountElite, _t2_mid_x + 165, _y)
 
 _y += 20
 lblUnique = QtBind.createLabel(gui, 'Unique (8)', _t2_mid_x, _y)
 _add_tab2(lblUnique, _t2_mid_x, _y)
-cbxIgnoreUnique = QtBind.createCheckBox(gui, 'cbxIgnoreUnique_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreUnique = QtBind.createCheckBox(gui, 'cbxIgnoreUnique_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreUnique, _t2_mid_x + 105, _y)
-cbxOnlyCountUnique = QtBind.createCheckBox(gui, 'cbxOnlyCountUnique_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountUnique = QtBind.createCheckBox(gui, 'cbxOnlyCountUnique_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountUnique, _t2_mid_x + 165, _y)
 
 _y += 20
 lblParty = QtBind.createLabel(gui, 'Party (16)', _t2_mid_x, _y)
 _add_tab2(lblParty, _t2_mid_x, _y)
-cbxIgnoreParty = QtBind.createCheckBox(gui, 'cbxIgnoreParty_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreParty = QtBind.createCheckBox(gui, 'cbxIgnoreParty_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreParty, _t2_mid_x + 105, _y)
-cbxOnlyCountParty = QtBind.createCheckBox(gui, 'cbxOnlyCountParty_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountParty = QtBind.createCheckBox(gui, 'cbxOnlyCountParty_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountParty, _t2_mid_x + 165, _y)
 
 _y += 20
 lblChampionParty = QtBind.createLabel(gui, 'ChampionParty (17)', _t2_mid_x, _y)
 _add_tab2(lblChampionParty, _t2_mid_x, _y)
-cbxIgnoreChampionParty = QtBind.createCheckBox(gui, 'cbxIgnoreChampionParty_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreChampionParty = QtBind.createCheckBox(gui, 'cbxIgnoreChampionParty_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreChampionParty, _t2_mid_x + 105, _y)
-cbxOnlyCountChampionParty = QtBind.createCheckBox(gui, 'cbxOnlyCountChampionParty_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountChampionParty = QtBind.createCheckBox(gui, 'cbxOnlyCountChampionParty_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountChampionParty, _t2_mid_x + 165, _y)
 
 _y += 20
 lblGiantParty = QtBind.createLabel(gui, 'GiantParty (20)', _t2_mid_x, _y)
 _add_tab2(lblGiantParty, _t2_mid_x, _y)
-cbxIgnoreGiantParty = QtBind.createCheckBox(gui, 'cbxIgnoreGiantParty_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreGiantParty = QtBind.createCheckBox(gui, 'cbxIgnoreGiantParty_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreGiantParty, _t2_mid_x + 105, _y)
-cbxOnlyCountGiantParty = QtBind.createCheckBox(gui, 'cbxOnlyCountGiantParty_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountGiantParty = QtBind.createCheckBox(gui, 'cbxOnlyCountGiantParty_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountGiantParty, _t2_mid_x + 165, _y)
 
 _y += 30
-cbxAcceptForgottenWorld = QtBind.createCheckBox(gui, 'cbxAcceptForgottenWorld_checked', 'Unutulmuş Dünya davetlerini kabul et', _t2_mid_x, _y)
+cbxAcceptForgottenWorld = QtBind.createCheckBox(gui, 'cbxAcceptForgottenWorld_checked', 'Accept Forgotten World invitations', _t2_mid_x, _y)
 _add_tab2(cbxAcceptForgottenWorld, _t2_mid_x, _y)
 
-# Sağ taraf - Canavar Sayacı
-_t2_right_x = _t2_mid_x + 260
-lblMonsterCounter = QtBind.createLabel(gui, '#       Canavar Sayacı       #', _t2_right_x, _t2_y)
+# Sağ - Monster Counter (xAutoDungeon layout)
+_t2_right_x = _t2_mid_x + 280
+lblMonsterCounter = QtBind.createLabel(gui, "#                 Monster Counter                 #", _t2_right_x, _t2_y)
 _add_tab2(lblMonsterCounter, _t2_right_x, _t2_y)
-lstMonsterCounter = QtBind.createList(gui, _t2_right_x, _t2_y + 23, 197, 237)
-_add_tab2(lstMonsterCounter, _t2_right_x, _t2_y + 23)
-QtBind.append(gui, lstMonsterCounter, 'İsim (Tür)')
+lstMonsterCounter = QtBind.createList(gui, _t2_right_x, _t2_y + 17, 197, 237)
+_add_tab2(lstMonsterCounter, _t2_right_x, _t2_y + 17)
+QtBind.append(gui, lstMonsterCounter, 'Name (Type)')
 
 # Tab 2 butonlarını lisans korumasına ekle
 _protected_buttons[2] = [btnAddMob, btnRemMob, cbxIgnoreGeneral, cbxOnlyCountGeneral, cbxIgnoreChampion, cbxOnlyCountChampion,
@@ -3002,9 +3002,9 @@ def handle_joymax(opcode, data):
         ns = _get_target_support_namespace()
         if ns and 'ts_handle_joymax' in ns:
             ns['ts_handle_joymax'](opcode, data)
-    # SERVER_DIMENSIONAL_INVITATION_REQUEST
+    # SERVER_DIMENSIONAL_INVITATION_REQUEST (licence kontrolü)
     elif opcode == 0x751A:
-        if QtBind.isChecked(gui, cbxAcceptForgottenWorld):
+        if _is_license_valid() and QtBind.isChecked(gui, cbxAcceptForgottenWorld):
             packet = data[:4]
             packet += b'\x00\x00\x00\x00'
             packet += b'\x01'
