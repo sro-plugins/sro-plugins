@@ -5,12 +5,22 @@
 # create_notification, get_training_script, time, os, _is_license_valid,
 # cbEnabled, cbP1..cbP8
 
-# FGW klasörü: Config/SROManager/FGW/
+# FGW klasörü: Config/SROManager/FGW_<PC>/ - Her bilgisayar kendi klasörünü kullanır (2+ PC çakışması önlenir)
+def _get_pc_id():
+    """Bilgisayar adı - 2 PC'de aynı config kullanılırsa her biri kendi FGW klasörüne yazar."""
+    try:
+        return os.environ.get('COMPUTERNAME', os.environ.get('HOSTNAME', 'PC1'))
+    except Exception:
+        return 'PC1'
+
 def _get_fgw_folder():
     cfg = get_config_dir()
-    if not cfg:
-        return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'FGW')
-    return cfg.rstrip('/\\') + os.sep + pName + os.sep + 'FGW' + os.sep
+    pc_id = _get_pc_id()
+    if cfg:
+        base = cfg.rstrip('/\\') + os.sep + pName
+    else:
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return base + os.sep + 'FGW_' + pc_id + os.sep
 
 FGW_FOLDER = None  # init below
 ATTACKAREA_FILENAMES = [
