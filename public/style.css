@@ -449,3 +449,281 @@ tr:last-child td {
 ::-webkit-scrollbar-track {
     background: transparent;
 }
+
+/* File Manager Styles */
+.drop-zone {
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 30px;
+    text-align: center;
+    transition: all 0.3s ease;
+    margin-bottom: 20px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+    border-color: var(--primary);
+    background: rgba(131, 56, 236, 0.05);
+    transform: scale(1.01);
+}
+
+.drop-zone.drag-over {
+    animation: dropPulse 1s ease infinite;
+}
+
+@keyframes dropPulse {
+
+    0%,
+    100% {
+        border-color: var(--primary);
+        background: rgba(131, 56, 236, 0.05);
+    }
+
+    50% {
+        border-color: var(--secondary);
+        background: rgba(58, 134, 255, 0.08);
+    }
+}
+
+.file-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+}
+
+.file-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    animation: fileSlideIn 0.4s ease backwards;
+}
+
+.file-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes fileSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.file-card .file-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.file-card .file-icon.txt {
+    background: rgba(58, 134, 255, 0.12);
+    color: var(--secondary);
+}
+
+.file-card .file-icon.json {
+    background: rgba(255, 167, 38, 0.12);
+    color: #ffa726;
+}
+
+.file-card .file-icon.py {
+    background: rgba(131, 56, 236, 0.12);
+    color: #8338ec;
+}
+
+.file-card .file-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-card .file-info .file-name {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 3px;
+}
+
+.file-card .file-info .file-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.file-card .file-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.file-card .file-actions .action-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.action-btn.view {
+    background: rgba(58, 134, 255, 0.1);
+    color: var(--secondary);
+}
+
+.action-btn.view:hover {
+    background: var(--secondary);
+    color: #fff;
+}
+
+.action-btn.download {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+}
+
+.action-btn.download:hover {
+    background: #4ade80;
+    color: #111;
+}
+
+.action-btn.delete {
+    background: rgba(255, 0, 110, 0.1);
+    color: #ff006e;
+}
+
+.action-btn.delete:hover {
+    background: #ff006e;
+    color: #fff;
+}
+
+/* Upload progress toast */
+.upload-toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: rgba(26, 26, 46, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 2000;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+    animation: toastSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.upload-toast.success {
+    border-left: 3px solid #4ade80;
+}
+
+.upload-toast.error {
+    border-left: 3px solid #ff006e;
+}
+
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes toastSlideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+}
+
+.file-card-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+    font-size: 14px;
+}
+
+/* API Tester Styles */
+.endpoint-btn {
+    flex: 1;
+    justify-content: center;
+    transition: all 0.25s ease;
+    font-size: 13px;
+    padding: 12px 16px;
+}
+
+.endpoint-btn.active {
+    background: var(--primary) !important;
+    color: #fff !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+.status-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.status-tag.success {
+    background: rgba(74, 222, 128, 0.12);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+.status-tag.error {
+    background: rgba(255, 0, 110, 0.12);
+    color: #ff006e;
+    border: 1px solid rgba(255, 0, 110, 0.25);
+}
+
+.status-tag.warning {
+    background: rgba(255, 167, 38, 0.12);
+    color: #ffa726;
+    border: 1px solid rgba(255, 167, 38, 0.25);
+}
+
+code {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
