@@ -27,8 +27,9 @@
 ### Kurulum
 
 1. `sromanager.py` dosyasını phBot’un **plugins** klasörüne kopyalayın.
-2. Opsiyonel: **caravan** ve **sc** klasörlerini eklenti dosyasıyla aynı dizine (veya phBot’un ilgili config/script dizinine) koyun; eklenti GitHub’dan da indirebilir.
-3. phBot’u başlatıp eklentiyi etkinleştirin.
+2. **cacert.pem** dosyasını sromanager.py ile aynı dizine koyun (Release'dan indirildiyse her iki dosya da birlikte gelir). Bu dosya HTTPS sertifika doğrulaması için gereklidir.
+3. Opsiyonel: **caravan** ve **sc** klasörlerini eklenti dosyasıyla aynı dizine (veya phBot’un ilgili config/script dizinine) koyun; eklenti GitHub’dan da indirebilir.
+4. phBot’u başlatıp eklentiyi etkinleştirin.
 
 ### Oto Kervan
 

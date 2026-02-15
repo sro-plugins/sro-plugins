@@ -1,3 +1,12 @@
+## v1.7.1 (SSL düzeltmesi, cacert.pem, güncelleme iyileştirmesi)
+
+### Değişiklikler
+- **SSL / CERTIFICATE_VERIFY_FAILED**: Plugin ile gelen `cacert.pem` ile HTTPS doğrulaması (ek paket kurulumu gerekmez)
+- **Güncelleme**: Otomatik güncellemede `cacert.pem` da indirilir
+- **Release**: `sromanager.py` ve `cacert.pem` birlikte yayınlanır
+
+---
+
 ## v1.7.0 (SROManager: plugin adı ve dosya yeniden adlandırıldı)
 
 ### Değişiklikler

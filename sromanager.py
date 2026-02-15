@@ -10,9 +10,32 @@ import copy
 import json
 import os
 import shutil
+import ssl
 import urllib.request
 import urllib.parse
+
+# SSL: Windows'ta CERTIFICATE_VERIFY_FAILED için CA paketi kullan (ek kurulum gerekmez)
+# Önce plugin dizinindeki cacert.pem, yoksa certifi (başka paketlerle gelmiş olabilir)
+try:
+    from urllib.request import HTTPSHandler, build_opener, install_opener
+    _ssl_dir = os.path.dirname(os.path.abspath(__file__))
+    _cacert_path = os.path.join(_ssl_dir, 'cacert.pem')
+    if os.path.isfile(_cacert_path):
+        _cafile = _cacert_path
+    else:
+        try:
+            import certifi
+            _cafile = certifi.where()
+        except ImportError:
+            _cafile = None
+    if _cafile:
+        _ssl_ctx = ssl.create_default_context(cafile=_cafile)
+        _opener = build_opener(HTTPSHandler(context=_ssl_ctx))
+        install_opener(_opener)
+except Exception:
+    pass
 import base64
+import ctypes
 import hmac
 import hashlib
 import sqlite3
@@ -23,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.0'
+pVersion = '1.7.1'
 
 MOVE_DELAY = 0.25
 
@@ -101,7 +124,8 @@ def _fetch_github_latest():
         log('[%s] Güncelleme kontrolü hatası: %s' % (pName, str(ex)))
         return None
 
-def _get_update_download_url():
+def _get_release_asset_urls():
+    """Son release'taki asset'lerin {isim: url} sözlüğünü döndürür."""
     try:
         req = urllib.request.Request(
             GITHUB_API_LATEST,
@@ -110,14 +134,21 @@ def _get_update_download_url():
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read().decode('utf-8'))
         assets = data.get('assets') or []
+        result = {}
         for a in assets:
-            name = (a.get('name') or '').lower()
-            if name == PLUGIN_FILENAME.lower() or name.endswith('.py'):
-                u = a.get('browser_download_url')
-                if u:
-                    return u
+            name = (a.get('name') or '').strip()
+            url = a.get('browser_download_url')
+            if name and url:
+                result[name] = url
+        return result
     except Exception:
-        pass
+        return {}
+
+def _get_update_download_url():
+    urls = _get_release_asset_urls()
+    for name, url in urls.items():
+        if name.lower() == PLUGIN_FILENAME.lower() or name.lower().endswith('.py'):
+            return url
     return GITHUB_RAW_MAIN
 
 _update_label_ref = None
@@ -290,6 +321,13 @@ def _validate_license():
         
         # İmzalı payload header'ları (sunucu doğrulama için)
         signed_headers = _create_signed_headers(license_key, user_ip, endpoint="validate")
+        payload_b64 = signed_headers.get("X-SROMANAGER-Payload", "")
+        if payload_b64:
+            try:
+                payload_raw = base64.b64decode(payload_b64).decode('utf-8')
+                log('[%s] [Server] Payload (base64 öncesi): %s' % (pName, payload_raw))
+            except Exception:
+                pass
         headers = {
             'User-Agent': 'phBot-SROManager/' + pVersion,
             'Accept': 'application/json',
@@ -631,6 +669,7 @@ def _do_auto_update_thread():
             except Exception:
                 pass
         log('[%s] Güncelleme indiriliyor...' % pName)
+        asset_urls = _get_release_asset_urls()
         download_url = _get_update_download_url()
         req = urllib.request.Request(download_url, headers={'User-Agent': 'phBot-SROManager/1.0'})
         with urllib.request.urlopen(req, timeout=15) as r:
@@ -645,8 +684,23 @@ def _do_auto_update_thread():
                     pass
             return
         plugin_path = os.path.abspath(__file__)
+        plugin_dir = os.path.dirname(plugin_path)
         with open(plugin_path, 'wb') as f:
             f.write(new_content)
+        # cacert.pem'i de indir (SSL doğrulama için)
+        cacert_url = asset_urls.get('cacert.pem')
+        if cacert_url:
+            try:
+                req_ca = urllib.request.Request(cacert_url, headers={'User-Agent': 'phBot-SROManager/1.0'})
+                with urllib.request.urlopen(req_ca, timeout=15) as r_ca:
+                    cacert_content = r_ca.read()
+                if cacert_content and len(cacert_content) > 100:
+                    cacert_path = os.path.join(plugin_dir, 'cacert.pem')
+                    with open(cacert_path, 'wb') as f:
+                        f.write(cacert_content)
+                    log('[%s] cacert.pem güncellendi.' % pName)
+            except Exception as ex:
+                log('[%s] cacert.pem indirilemedi (SSL çalışmaya devam eder): %s' % (pName, str(ex)))
         log('[%s] Güncelleme tamamlandı. Eklentiyi yeniden yükleyin.' % pName)
         _update_status_text = 'Güncellendi - yeniden yükleyin'
         if _update_label_ref is not None:
@@ -2613,12 +2667,12 @@ _add_tab11(_scm_btnHideDel, _scm_x + 370, _scm_y + 192)
 _scm_lstHide = QtBind.createList(gui, _scm_x + 490, _scm_y + 168, 190, 52)
 _add_tab11(_scm_lstHide, _scm_x + 490, _scm_y + 168)
 _add_tab11(QtBind.createLabel(gui, 'Lider:', _scm_x, _scm_y + 228), _scm_x, _scm_y + 228)
-_scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 130, 20)
+_scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 200, 20)
 _add_tab11(_scm_tbLeader, _scm_x + 55, _scm_y + 224)
+_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_commands_help_clicked', 'Yardım', _scm_x + 270, _scm_y + 223)
+_add_tab11(_scm_btnHelp, _scm_x + 270, _scm_y + 223)
 _scm_lblStatus = QtBind.createLabel(gui, 'Hazır', _scm_x, _scm_y + 248)
 _add_tab11(_scm_lblStatus, _scm_x, _scm_y + 248)
-_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_help_clicked', 'Yardım', _scm_x + 680, _scm_y)
-_add_tab11(_scm_btnHelp, _scm_x + 680, _scm_y)
 
 _script_command_maker_namespace = None
 
@@ -2648,10 +2702,16 @@ def _get_script_command_maker_namespace():
         except Exception as ex:
             log('[%s] [Script-Command] Modül indirilemedi: %s' % (pName, str(ex)))
             return None
+    script_cmds_path = get_config_dir()[:-7] if get_config_dir() else ''
     namespace = {
         'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         'get_config_dir': get_config_dir, 'get_character_data': get_character_data,
         'inject_joymax': inject_joymax, 'os': os, 'json': json, 're': __import__('re'), 'time': time,
+        'start_bot': start_bot, 'stop_bot': stop_bot, 'start_trace': start_trace, 'stop_trace': stop_trace,
+        'get_position': get_position, 'set_training_position': set_training_position,
+        'set_training_radius': set_training_radius, 'set_training_script': set_training_script,
+        'set_training_area': set_training_area, 'set_profile': set_profile, 'get_party': get_party,
+        'get_pets': get_pets, 'move_to': move_to, 'phBotChat': phBotChat, 'script_cmds_path': script_cmds_path,
         'tbChat': _scm_tbChat, 'tbScript': _scm_tbScript, 'tbOpcode': _scm_tbOpcode, 'tbData': _scm_tbData,
         'tbLeader': _scm_tbLeader, 'tbHide': _scm_tbHide, 'lstMap': _scm_lstMap, 'lstHide': _scm_lstHide,
         'btnSave': _scm_btnSave, 'btnLoad': _scm_btnLoad, 'btnRemove': _scm_btnRemove, 'btnEdit': _scm_btnEdit,
@@ -2680,6 +2740,32 @@ def _scm_ns_call(name, *args):
     except Exception:
         return None
 
+def scm_btn_commands_help_clicked():
+    """Varsayılan komutlar dialog'u açar."""
+    try:
+        text = (
+            "Varsayılan komutlar (lider listesindeki oyunculardan gelen parti sohbeti mesajları):\r\n\r\n"
+            "START – Botu başlatır\r\n"
+            "STOP – Botu durdurur\r\n"
+            "TRACE [Oyuncu] – Parti liderine veya belirtilen oyuncuya trace (parametre yoksa komutu yazan oyuncuya)\r\n"
+            "NOTRACE – Trace'i durdurur\r\n"
+            "ZERK – Berserker (Fury) modunu açar\r\n"
+            "SETPOS [X Y Region Z] – Antrenman alanını ayarlar (parametre yoksa mevcut pozisyon)\r\n"
+            "GETPOS – Mevcut pozisyonu özel mesajla gönderir\r\n"
+            "SETRADIUS [m] – Farm yarıçapını ayarlar (varsayılan 35)\r\n"
+            "SETSCRIPT [yol] – Script yolunu ayarlar\r\n"
+            "SETAREA [isim] – Config'teki alan adına göre alanı değiştirir\r\n"
+            "PROFILE [isim] – Profili değiştirir\r\n"
+            "FOLLOW [Oyuncu] [mesafe] – Belirtilen oyuncuyu mesafeyle takip eder (varsayılan: komutu yazan, 10 m)\r\n"
+            "NOFOLLOW – Takibi durdurur"
+        )
+        ctypes.windll.user32.MessageBoxW(None, str(text), "%s — Varsayılan Komutlar" % pName, 0x40)
+    except Exception as ex:
+        try:
+            log('[%s] Script-Command yardım penceresi açılamadı: %s' % (pName, str(ex)))
+        except Exception:
+            pass
+
 def scm_btn_help_clicked():
     try:
         text = (
@@ -2697,7 +2783,8 @@ def scm_btn_help_clicked():
             "Chat + Opcode (ve isteğe Data) girip Kaydet'e basın. "
             "Bu eşleme JSON dosyasına kaydedilir:\r\n"
             "  Config/SROManager/script_command_Server_Karakter.json\r\n"
-            "Lider alanına parti liderinin adını yazın; sadece o kişi Chat komutlarını tetikleyebilir.\r\n\r\n"
+            "Lider alanına parti liderinin adını yazın; sadece o kişi Chat komutlarını tetikleyebilir. "
+            "Birden fazla isim: A,B,C şeklinde virgülle ayırarak girin.\r\n\r\n"
             "SROManager:\r\n"
             "Script komutunda 'sromanager <anahtar>' yazarsanız, phBot script panelinden "
             "ör. sromanager bless çağrıldığında o eşleme çalışır (paket enjekte edilir).\r\n\r\n"
@@ -2705,7 +2792,14 @@ def scm_btn_help_clicked():
             "1) 'Tüm C2S paketlerini göster' işaretleyin\r\n"
             "2) Oyunda yapmak istediğiniz işlemi yapın (log'dan opcode/data kopyalayın)\r\n"
             "3) Chat + Script + Opcode + Data girin, Kaydet\r\n"
-            "4) Lider adını yazın (Chat için) veya sromanager kullanın (Script için)"
+            "4) Lider adını yazın (Chat için, birden fazlaysa A,B,C) veya sromanager kullanın (Script için)\r\n\r\n"
+            "Varsayılan komutlar (liderler parti sohbetinde yazabilir):\r\n"
+            "- START, STOP : Bot başlat/durdur\r\n"
+            "- TRACE [Oyuncu], NOTRACE : Trace başlat/durdur\r\n"
+            "- ZERK : Berserker modu\r\n"
+            "- SETPOS [X Y Region Z], GETPOS : Antrenman alanı/pozisyon\r\n"
+            "- SETRADIUS [m], SETSCRIPT [yol], SETAREA [isim], PROFILE [isim]\r\n"
+            "- FOLLOW [Oyuncu] [mesafe], NOFOLLOW : Takip"
         )
         ctypes.windll.user32.MessageBoxW(None, str(text), "%s — Script-Command Yardım" % pName, 0x40)
     except Exception as ex:
