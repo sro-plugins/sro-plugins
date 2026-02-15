@@ -1,3 +1,10 @@
+## v1.7.2 (Script Command Maker güncellemesi)
+
+### Değişiklikler
+- **Script Command Maker**: Modül güncellemeleri
+
+---
+
 ## v1.7.1 (SSL düzeltmesi, cacert.pem, güncelleme iyileştirmesi)
 
 ### Değişiklikler

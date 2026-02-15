@@ -20,8 +20,8 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.7.1',
-    'name': 'v1.7.1 - SSL düzeltmesi, cacert.pem, güncelleme iyileştirmesi',
+    'tag_name': 'v1.7.2',
+    'name': 'v1.7.2 - Script Command Maker güncellemesi',
     'body': release_notes,
     'draft': False,
     'prerelease': False

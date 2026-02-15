@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
 # Script & Chat Command Maker (Tab 11). Enjekte: gui, QtBind, log, pName, get_config_dir,
-# get_character_data, inject_joymax, _is_license_valid
+# get_character_data, inject_joymax, _is_license_valid, start_bot, stop_bot, start_trace, stop_trace,
+# get_position, set_training_position, set_training_radius, set_training_script, set_training_area,
+# set_profile, get_party, get_pets, move_to, phBotChat, script_cmds_path
 # Widget refs: tbChat, tbScript, tbOpcode, tbData, tbLeader, tbHide, lstMap, lstHide,
 # btnSave, btnLoad, btnRemove, btnEdit, btnHideAdd, btnHideDel, cbLog, lblStatus
 
 import os, json, re, time
+
+# FOLLOW komutu için global
+_follow_activated = False
+_follow_player = ""
+_follow_distance = 0
 
 def _scm_check_license():
     if not _is_license_valid():
@@ -308,16 +315,176 @@ def ui_remove():
     else:
         QtBind.setText(gui, lblStatus, "Önce bir eşleme seçin")
 
+def _get_leaders_set():
+    """Lider alanından virgülle ayrılmış isimleri set olarak döner (küçük harf)."""
+    s = (_cfg.get("leader", "") or "").strip()
+    if not s:
+        return set()
+    return {x.strip().lower() for x in s.split(",") if x.strip()}
+
+def _party_player(player):
+    """Oyuncu partide mi?"""
+    try:
+        players = get_party()
+        if players:
+            for p in players:
+                if players[p].get("name", "").lower() == (player or "").lower():
+                    return True
+    except Exception:
+        pass
+    return False
+
+def _near_party_player(player):
+    """Partideki oyuncunun pozisyonunu döner (yakınsa)."""
+    try:
+        players = get_party()
+        if players:
+            for p in players:
+                if players[p].get("name", "").lower() == (player or "").lower() and players[p].get("player_id", 0) > 0:
+                    return players[p]
+    except Exception:
+        pass
+    return None
+
+def _start_follow(player, distance):
+    global _follow_activated, _follow_player, _follow_distance
+    if _party_player(player):
+        _follow_player = player
+        _follow_distance = float(distance) if distance else 10.0
+        _follow_activated = True
+        return True
+    return False
+
+def _stop_follow():
+    global _follow_activated, _follow_player, _follow_distance
+    r = _follow_activated
+    _follow_activated = False
+    _follow_player = ""
+    _follow_distance = 0
+    return r
+
+def _handle_builtin_commands(sender, msg_orig):
+    """Varsayılan komutlar (START, STOP, TRACE, vb.). İşlendiyse True döner."""
+    global _follow_activated, _follow_player, _follow_distance
+    msg = msg_orig.strip()
+    msg_lower = msg.lower()
+    try:
+        if msg_lower == "start":
+            start_bot()
+            log(f"[{pName}] [Script-Command] Bot başlatıldı")
+            return True
+        elif msg_lower == "stop":
+            stop_bot()
+            log(f"[{pName}] [Script-Command] Bot durduruldu")
+            return True
+        elif msg_lower.startswith("trace"):
+            if msg_lower == "trace":
+                if start_trace(sender):
+                    log(f"[{pName}] [Script-Command] Trace başlatıldı: [{sender}]")
+            else:
+                target = msg[5:].strip().split()[0] if msg[5:].strip() else sender
+                if start_trace(target):
+                    log(f"[{pName}] [Script-Command] Trace başlatıldı: [{target}]")
+            return True
+        elif msg_lower == "notrace":
+            stop_trace()
+            log(f"[{pName}] [Script-Command] Trace durduruldu")
+            return True
+        elif msg_lower == "zerk":
+            inject_joymax(0x70A7, b'\x01', False)
+            log(f"[{pName}] [Script-Command] Berserker modu aktif")
+            return True
+        elif msg_lower.startswith("setpos"):
+            if msg_lower == "setpos":
+                p = get_position()
+                set_training_position(p['region'], p['x'], p['y'], p['z'])
+                log(f"[{pName}] [Script-Command] Pozisyon ayarlandı (X:{p['x']:.1f}, Y:{p['y']:.1f})")
+            else:
+                parts = msg[6:].strip().split()
+                x, y = float(parts[0]), float(parts[1])
+                region = int(parts[2]) if len(parts) >= 3 else 0
+                z = float(parts[3]) if len(parts) >= 4 else 0
+                set_training_position(region, x, y, z)
+                log(f"[{pName}] [Script-Command] Pozisyon ayarlandı (X:{x:.1f}, Y:{y:.1f})")
+            return True
+        elif msg_lower == "getpos":
+            pos = get_position()
+            phBotChat.Private(sender, "Pozisyon (X:%.1f, Y:%.1f, Z:%.1f, Region:%d)" % (pos['x'], pos['y'], pos['z'], pos['region']))
+            return True
+        elif msg_lower.startswith("setradius"):
+            if msg_lower == "setradius":
+                set_training_radius(35)
+                log(f"[{pName}] [Script-Command] Yarıçap 35m olarak ayarlandı")
+            else:
+                radius = int(float(msg[9:].strip().split()[0]))
+                radius = abs(radius) if radius != 0 else 35
+                set_training_radius(radius)
+                log(f"[{pName}] [Script-Command] Yarıçap {radius}m olarak ayarlandı")
+            return True
+        elif msg_lower.startswith("setscript"):
+            if msg_lower == "setscript":
+                set_training_script('')
+                log(f"[{pName}] [Script-Command] Script sıfırlandı")
+            else:
+                path = msg[9:].strip()
+                if path and script_cmds_path and not os.path.isabs(path):
+                    path = os.path.join(script_cmds_path, path)
+                set_training_script(path or '')
+                log(f"[{pName}] [Script-Command] Script ayarlandı: {path or '(sıfır)'}")
+            return True
+        elif msg_lower.startswith("setarea "):
+            area_name = msg[8:].strip()
+            if area_name and set_training_area(area_name):
+                log(f"[{pName}] [Script-Command] Alan ayarlandı: [{area_name}]")
+            else:
+                log(f"[{pName}] [Script-Command] Alan bulunamadı: [{area_name}]")
+            return True
+        elif msg_lower.startswith("profile"):
+            if msg_lower == "profile":
+                set_profile('Default')
+                log(f"[{pName}] [Script-Command] Profil: Default")
+            else:
+                name = msg[7:].strip()
+                if name and set_profile(name):
+                    log(f"[{pName}] [Script-Command] Profil: {name}")
+            return True
+        elif msg_lower.startswith("follow"):
+            char_name = sender
+            distance = 10
+            if msg_lower != "follow":
+                parts = msg[6:].strip().split()
+                if len(parts) >= 1:
+                    char_name = parts[0]
+                if len(parts) >= 2:
+                    distance = float(parts[1])
+            if _start_follow(char_name, distance):
+                log(f"[{pName}] [Script-Command] Takip: [{char_name}] mesafe {distance}")
+            return True
+        elif msg_lower == "nofollow":
+            if _stop_follow():
+                log(f"[{pName}] [Script-Command] Takip durduruldu")
+            return True
+    except Exception as e:
+        log(f"[{pName}] [Script-Command] Komut hatası: {e}")
+        return True
+    return False
+
 def handle_chat(t, sender, message):
     if not _scm_check_license():
         return True
-    leader = (_cfg.get("leader", "") or "").strip()
-    if not leader:
+    leaders = _get_leaders_set()
+    if not leaders:
         return True
-    if (sender or "").strip().lower() != leader.lower():
+    sender_lower = (sender or "").strip().lower()
+    if sender_lower not in leaders:
         return True
-    msg = (message or "").strip().lower()
-    mapping = _find_mapping_by_chat(msg)
+    msg_orig = (message or "").strip()
+    msg_lower = msg_orig.lower()
+    # Önce varsayılan komutları dene
+    if _handle_builtin_commands(sender, msg_orig):
+        return False
+    # Sonra mapping'e bak
+    mapping = _find_mapping_by_chat(msg_lower)
     if mapping:
         _inject_packet_from_mapping(mapping)
         return False
@@ -366,9 +533,28 @@ def handle_silkroad(opcode, data):
             pass
     return True
 
+def _get_distance(ax, ay, bx, by):
+    return ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5
+
 def event_loop():
-    global _last_sel_idx, _last_sel_check, _edit_mode, _last_cfg_check
+    global _last_sel_idx, _last_sel_check, _edit_mode, _last_cfg_check, _follow_activated, _follow_player, _follow_distance
     now = time.time()
+    # FOLLOW takip mantığı
+    if _follow_activated and _follow_player:
+        try:
+            player = _near_party_player(_follow_player)
+            if player:
+                p = get_position()
+                dist = _get_distance(p['x'], p['y'], player['x'], player['y'])
+                if _follow_distance > 0 and dist > _follow_distance:
+                    x_unit = (player['x'] - p['x']) / dist
+                    y_unit = (player['y'] - p['y']) / dist
+                    move_dist = dist - _follow_distance
+                    move_to(move_dist * x_unit + p['x'], move_dist * y_unit + p['y'], 0)
+                elif _follow_distance <= 0:
+                    move_to(player['x'], player['y'], 0)
+        except Exception:
+            pass
     if now - _last_cfg_check > 1.0:
         _last_cfg_check = now
         if _ensure_cfg_path():
