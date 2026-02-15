@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.2'
+pVersion = '1.7.3'
 
 MOVE_DELAY = 0.25
 
@@ -1194,26 +1194,49 @@ def garden_dungeon_stop():
     if ns and 'garden_dungeon_stop' in ns:
         ns['garden_dungeon_stop']()
 
-# Auto Hwt (Tab 4): GitHub'dan indirilip exec ile çalıştırılır (şu an placeholder)
+# Auto Hwt (Tab 4): SROMaster FGW & HWT - feature/auto_hwt.py (yerel önce, GitHub yedek)
 _auto_hwt_namespace = None
 
 def _get_auto_hwt_namespace():
     global _auto_hwt_namespace
     if _auto_hwt_namespace is not None:
         return _auto_hwt_namespace
-    try:
-        req = urllib.request.Request(
-            GITHUB_AUTO_HWT_URL,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-    except Exception as ex:
-        log('[%s] Auto Hwt modülü indirilemedi: %s' % (pName, str(ex)))
-        return None
+    code = None
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
+        local_path = os.path.join(base, 'feature', 'auto_hwt.py')
+        if os.path.exists(local_path):
+            try:
+                with open(local_path, 'r', encoding='utf-8') as f:
+                    code = f.read()
+                break
+            except Exception as ex:
+                log('[%s] [Auto Hwt] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    if not code:
+        try:
+            req = urllib.request.Request(
+                GITHUB_AUTO_HWT_URL,
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                code = r.read().decode('utf-8')
+        except Exception as ex:
+            log('[%s] Auto Hwt modülü indirilemedi: %s' % (pName, str(ex)))
+            return None
+    g = globals()
     namespace = {
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         'gui': gui, 'QtBind': QtBind,
+        'get_config_dir': get_config_dir, 'get_character_data': get_character_data,
+        'get_position': get_position, 'get_monsters': get_monsters,
+        'set_training_script': set_training_script, 'set_training_position': set_training_position,
+        'start_bot': start_bot, 'stop_bot': stop_bot,
+        'create_notification': globals().get('create_notification', lambda x: log('[%s] %s' % (pName, x))),
+        'get_training_script': globals().get('get_training_script', lambda: None),
+        'time': time, 'os': os,
+        'cbEnabled': g.get('_hwt_cbEnabled'), 'cbP1': g.get('_hwt_cbP1'), 'cbP2': g.get('_hwt_cbP2'),
+        'cbP3': g.get('_hwt_cbP3'), 'cbP4': g.get('_hwt_cbP4'), 'cbP5': g.get('_hwt_cbP5'),
+        'cbP6': g.get('_hwt_cbP6'), 'cbP7': g.get('_hwt_cbP7'), 'cbP8': g.get('_hwt_cbP8'),
     }
     try:
         exec(code, namespace)
@@ -1222,6 +1245,13 @@ def _get_auto_hwt_namespace():
         return None
     _auto_hwt_namespace = namespace
     return _auto_hwt_namespace
+
+def _auto_hwt_call(name, *args, **kwargs):
+    ns = _get_auto_hwt_namespace()
+    if ns and name in ns:
+        fn = ns[name]
+        return fn(*args, **kwargs) if args or kwargs else fn()
+    return None
 
 # ______________________________ Oto Kervan (Tab 5 - GitHub'dan uzaktan) ______________________________ #
 _caravan_namespace = None
@@ -1980,23 +2010,136 @@ _add_tab3(QtBind.createLabel(gui, 'Script türünü seç, sonra Başlat', _gd_ti
 # Tab 3 butonlarını lisans korumasına ekle
 _protected_buttons[3] = [_btn_garden_wizz, _btn_garden_normal, _btn_garden_start, _btn_garden_stop]
 
-# Tab 4 - Auto Hwt
-_hwt_container_w = 380
-_hwt_container_h = 240
-_hwt_container_x = _tab_bar_x + (_tab_bar_w - _hwt_container_w) // 2
-_hwt_container_y = _content_y + 15
+# Tab 4 - Auto Hwt (SROMaster FGW & HWT tasarımı)
+_hwt_x = _tab_bar_x + 15
+_hwt_y = _content_y + 10
 
-_hwt_container = QtBind.createList(gui, _hwt_container_x, _hwt_container_y, _hwt_container_w, _hwt_container_h)
-_add_tab4(_hwt_container, _hwt_container_x, _hwt_container_y)
+_add_tab4(QtBind.createLabel(gui, '%s FGW / HWT v2.0' % pName, _hwt_x, _hwt_y), _hwt_x, _hwt_y)
 
-_hwt_title_x = _hwt_container_x + 20
-_hwt_title_y = _hwt_container_y + 15
+_hwt_cbEnabled = QtBind.createCheckBox(gui, 'hwt_cbx_toggle_enabled', 'Eklentiyi Etkinleştir (Ghost Curse Yoksayılır)', _hwt_x, _hwt_y + 25)
+_add_tab4(_hwt_cbEnabled, _hwt_x, _hwt_y + 25)
 
-_add_tab4(QtBind.createLabel(gui, 'Auto Hwt', _hwt_title_x, _hwt_title_y), _hwt_title_x, _hwt_title_y)
-_add_tab4(QtBind.createLabel(gui, 'Yakında eklenecek...', _hwt_title_x, _hwt_title_y + 30), _hwt_title_x, _hwt_title_y + 30)
+_add_tab4(QtBind.createLabel(gui, 'FGW / HWT Scriptleri (Eğitim scriptine yüklenecek):', _hwt_x, _hwt_y + 60), _hwt_x, _hwt_y + 60)
+_add_tab4(QtBind.createLabel(gui, 'PC Hesabı:', _hwt_x + 290, _hwt_y + 60), _hwt_x + 290, _hwt_y + 60)
 
-# Tab 4 butonları lisans korumasına (şu an boş; özellik eklenince eklenecek)
-_protected_buttons[4] = []
+_hwt_cbP1 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_1', '1', _hwt_x + 360, _hwt_y + 58)
+_hwt_cbP2 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_2', '2', _hwt_x + 390, _hwt_y + 58)
+_hwt_cbP3 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_3', '3', _hwt_x + 420, _hwt_y + 58)
+_hwt_cbP4 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_4', '4', _hwt_x + 450, _hwt_y + 58)
+_hwt_cbP5 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_5', '5', _hwt_x + 480, _hwt_y + 58)
+_hwt_cbP6 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_6', '6', _hwt_x + 510, _hwt_y + 58)
+_hwt_cbP7 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_7', '7', _hwt_x + 540, _hwt_y + 58)
+_hwt_cbP8 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_8', '8', _hwt_x + 570, _hwt_y + 58)
+QtBind.setChecked(gui, _hwt_cbP1, True)
+_add_tab4(_hwt_cbP1, _hwt_x + 360, _hwt_y + 58)
+_add_tab4(_hwt_cbP2, _hwt_x + 390, _hwt_y + 58)
+_add_tab4(_hwt_cbP3, _hwt_x + 420, _hwt_y + 58)
+_add_tab4(_hwt_cbP4, _hwt_x + 450, _hwt_y + 58)
+_add_tab4(_hwt_cbP5, _hwt_x + 480, _hwt_y + 58)
+_add_tab4(_hwt_cbP6, _hwt_x + 510, _hwt_y + 58)
+_add_tab4(_hwt_cbP7, _hwt_x + 540, _hwt_y + 58)
+_add_tab4(_hwt_cbP8, _hwt_x + 570, _hwt_y + 58)
+
+_hwt_btn_togui = QtBind.createButton(gui, 'hwt_btn_togui', 'Togui Köyü', _hwt_x, _hwt_y + 85)
+_hwt_btn_ship12 = QtBind.createButton(gui, 'hwt_btn_ship12', 'Gemi Enkazı 1-2★', _hwt_x + 120, _hwt_y + 85)
+_hwt_btn_ship34 = QtBind.createButton(gui, 'hwt_btn_ship34', 'Gemi Enkazı 3-4★', _hwt_x + 270, _hwt_y + 85)
+_hwt_btn_flame = QtBind.createButton(gui, 'hwt_btn_flame', 'Alev Dağı', _hwt_x + 420, _hwt_y + 85)
+_hwt_btn_hwt_beg = QtBind.createButton(gui, 'hwt_btn_hwt_beginner', 'HWT Başlangıç', _hwt_x, _hwt_y + 118)
+_hwt_btn_hwt_int = QtBind.createButton(gui, 'hwt_btn_hwt_intermediate', 'HWT Orta', _hwt_x + 120, _hwt_y + 118)
+_hwt_btn_hwt_adv = QtBind.createButton(gui, 'hwt_btn_hwt_advanced', 'HWT İleri', _hwt_x + 270, _hwt_y + 118)
+
+_add_tab4(_hwt_btn_togui, _hwt_x, _hwt_y + 85)
+_add_tab4(_hwt_btn_ship12, _hwt_x + 120, _hwt_y + 85)
+_add_tab4(_hwt_btn_ship34, _hwt_x + 270, _hwt_y + 85)
+_add_tab4(_hwt_btn_flame, _hwt_x + 420, _hwt_y + 85)
+_add_tab4(_hwt_btn_hwt_beg, _hwt_x, _hwt_y + 118)
+_add_tab4(_hwt_btn_hwt_int, _hwt_x + 120, _hwt_y + 118)
+_add_tab4(_hwt_btn_hwt_adv, _hwt_x + 270, _hwt_y + 118)
+
+_hwt_btn_download = QtBind.createButton(gui, 'hwt_btn_download', 'Scriptleri İndir', _hwt_x + 420, _hwt_y + 32)
+_add_tab4(_hwt_btn_download, _hwt_x + 420, _hwt_y + 32)
+
+_add_tab4(QtBind.createLabel(gui, 'Nasıl kullanılır SROMaster FGW Yöneticisi:', _hwt_x, _hwt_y + 165), _hwt_x, _hwt_y + 165)
+_add_tab4(QtBind.createLabel(gui, '1. Adım: "Scriptleri İndir" tuşuna basın', _hwt_x, _hwt_y + 185), _hwt_x, _hwt_y + 185)
+_add_tab4(QtBind.createLabel(gui, '2. Adım: İstediğiniz FGW butonuna basın (Togui / Gemi / Alev / HWT)', _hwt_x, _hwt_y + 203), _hwt_x, _hwt_y + 203)
+_add_tab4(QtBind.createLabel(gui, '3. Adım: PC Hesabı 1~8 seçin (takılmamak için her karakter kendi scripti)', _hwt_x, _hwt_y + 221), _hwt_x, _hwt_y + 221)
+_add_tab4(QtBind.createLabel(gui, '4. Adım: Attack Area etkin > Bot Başlat', _hwt_x, _hwt_y + 239), _hwt_x, _hwt_y + 239)
+
+# Tab 4 butonları lisans korumasına
+_protected_buttons[4] = [
+    _hwt_cbEnabled, _hwt_cbP1, _hwt_cbP2, _hwt_cbP3, _hwt_cbP4, _hwt_cbP5, _hwt_cbP6, _hwt_cbP7, _hwt_cbP8,
+    _hwt_btn_togui, _hwt_btn_ship12, _hwt_btn_ship34, _hwt_btn_flame, _hwt_btn_hwt_beg, _hwt_btn_hwt_int, _hwt_btn_hwt_adv, _hwt_btn_download
+]
+
+def hwt_cbx_toggle_enabled(checked):
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('cbx_toggle_enabled', checked)
+
+def hwt_cbx_slot_1(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 1)
+def hwt_cbx_slot_2(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 2)
+def hwt_cbx_slot_3(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 3)
+def hwt_cbx_slot_4(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 4)
+def hwt_cbx_slot_5(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 5)
+def hwt_cbx_slot_6(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 6)
+def hwt_cbx_slot_7(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 7)
+def hwt_cbx_slot_8(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 8)
+
+def hwt_btn_download():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_download_all_scripts')
+
+def hwt_btn_togui():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'Togui Köyü', 'Togui Village Forgotten World.txt', 'SCRIPT_TOGUI')
+
+def hwt_btn_ship12():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 1-2★', 'Ship Wreck 1-2 Stars Forgotten World.txt', 'SCRIPT_SHIP12')
+
+def hwt_btn_ship34():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 3-4★', 'Ship Wreck 3-4 Stars Forgotten World.txt', 'SCRIPT_SHIP34')
+
+def hwt_btn_flame():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'Alev Dağı', 'Flame Mountain Forgotten World.txt', 'SCRIPT_FLAME')
+
+def hwt_btn_hwt_beginner():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'HWT Başlangıç', 'Holy Water Temple Beginner.txt', 'SCRIPT_HWT_BEGINNER')
+
+def hwt_btn_hwt_intermediate():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'HWT Orta', 'Holy Water Temple Intermediate.txt', 'SCRIPT_HWT_INTERMEDIATE')
+
+def hwt_btn_hwt_advanced():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'HWT İleri', 'Holy Water Temple Advanced.txt', 'SCRIPT_HWT_ADVANCED')
 
 # Tab 5 - Oto Kervan (GitHub'dan script listesi, seçilen ile Başla/Durdur)
 _kervan_x = _tab_bar_x + 30
@@ -2950,6 +3093,10 @@ def event_loop():
     scm_ns = _get_script_command_maker_namespace()
     if scm_ns and 'event_loop' in scm_ns:
         scm_ns['event_loop']()
+    # Auto Hwt: FGW/HWT mob kontrolü, AttackArea geçişi
+    hwt_ns = _get_auto_hwt_namespace()
+    if hwt_ns and 'event_loop' in hwt_ns:
+        hwt_ns['event_loop']()
 
 def handle_silkroad(opcode, data):
     """Script Komutları: paket kaydı; Script-Command: C2S log"""
