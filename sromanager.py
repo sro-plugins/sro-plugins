@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.3'
+pVersion = '1.7.4'
 
 MOVE_DELAY = 0.25
 
@@ -1202,6 +1202,7 @@ def _get_auto_hwt_namespace():
     if _auto_hwt_namespace is not None:
         return _auto_hwt_namespace
     code = None
+    auto_hwt_path = None
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
     for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
         local_path = os.path.join(base, 'feature', 'auto_hwt.py')
@@ -1209,6 +1210,7 @@ def _get_auto_hwt_namespace():
             try:
                 with open(local_path, 'r', encoding='utf-8') as f:
                     code = f.read()
+                auto_hwt_path = local_path
                 break
             except Exception as ex:
                 log('[%s] [Auto Hwt] Yerel modül okunamadı: %s' % (pName, str(ex)))
@@ -1223,8 +1225,11 @@ def _get_auto_hwt_namespace():
         except Exception as ex:
             log('[%s] Auto Hwt modülü indirilemedi: %s' % (pName, str(ex)))
             return None
+    if auto_hwt_path is None:
+        auto_hwt_path = os.path.join(plugin_dir, 'feature', 'auto_hwt.py')
     g = globals()
     namespace = {
+        '__file__': auto_hwt_path,
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         'gui': gui, 'QtBind': QtBind,
         'get_config_dir': get_config_dir, 'get_character_data': get_character_data,
