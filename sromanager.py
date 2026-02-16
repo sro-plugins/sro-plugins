@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.13'
+pVersion = '1.7.14'
 
 MOVE_DELAY = 0.25
 
@@ -1232,13 +1232,14 @@ def _get_auto_hwt_namespace():
         '__file__': auto_hwt_path,
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         'gui': gui, 'QtBind': QtBind,
-        'get_config_dir': get_config_dir, 'get_character_data': get_character_data,
+        'get_config_dir': get_config_dir, 'get_config_path': get_config_path, 'get_character_data': get_character_data,
         'get_position': get_position, 'get_monsters': get_monsters,
+        'json': json,
         'set_training_script': set_training_script, 'set_training_position': set_training_position,
         'start_bot': start_bot, 'stop_bot': stop_bot,
         'create_notification': globals().get('create_notification', lambda x: log('[%s] %s' % (pName, x))),
         'get_training_script': globals().get('get_training_script', lambda: None),
-        'time': time, 'os': os,
+        'time': time, 'os': os, 'threading': threading,
         'cbEnabled': g.get('_hwt_cbEnabled'), 'cbP1': g.get('_hwt_cbP1'), 'cbP2': g.get('_hwt_cbP2'),
         'cbP3': g.get('_hwt_cbP3'), 'cbP4': g.get('_hwt_cbP4'), 'cbP5': g.get('_hwt_cbP5'),
         'cbP6': g.get('_hwt_cbP6'), 'cbP7': g.get('_hwt_cbP7'), 'cbP8': g.get('_hwt_cbP8'),
@@ -2070,10 +2071,20 @@ _add_tab4(QtBind.createLabel(gui, '2. Adım: İstediğiniz FGW butonuna basın (
 _add_tab4(QtBind.createLabel(gui, '3. Adım: PC Hesabı 1~8 seçin (takılmamak için her karakter kendi scripti)', _hwt_x, _hwt_y + 221), _hwt_x, _hwt_y + 221)
 _add_tab4(QtBind.createLabel(gui, '4. Adım: Attack Area etkin > Bot Başlat', _hwt_x, _hwt_y + 239), _hwt_x, _hwt_y + 239)
 
+# Multi-PC Config Sync (sc/sync_config.json, 2. PC 5 sn aralıkla 5 deneme)
+_hwt_sync_y = _hwt_y + 265
+_add_tab4(QtBind.createLabel(gui, 'Config Sync:', _hwt_x, _hwt_sync_y), _hwt_x, _hwt_sync_y)
+_hwt_btn_sync_upload = QtBind.createButton(gui, 'hwt_btn_sync_upload', '  Yükle (1. PC)  ', _hwt_x, _hwt_sync_y + 22)
+_hwt_btn_sync_download = QtBind.createButton(gui, 'hwt_btn_sync_download', '  İndir (2. PC)  ', _hwt_x + 160, _hwt_sync_y + 22)
+_add_tab4(_hwt_btn_sync_upload, _hwt_x, _hwt_sync_y + 22)
+_add_tab4(_hwt_btn_sync_download, _hwt_x + 160, _hwt_sync_y + 22)
+_add_tab4(QtBind.createLabel(gui, 'Config sc/sync_config.json olarak kaydedilir. İndir: 5 sn arayla 5 deneme.', _hwt_x, _hwt_sync_y + 48), _hwt_x, _hwt_sync_y + 48)
+
 # Tab 4 butonları lisans korumasına
 _protected_buttons[4] = [
     _hwt_cbEnabled, _hwt_cbP1, _hwt_cbP2, _hwt_cbP3, _hwt_cbP4, _hwt_cbP5, _hwt_cbP6, _hwt_cbP7, _hwt_cbP8,
-    _hwt_btn_togui, _hwt_btn_ship12, _hwt_btn_ship34, _hwt_btn_flame, _hwt_btn_hwt_beg, _hwt_btn_hwt_int, _hwt_btn_hwt_adv, _hwt_btn_download
+    _hwt_btn_togui, _hwt_btn_ship12, _hwt_btn_ship34, _hwt_btn_flame, _hwt_btn_hwt_beg, _hwt_btn_hwt_int, _hwt_btn_hwt_adv, _hwt_btn_download,
+    _hwt_btn_sync_upload, _hwt_btn_sync_download
 ]
 
 def hwt_cbx_toggle_enabled(checked):
@@ -2110,6 +2121,16 @@ def hwt_btn_download():
     if not _is_license_valid():
         return
     _auto_hwt_call('_download_all_scripts')
+
+def hwt_btn_sync_upload():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('config_sync_upload')
+
+def hwt_btn_sync_download():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('config_sync_download')
 
 def hwt_btn_togui():
     if not _is_license_valid():

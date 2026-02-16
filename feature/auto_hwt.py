@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Auto Hwt (Tab 4) - SROMaster FGW & HWT mantığı, UI sromanager'da.
-# Enjekte: gui, QtBind, log, pName, get_config_dir, get_position, get_monsters,
+# Enjekte: gui, QtBind, log, pName, get_config_dir, get_config_path, get_position, get_monsters,
 # set_training_script, set_training_position, start_bot, stop_bot,
-# create_notification, get_training_script, time, os, _is_license_valid,
+# create_notification, get_training_script, time, os, json, threading, _is_license_valid,
 # cbEnabled, cbP1..cbP8
 
 # FGW klasörü: Config/SROManager/FGW_<PC>/ - Her bilgisayar kendi klasörünü kullanır (2+ PC çakışması önlenir)
@@ -313,3 +313,157 @@ def event_loop():
                 pass
         _current_state = 'fgw'
         start_bot()
+
+
+# ______________________________ Config Sync (sc/ klasörüne kayıt, 5x5 sn retry) ______________________________ #
+CONFIG_SYNC_RETRY_COUNT = 5
+CONFIG_SYNC_RETRY_DELAY = 5.0
+
+def _get_sc_sync_folder():
+    """Plugin sc/ klasörü yolu (sromanager ile aynı seviye)."""
+    try:
+        plugin_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(plugin_dir, 'sc')
+    except Exception:
+        return None
+
+CONFIG_SYNC_FILENAME = 'sync_config.json'
+
+def _get_sc_sync_file_path():
+    """sc/sync_config.json dosya yolu - parti ID yok, tek dosya."""
+    folder = _get_sc_sync_folder()
+    if not folder:
+        return None
+    return os.path.join(folder, CONFIG_SYNC_FILENAME)
+
+def config_sync_read_with_retry():
+    """
+    sc/ klasöründen sync config'i okur. Bulamazsa 5 sn arayla toplam 5 deneme.
+    Başarılı: (cfg_dict, True), Hata: (None, False) + log
+    """
+    path = _get_sc_sync_file_path()
+    if not path:
+        log('[%s] [Config Sync] sc klasörü bulunamadı.' % pName)
+        return (None, False)
+    for attempt in range(1, CONFIG_SYNC_RETRY_COUNT + 1):
+        try:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                if attempt > 1:
+                    log('[%s] [Config Sync] Config bulundu (%d. deneme): %s' % (pName, attempt, path))
+                return (cfg, True)
+        except Exception as e:
+            log('[%s] [Config Sync] Okuma hatası (%d. deneme): %s' % (pName, attempt, e))
+        if attempt < CONFIG_SYNC_RETRY_COUNT:
+            log('[%s] [Config Sync] Config bulunamadı, %d sn sonra tekrar deneniyor (%d/%d)...' % (
+                pName, int(CONFIG_SYNC_RETRY_DELAY), attempt, CONFIG_SYNC_RETRY_COUNT))
+            time.sleep(CONFIG_SYNC_RETRY_DELAY)
+    log('[%s] [Config Sync] HATA: Config %d denemeden sonra bulunamadı: %s' % (pName, CONFIG_SYNC_RETRY_COUNT, path))
+    log('[%s] [Config Sync] 1. PC\'de "Yükle" yapıldığından emin olun. sc/ klasörü paylaşılıyor olmalı.' % pName)
+    return (None, False)
+
+def _remap_config_paths_for_this_pc(cfg):
+    """
+    Config içindeki FGW ve diğer PC'ye özel path'leri bu PC'ye uyarlar.
+    Böylece 1. PC'den indirilen config 2. PC'de doğru path'lerle çalışır.
+    """
+    if not cfg or not isinstance(cfg, dict):
+        return cfg
+    current_fgw = _get_fgw_folder()
+    current_pc = _get_pc_id()
+    # Loop.Script altındaki Path alanları
+    loop = cfg.get('Loop')
+    if isinstance(loop, dict):
+        script_cfg = loop.get('Script')
+        if isinstance(script_cfg, dict):
+            for area_name, area_data in list(script_cfg.items()):
+                if not isinstance(area_data, dict):
+                    continue
+                path_val = area_data.get('Path')
+                if path_val and isinstance(path_val, str) and 'FGW_' in path_val:
+                    # Sadece FGW dosya adını al, mevcut FGW klasörüne bağla
+                    fname = path_val.replace('/', os.sep).split(os.sep)[-1]
+                    area_data['Path'] = current_fgw + fname
+        # SkipTownScript vb. path içerebilir
+        for key in ('SkipTownScript', 'SkipTown', 'NoTownScript'):
+            val = loop.get(key)
+            if isinstance(val, dict) and val.get('Path'):
+                p = val['Path']
+                if p and 'FGW_' in p:
+                    fname = p.replace('/', os.sep).split(os.sep)[-1]
+                    val['Path'] = current_fgw + fname
+    # FGW_XXX pattern'ini her yerde değiştir (nested dict'lerde)
+    def _remap_recursive(obj):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k == 'Path' and isinstance(v, str) and 'FGW_' in v:
+                    fname = v.replace('/', os.sep).split(os.sep)[-1]
+                    obj[k] = current_fgw + fname
+                else:
+                    _remap_recursive(v)
+        elif isinstance(obj, list):
+            for i, x in enumerate(obj):
+                _remap_recursive(x)
+    _remap_recursive(cfg)
+    return cfg
+
+def config_sync_upload():
+    """
+    Mevcut config'i sc/ klasörüne yükler. 1. PC'de çalıştırılır.
+    Dosya: sc/sync_config.json
+    """
+    cfg_path = get_config_path()
+    if not cfg_path or not os.path.exists(cfg_path):
+        log('[%s] [Config Sync] Config dosyası bulunamadı. Oyuna giriş yapıp tekrar deneyin.' % pName)
+        return False
+    sc_folder = _get_sc_sync_folder()
+    if not sc_folder:
+        log('[%s] [Config Sync] sc klasörü bulunamadı.' % pName)
+        return False
+    try:
+        with open(cfg_path, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+        cfg['_sync_meta'] = {
+            'source_pc': _get_pc_id(),
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+        }
+        if not os.path.isdir(sc_folder):
+            os.makedirs(sc_folder, exist_ok=True)
+            log('[%s] [Config Sync] sc klasörü oluşturuldu: %s' % (pName, sc_folder))
+        out_path = _get_sc_sync_file_path()
+        with open(out_path, 'w', encoding='utf-8', newline='\n') as f:
+            json.dump(cfg, f, indent=4, ensure_ascii=False)
+        log('[%s] [Config Sync] Config sc/ klasörüne yüklendi: %s' % (pName, out_path))
+        return True
+    except Exception as e:
+        log('[%s] [Config Sync] Upload hatası: %s' % (pName, e))
+        return False
+
+def _config_sync_download_worker():
+    """Thread'de çalışır; UI bloke olmaz."""
+    cfg, ok = config_sync_read_with_retry()
+    if not ok or not cfg:
+        return
+    cfg_path = get_config_path()
+    if not cfg_path:
+        log('[%s] [Config Sync] Config yolu alınamadı. Oyuna giriş yapıp tekrar deneyin.' % pName)
+        return
+    try:
+        meta = cfg.pop('_sync_meta', {})
+        log('[%s] [Config Sync] Kaynak: %s, Zaman: %s' % (pName, meta.get('source_pc', '?'), meta.get('timestamp', '?')))
+        cfg = _remap_config_paths_for_this_pc(cfg)
+        with open(cfg_path, 'w', encoding='utf-8', newline='\n') as f:
+            json.dump(cfg, f, indent=4, ensure_ascii=False)
+        log('[%s] [Config Sync] Config indirildi ve uygulandı. Path\'ler bu PC\'ye uyarlandı.' % pName)
+        log('[%s] [Config Sync] Gerekirse "Scriptleri İndir" ile FGW scriptlerini oluşturun, ardından Bot Başlat.' % pName)
+    except Exception as e:
+        log('[%s] [Config Sync] Download hatası: %s' % (pName, e))
+
+def config_sync_download():
+    """
+    sc/ klasöründen config indirir (5 sn arayla 5 deneme, thread'de). 2. PC'de çalıştırılır.
+    """
+    t = threading.Thread(target=_config_sync_download_worker, daemon=True)
+    t.start()
+    log('[%s] [Config Sync] İndirme başlatıldı (arka planda, 5 sn arayla 5 deneme).' % pName)
