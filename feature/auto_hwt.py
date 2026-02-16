@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
 # Auto Hwt (Tab 4) - SROMaster FGW & HWT mantığı, UI sromanager'da.
-# Enjekte: gui, QtBind, log, pName, get_config_dir, get_position, get_monsters,
-# set_training_script, set_training_position, start_bot, stop_bot,
-# create_notification, get_training_script, time, os, _is_license_valid,
-# cbEnabled, cbP1..cbP8
+# Scriptler: GitHub sc/ klasöründen indirilir (İndir butonu) veya yerel sc/ kullanılır.
+# Attack Area 1-8: Config/SROManager/FGW_<PC>/ - Her PC kendi klasörüne yazar (4 PC çakışmasız).
+# Enjekte: gui, QtBind, log, pName, get_config_dir, plugin_dir, urllib,
+# GITHUB_FGW_RAW_TEMPLATE, GITHUB_FGW_SCRIPT_FILENAMES,
+# get_position, get_monsters, set_training_script, set_training_position, start_bot, stop_bot,
+# create_notification, get_training_script, time, os, _is_license_valid, cbEnabled, cbP1..cbP8
 
-# FGW klasörü: Config/SROManager/FGW_<PC>/ - Her bilgisayar kendi klasörünü kullanır (2+ PC çakışması önlenir)
 def _get_pc_id():
-    """Bilgisayar adı - 2 PC'de aynı config kullanılırsa her biri kendi FGW klasörüne yazar."""
+    """Bilgisayar adı - 4 PC'de her biri kendi FGW klasörüne yazar."""
     try:
         return os.environ.get('COMPUTERNAME', os.environ.get('HOSTNAME', 'PC1'))
     except Exception:
         return 'PC1'
 
+def _get_sc_folder():
+    """Script klasörü: plugin_dir/sc/ - GitHub ile senkron, sabit path yok."""
+    return os.path.join(plugin_dir, 'sc')
+
 def _get_fgw_folder():
+    """Attack Area klasörü: Config/SROManager/FGW_<PC>/ - PC bazlı (4 PC uyumlu)."""
     cfg = get_config_dir()
     pc_id = _get_pc_id()
     if cfg:
@@ -22,13 +28,26 @@ def _get_fgw_folder():
         base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return base + os.sep + 'FGW_' + pc_id + os.sep
 
-FGW_FOLDER = None  # init below
+SC_FOLDER = None
+FGW_FOLDER = None
+
 ATTACKAREA_FILENAMES = [
     "FGW Attack Area1.txt", "FGW Attack Area2.txt", "FGW Attack Area3.txt", "FGW Attack Area4.txt",
     "FGW Attack Area5.txt", "FGW Attack Area6.txt", "FGW Attack Area7.txt", "FGW Attack Area8.txt",
 ]
 ATTACKAREA_FILENAME = ATTACKAREA_FILENAMES[0]
 DYNAMIC_ATTACK_FILENAME = "FGW_DYNAMIC_ATTACKAREA.txt"
+
+# Script dosya eşlemesi (display_name -> filename)
+FGW_SCRIPT_MAP = [
+    ('Togui Köyü', 'Togui Village Forgotten World.txt', 'SCRIPT_TOGUI'),
+    ('Gemi Enkazı 1-2★', 'Ship Wreck 1-2 Stars Forgotten World.txt', 'SCRIPT_SHIP12'),
+    ('Gemi Enkazı 3-4★', 'Ship Wreck 3-4 Stars Forgotten World.txt', 'SCRIPT_SHIP34'),
+    ('Alev Dağı', 'Flame Mountain Forgotten World.txt', 'SCRIPT_FLAME'),
+    ('HWT Başlangıç', 'Holy Water Temple Beginner.txt', 'SCRIPT_HWT_BEGINNER'),
+    ('HWT Orta', 'Holy Water Temple Intermediate.txt', 'SCRIPT_HWT_INTERMEDIATE'),
+    ('HWT İleri', 'Holy Water Temple Advanced.txt', 'SCRIPT_HWT_ADVANCED'),
+]
 
 _my_slot = 1
 _last_fgw_script_path = None
@@ -42,64 +61,6 @@ IGNORE_MONSTER_SUBSTR = (
     'bastet', 'keisas', 'mhont', 'lightning khepri', 'demon bug'
 )
 
-# Script sabitleri: SROMaster/auto_hwt_scripts dosyasından metin olarak parse et
-def _parse_script_file(path):
-    """Dosyadan SCRIPT_X = \"\"\"...\"\"\" bloklarını parse eder."""
-    out = {}
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            s = f.read()
-    except Exception:
-        return out
-    i = 0
-    while True:
-        beg = s.find('SCRIPT_', i)
-        if beg < 0:
-            break
-        eq = s.find('=', beg)
-        if eq < 0 or eq - beg > 30:
-            i = beg + 1
-            continue
-        tq = s.find('"""', eq + 1)
-        if tq < 0:
-            i = beg + 1
-            continue
-        name = s[beg:eq].strip().rstrip('= ')
-        end = s.find('"""', tq + 3)
-        if end < 0:
-            break
-        content = s[tq + 3:end].strip()
-        if name.startswith('SCRIPT_') and content and len(content) > 10:
-            out[name] = content
-        i = end + 3
-    return out
-
-def _load_scripts():
-    base = os.path.dirname(os.path.abspath(__file__))
-    parent = os.path.dirname(base)
-    paths = [
-        os.path.join(base, 'auto_hwt_scripts.py'),
-        os.path.join(parent, 'feature', 'auto_hwt_scripts.py'),
-        r'C:\Users\Burakcan\Downloads\SROCAVE OTO FGW HWT 2026 (1)\SROMaster FGW & HWT.py',
-    ]
-    for p in paths:
-        if os.path.exists(p):
-            r = _parse_script_file(p)
-            if r:
-                return r
-    return {}
-
-SCRIPT_TOGUI = "walk,0,0,0\n"
-SCRIPT_SHIP12 = "walk,0,0,0\n"
-SCRIPT_SHIP34 = "walk,0,0,0\n"
-SCRIPT_FLAME = "walk,0,0,0\n"
-SCRIPT_HWT_BEGINNER = "walk,0,0,0\nteleport,Pharaoh tomb (beginner),Kings Valley\ninject,0x7061,00\n"
-SCRIPT_HWT_INTERMEDIATE = "walk,0,0,0\nteleport,Pharaoh tomb (intermediate),Kings Valley\ninject,0x7061,00\n"
-SCRIPT_HWT_ADVANCED = "walk,0,0,0\nteleport,Pharaoh tomb (advance),Kings Valley\ninject,0x7061,00\n"
-for k, v in _load_scripts().items():
-    if v and len(v) > 20:
-        globals()[k] = v
-
 def _set_slot(n):
     global _my_slot
     _my_slot = int(n)
@@ -112,6 +73,15 @@ def cbx_toggle_enabled(checked):
     _pluginEnabled = bool(checked)
     log('[%s] AttackArea mantığı %s' % (pName, 'AÇIK' if _pluginEnabled else 'KAPALI'))
 
+def _ensure_sc_folder():
+    global SC_FOLDER
+    if SC_FOLDER is None:
+        SC_FOLDER = _get_sc_folder()
+    try:
+        os.makedirs(SC_FOLDER, exist_ok=True)
+    except Exception as e:
+        log('[%s] sc klasörü oluşturulamadı %s: %s' % (pName, SC_FOLDER, e))
+
 def _ensure_fgw_folder():
     global FGW_FOLDER
     if FGW_FOLDER is None:
@@ -119,26 +89,34 @@ def _ensure_fgw_folder():
     try:
         os.makedirs(FGW_FOLDER, exist_ok=True)
     except Exception as e:
-        log('[%s] Klasör oluşturulamadı %s: %s' % (pName, FGW_FOLDER, e))
+        log('[%s] FGW klasörü oluşturulamadı %s: %s' % (pName, FGW_FOLDER, e))
 
-def _save_script_to_file(display_name, filename, content):
-    if not content or not content.strip():
-        log('[%s] Script boş: %s' % (pName, display_name))
-        return None
-    _ensure_fgw_folder()
-    path = os.path.join(FGW_FOLDER, filename)
+def _download_script_from_github(filename):
+    """GitHub'dan tek script indirir, sc/ klasörüne kaydeder. Başarılıysa path döner."""
+    _ensure_sc_folder()
+    from urllib.parse import quote
+    encoded = quote(filename, safe='')
+    url = GITHUB_FGW_RAW_TEMPLATE % encoded
+    dest = os.path.join(SC_FOLDER, filename)
     try:
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write(content.strip() + '\n')
-        log('[%s] Kaydedildi: %s' % (pName, path))
-        return path
+        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            content = r.read()
+        if not content or len(content) < 50:
+            return None
+        with open(dest, 'wb') as f:
+            f.write(content)
+        log('[%s] İndirildi: %s' % (pName, filename))
+        return dest
     except Exception as e:
-        log('[%s] Yazma hatası %s: %s' % (pName, path, e))
+        log('[%s] İndirme hatası (%s): %s' % (pName, filename, str(e)))
         return None
 
 def _write_empty_file(full_path):
     try:
-        _ensure_fgw_folder()
+        dirp = os.path.dirname(full_path)
+        if dirp and not os.path.exists(dirp):
+            os.makedirs(dirp, exist_ok=True)
         with open(full_path, 'w', encoding='utf-8') as f:
             f.write('')
         return True
@@ -146,49 +124,48 @@ def _write_empty_file(full_path):
         log('[%s] Boş dosya yazılamadı %s: %s' % (pName, full_path, e))
         return False
 
-def _ensure_attackarea_files():
+def _download_all_scripts():
+    """GitHub'dan FGW scriptlerini sc/'ye indirir; Attack Area dosyalarını FGW_<PC>/'ye oluşturur."""
+    _ensure_sc_folder()
     _ensure_fgw_folder()
+    count = 0
+
+    for disp, filename, _ in FGW_SCRIPT_MAP:
+        if _download_script_from_github(filename):
+            count += 1
+
     for fn in ATTACKAREA_FILENAMES:
         p = os.path.join(FGW_FOLDER, fn)
         if not os.path.exists(p):
-            _write_empty_file(p)
+            if _write_empty_file(p):
+                count += 1
 
-def _download_all_scripts():
-    _ensure_fgw_folder()
-    count = 0
-    maps = [
-        ('Togui Köyü', 'Togui Village Forgotten World.txt', 'SCRIPT_TOGUI'),
-        ('Gemi Enkazı 1-2★', 'Ship Wreck 1-2 Stars Forgotten World.txt', 'SCRIPT_SHIP12'),
-        ('Gemi Enkazı 3-4★', 'Ship Wreck 3-4 Stars Forgotten World.txt', 'SCRIPT_SHIP34'),
-        ('Alev Dağı', 'Flame Mountain Forgotten World.txt', 'SCRIPT_FLAME'),
-        ('HWT Başlangıç', 'Holy Water Temple Beginner.txt', 'SCRIPT_HWT_BEGINNER'),
-        ('HWT Orta', 'Holy Water Temple Intermediate.txt', 'SCRIPT_HWT_INTERMEDIATE'),
-        ('HWT İleri', 'Holy Water Temple Advanced.txt', 'SCRIPT_HWT_ADVANCED'),
-    ]
-    for disp, fname, var in maps:
-        c = globals().get(var, '')
-        if c and _save_script_to_file(disp, fname, c):
-            count += 1
-    _ensure_attackarea_files()
-    for fn in ATTACKAREA_FILENAMES:
-        if _write_empty_file(os.path.join(FGW_FOLDER, fn)):
-            count += 1
-    log('[%s] %d script indirildi: %s' % (pName, count, FGW_FOLDER))
+    log('[%s] %d script hazır. sc: %s | FGW: %s' % (pName, count, SC_FOLDER, FGW_FOLDER))
+    create_notification('FGW: Scriptler hazır')
 
-def _ensure_script_file(display_name, filename, script_var_name):
-    _ensure_fgw_folder()
-    path = os.path.join(FGW_FOLDER, filename)
-    if os.path.exists(path):
+def _get_fgw_script_path(filename):
+    """sc/ klasöründe script var mı kontrol eder. Varsa path, yoksa None."""
+    _ensure_sc_folder()
+    path = os.path.join(SC_FOLDER, filename)
+    return path if os.path.exists(path) and os.path.getsize(path) > 50 else None
+
+def _ensure_script_file(display_name, filename, _fallback_var=None):
+    """
+    Script dosyasının mevcut olduğundan emin olur. Önce sc/'de arar, yoksa GitHub'dan indirir.
+    Fallback: GitHub başarısızsa gömülü içerik kullanılabilir (opsiyonel).
+    """
+    path = _get_fgw_script_path(filename)
+    if path:
         return path
-    content = globals().get(script_var_name, '')
-    if not content or not content.strip():
-        log('[%s] Gömülü script yok: %s' % (pName, script_var_name))
-        return None
-    return _save_script_to_file(display_name, filename, content)
+    path = _download_script_from_github(filename)
+    if path:
+        return path
+    log('[%s] Script bulunamadı/indirilemedi: %s' % (pName, display_name))
+    return None
 
-def _set_training_script_from_file(display_name, filename, script_var_name):
+def _set_training_script_from_file(display_name, filename, _fallback_var=None):
     global _last_fgw_script_path, _current_state
-    path = _ensure_script_file(display_name, filename, script_var_name)
+    path = _ensure_script_file(display_name, filename, _fallback_var)
     if not path:
         return
     try:
@@ -236,6 +213,13 @@ def _attackarea_path_for_slot(slot):
         slot = 1
     return os.path.join(FGW_FOLDER, ATTACKAREA_FILENAMES[slot - 1])
 
+def _ensure_attackarea_files():
+    _ensure_fgw_folder()
+    for fn in ATTACKAREA_FILENAMES:
+        p = os.path.join(FGW_FOLDER, fn)
+        if not os.path.exists(p):
+            _write_empty_file(p)
+
 def _is_ignored_monster(name):
     if not name:
         return False
@@ -279,6 +263,7 @@ def event_loop():
     _last_check = now
     valid = _get_valid_monsters()
     has_mobs = len(valid) > 0
+
     if has_mobs and _current_state != 'attack':
         stop_bot()
         attack_path = _attackarea_path_for_slot(_my_slot)
@@ -298,6 +283,7 @@ def event_loop():
         _current_state = 'attack'
         start_bot()
         return
+
     if not has_mobs and _current_state == 'attack':
         stop_bot()
         if _last_fgw_script_path:
@@ -313,5 +299,3 @@ def event_loop():
                 pass
         _current_state = 'fgw'
         start_bot()
-
-

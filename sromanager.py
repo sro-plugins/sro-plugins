@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.14'
+pVersion = '1.7.16'
 
 MOVE_DELAY = 0.25
 
@@ -73,6 +73,13 @@ GITHUB_SCRIPT_COMMAND_MAKER_URL = 'https://raw.githubusercontent.com/%s/main/fea
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
+# Auto Hwt (FGW/HWT): GitHub sc/ klasöründeki scriptler
+GITHUB_FGW_RAW_TEMPLATE = 'https://raw.githubusercontent.com/%s/main/sc/%s' % (GITHUB_REPO, '%s')
+GITHUB_FGW_SCRIPT_FILENAMES = [
+    'Togui Village Forgotten World.txt', 'Ship Wreck 1-2 Stars Forgotten World.txt',
+    'Ship Wreck 3-4 Stars Forgotten World.txt', 'Flame Mountain Forgotten World.txt',
+    'Holy Water Temple Beginner.txt', 'Holy Water Temple Intermediate.txt', 'Holy Water Temple Advanced.txt',
+]
 # Oto Kervan: GitHub'daki karavan scriptleri klasörü (API ile liste, raw ile indirme)
 # GitHub'da klasör yoksa veya 404 alırsa yerel "caravan" klasörü kullanılır (plugin yanında).
 GITHUB_CARAVAN_FOLDER = 'caravan'
@@ -1238,7 +1245,10 @@ def _get_auto_hwt_namespace():
         'start_bot': start_bot, 'stop_bot': stop_bot,
         'create_notification': globals().get('create_notification', lambda x: log('[%s] %s' % (pName, x))),
         'get_training_script': globals().get('get_training_script', lambda: None),
-        'time': time, 'os': os,
+        'time': time, 'os': os, 'urllib': __import__('urllib'),
+        'plugin_dir': plugin_dir,
+        'GITHUB_FGW_RAW_TEMPLATE': GITHUB_FGW_RAW_TEMPLATE,
+        'GITHUB_FGW_SCRIPT_FILENAMES': GITHUB_FGW_SCRIPT_FILENAMES,
         'cbEnabled': g.get('_hwt_cbEnabled'), 'cbP1': g.get('_hwt_cbP1'), 'cbP2': g.get('_hwt_cbP2'),
         'cbP3': g.get('_hwt_cbP3'), 'cbP4': g.get('_hwt_cbP4'), 'cbP5': g.get('_hwt_cbP5'),
         'cbP6': g.get('_hwt_cbP6'), 'cbP7': g.get('_hwt_cbP7'), 'cbP8': g.get('_hwt_cbP8'),

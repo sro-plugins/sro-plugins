@@ -20,8 +20,8 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.7.14',
-    'name': 'v1.7.14 - Config Sync kaldırıldı',
+    'tag_name': 'v1.7.16',
+    'name': 'v1.7.16 - FGW/HWT sc/ GitHub entegrasyonu',
     'body': release_notes,
     'draft': False,
     'prerelease': False

@@ -1,3 +1,12 @@
+## v1.7.16 (Auto Hwt - FGW/HWT sc/ GitHub entegrasyonu)
+
+### Değişiklikler
+- **FGW/HWT scriptleri GitHub sc/ klasöründe**: Togui, Gemi, Alev, HWT scriptleri repoda
+- **Scriptleri İndir**: GitHub'dan sc/'ye indirir (sabit path yok)
+- **4 PC uyumlu**: Attack Area FGW_<PC>/ ile her PC kendi klasörüne yazar
+
+---
+
 ## v1.7.14 (Auto Hwt - Config Sync kaldırıldı)
 
 ### Değişiklikler
