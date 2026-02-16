@@ -247,9 +247,11 @@ def _set_training_script_from_file(display_name, filename, script_var_name):
         log('[%s] Script ayarlama hatası: %s' % (pName, e))
 
 def _write_attackarea_walk(path, x, y, z):
+    """walk + AttackArea - karakter konumunda saldırı."""
     try:
         with open(path, 'w', encoding='utf-8') as f:
             f.write('walk,%d,%d,%d\n' % (int(x), int(y), int(z)))
+            f.write('AttackArea,100\n')
         return True
     except Exception as e:
         log('[%s] AttackArea yazma hatası: %s' % (pName, e))
@@ -329,16 +331,22 @@ def event_loop():
         stop_bot()
         attack_path = _attackarea_path_for_slot(_my_slot)
         _ensure_attackarea_files()
-        try:
-            set_training_script(attack_path)
-        except Exception:
-            pass
-        mpos = _get_nearest_monster_position()
-        if mpos:
-            region, x, y, z = mpos
-            _write_attackarea_walk(attack_path, x, y, z)
+        # Karakterin BULUNDUĞU noktayı kullan (phBot "alanından uzaktasın" hatasını önler)
+        pos = get_position()
+        if pos:
             try:
+                region = int(pos.get('region', 0))
+                x = float(pos.get('x', 0))
+                y = float(pos.get('y', 0))
+                z = float(pos.get('z', 0))
+                _write_attackarea_walk(attack_path, x, y, z)
+                set_training_script(attack_path)
                 set_training_position(region, x, y, z)
+            except Exception:
+                pass
+        else:
+            try:
+                set_training_script(attack_path)
             except Exception:
                 pass
         _current_state = 'attack'
