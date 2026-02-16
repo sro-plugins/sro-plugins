@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.8'
+pVersion = '1.7.9'
 
 MOVE_DELAY = 0.25
 
@@ -1242,7 +1242,7 @@ def _get_auto_hwt_namespace():
         'cbEnabled': g.get('_hwt_cbEnabled'), 'cbP1': g.get('_hwt_cbP1'), 'cbP2': g.get('_hwt_cbP2'),
         'cbP3': g.get('_hwt_cbP3'), 'cbP4': g.get('_hwt_cbP4'), 'cbP5': g.get('_hwt_cbP5'),
         'cbP6': g.get('_hwt_cbP6'), 'cbP7': g.get('_hwt_cbP7'), 'cbP8': g.get('_hwt_cbP8'),
-        'cmbPC': g.get('_hwt_cmbPC'),
+        'cbPC1': g.get('_hwt_cbPC1'), 'cbPC2': g.get('_hwt_cbPC2'), 'cbPC3': g.get('_hwt_cbPC3'), 'cbPC4': g.get('_hwt_cbPC4'),
     }
     try:
         exec(code, namespace)
@@ -2026,14 +2026,16 @@ _hwt_cbEnabled = QtBind.createCheckBox(gui, 'hwt_cbx_toggle_enabled', 'Eklentiyi
 _add_tab4(_hwt_cbEnabled, _hwt_x, _hwt_y + 25)
 
 _add_tab4(QtBind.createLabel(gui, 'FGW / HWT Scriptleri (Eğitim scriptine yüklenecek):', _hwt_x, _hwt_y + 60), _hwt_x, _hwt_y + 60)
-_add_tab4(QtBind.createLabel(gui, 'Bilgisayar No (2. PC = 2 seç):', _hwt_x + 260, _hwt_y + 42), _hwt_x + 260, _hwt_y + 42)
-_hwt_cmbPC = QtBind.createCombobox(gui, _hwt_x + 390, _hwt_y + 38, 50, 22)
-QtBind.append(gui, _hwt_cmbPC, '1')
-QtBind.append(gui, _hwt_cmbPC, '2')
-QtBind.append(gui, _hwt_cmbPC, '3')
-QtBind.append(gui, _hwt_cmbPC, '4')
-QtBind.setIndex(gui, _hwt_cmbPC, 0)
-_add_tab4(_hwt_cmbPC, _hwt_x + 390, _hwt_y + 38)
+_add_tab4(QtBind.createLabel(gui, 'Bilgisayar No (2. PC=2 tikla):', _hwt_x + 255, _hwt_y + 42), _hwt_x + 255, _hwt_y + 42)
+_hwt_cbPC1 = QtBind.createCheckBox(gui, 'hwt_cbx_pc_1', '1', _hwt_x + 380, _hwt_y + 40)
+_hwt_cbPC2 = QtBind.createCheckBox(gui, 'hwt_cbx_pc_2', '2', _hwt_x + 410, _hwt_y + 40)
+_hwt_cbPC3 = QtBind.createCheckBox(gui, 'hwt_cbx_pc_3', '3', _hwt_x + 440, _hwt_y + 40)
+_hwt_cbPC4 = QtBind.createCheckBox(gui, 'hwt_cbx_pc_4', '4', _hwt_x + 470, _hwt_y + 40)
+QtBind.setChecked(gui, _hwt_cbPC1, True)
+_add_tab4(_hwt_cbPC1, _hwt_x + 380, _hwt_y + 40)
+_add_tab4(_hwt_cbPC2, _hwt_x + 410, _hwt_y + 40)
+_add_tab4(_hwt_cbPC3, _hwt_x + 440, _hwt_y + 40)
+_add_tab4(_hwt_cbPC4, _hwt_x + 470, _hwt_y + 40)
 _add_tab4(QtBind.createLabel(gui, 'PC Hesabı:', _hwt_x + 290, _hwt_y + 60), _hwt_x + 290, _hwt_y + 60)
 
 _hwt_cbP1 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_1', '1', _hwt_x + 360, _hwt_y + 58)
@@ -2081,9 +2083,22 @@ _add_tab4(QtBind.createLabel(gui, '4. Adım: Attack Area etkin > Bot Başlat', _
 
 # Tab 4 butonları lisans korumasına
 _protected_buttons[4] = [
-    _hwt_cbEnabled, _hwt_cmbPC, _hwt_cbP1, _hwt_cbP2, _hwt_cbP3, _hwt_cbP4, _hwt_cbP5, _hwt_cbP6, _hwt_cbP7, _hwt_cbP8,
+    _hwt_cbEnabled, _hwt_cbPC1, _hwt_cbPC2, _hwt_cbPC3, _hwt_cbPC4, _hwt_cbP1, _hwt_cbP2, _hwt_cbP3, _hwt_cbP4, _hwt_cbP5, _hwt_cbP6, _hwt_cbP7, _hwt_cbP8,
     _hwt_btn_togui, _hwt_btn_ship12, _hwt_btn_ship34, _hwt_btn_flame, _hwt_btn_hwt_beg, _hwt_btn_hwt_int, _hwt_btn_hwt_adv, _hwt_btn_download
 ]
+
+def hwt_cbx_pc_1(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_pc_id', 1)
+def hwt_cbx_pc_2(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_pc_id', 2)
+def hwt_cbx_pc_3(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_pc_id', 3)
+def hwt_cbx_pc_4(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_pc_id', 4)
 
 def hwt_cbx_toggle_enabled(checked):
     if not _is_license_valid():

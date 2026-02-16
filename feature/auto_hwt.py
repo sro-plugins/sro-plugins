@@ -3,7 +3,7 @@
 # Enjekte: gui, QtBind, log, pName, get_config_dir, get_position, get_monsters,
 # set_training_script, set_training_position, start_bot, stop_bot,
 # create_notification, get_training_script, time, os, _is_license_valid,
-# cbEnabled, cbP1..cbP8, cmbPC
+# cbEnabled, cbP1..cbP8, cbPC1..cbPC4
 
 # FGW klasörü: Config/SROManager/FGW_<PC>/ - Bilgisayar No ile 2+ PC çakışması önlenir
 def _get_pc_id_file():
@@ -19,7 +19,7 @@ def _get_pc_id_file():
     return None
 
 def _get_pc_id():
-    """Önce yerel dosyadan, yoksa UI'dan, yoksa bilgisayar adından PC ID al."""
+    """Önce yerel dosyadan, yoksa UI'dan, yoksa 1."""
     try:
         pf = _get_pc_id_file()
         if pf and os.path.exists(pf):
@@ -27,10 +27,9 @@ def _get_pc_id():
                 v = f.read().strip()
             if v in ('1', '2', '3', '4'):
                 return v
-        if cmbPC is not None:
-            idx = QtBind.currentIndex(gui, cmbPC)
-            if 0 <= idx <= 3:
-                v = str(idx + 1)
+        for cb, n in [(cbPC1, 1), (cbPC2, 2), (cbPC3, 3), (cbPC4, 4)]:
+            if cb and QtBind.isChecked(gui, cb):
+                v = str(n)
                 pf2 = _get_pc_id_file()
                 if pf2:
                     try:
@@ -41,10 +40,24 @@ def _get_pc_id():
                 return v
     except Exception:
         pass
-    try:
-        return os.environ.get('COMPUTERNAME', os.environ.get('HOSTNAME', '1'))
-    except Exception:
-        return '1'
+    return '1'
+
+def _set_pc_id(n):
+    """Bilgisayar No checkbox değiştiğinde - tek seçim ve dosyaya kaydet."""
+    global FGW_FOLDER
+    n = max(1, min(4, int(n)))
+    for cb, i in [(cbPC1, 1), (cbPC2, 2), (cbPC3, 3), (cbPC4, 4)]:
+        if cb:
+            QtBind.setChecked(gui, cb, n == i)
+    pf = _get_pc_id_file()
+    if pf:
+        try:
+            with open(pf, 'w', encoding='utf-8') as f:
+                f.write(str(n))
+            FGW_FOLDER = None
+            log('[%s] Bilgisayar No: %d' % (pName, n))
+        except Exception:
+            pass
 
 def _get_fgw_folder():
     cfg = get_config_dir()
@@ -347,18 +360,16 @@ def event_loop():
         _current_state = 'fgw'
         start_bot()
 
-# Init: kayıtlı Bilgisayar No'yu combobox'a uygula
+# Init: kayıtlı Bilgisayar No'yu checkbox'lara uygula
 try:
-    if cmbPC:
-        pf = _get_pc_id_file()
-        if pf and os.path.exists(pf):
-            with open(pf, 'r', encoding='utf-8') as f:
-                v = f.read().strip()
-            if v == '2':
-                QtBind.setIndex(gui, cmbPC, 1)
-            elif v == '3':
-                QtBind.setIndex(gui, cmbPC, 2)
-            elif v == '4':
-                QtBind.setIndex(gui, cmbPC, 3)
+    pf = _get_pc_id_file()
+    if pf and os.path.exists(pf):
+        with open(pf, 'r', encoding='utf-8') as f:
+            v = f.read().strip()
+        if v in ('1', '2', '3', '4'):
+            n = int(v)
+            for cb, i in [(cbPC1, 1), (cbPC2, 2), (cbPC3, 3), (cbPC4, 4)]:
+                if cb:
+                    QtBind.setChecked(gui, cb, n == i)
 except Exception:
     pass
