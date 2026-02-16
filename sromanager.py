@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.6'
+pVersion = '1.7.7'
 
 MOVE_DELAY = 0.25
 
@@ -2027,7 +2027,7 @@ _add_tab4(_hwt_cbEnabled, _hwt_x, _hwt_y + 25)
 
 _add_tab4(QtBind.createLabel(gui, 'FGW / HWT Scriptleri (Eğitim scriptine yüklenecek):', _hwt_x, _hwt_y + 60), _hwt_x, _hwt_y + 60)
 _add_tab4(QtBind.createLabel(gui, 'Bilgisayar No (2. PC = 2 seç):', _hwt_x + 260, _hwt_y + 42), _hwt_x + 260, _hwt_y + 42)
-_hwt_cmbPC = QtBind.createCombobox(gui, 'hwt_cmb_pc_changed', _hwt_x + 390, _hwt_y + 38, 50, 22)
+_hwt_cmbPC = QtBind.createCombobox(gui, _hwt_x + 390, _hwt_y + 38, 50, 22)
 QtBind.append(gui, _hwt_cmbPC, '1')
 QtBind.append(gui, _hwt_cmbPC, '2')
 QtBind.append(gui, _hwt_cmbPC, '3')
@@ -2084,11 +2084,6 @@ _protected_buttons[4] = [
     _hwt_cbEnabled, _hwt_cmbPC, _hwt_cbP1, _hwt_cbP2, _hwt_cbP3, _hwt_cbP4, _hwt_cbP5, _hwt_cbP6, _hwt_cbP7, _hwt_cbP8,
     _hwt_btn_togui, _hwt_btn_ship12, _hwt_btn_ship34, _hwt_btn_flame, _hwt_btn_hwt_beg, _hwt_btn_hwt_int, _hwt_btn_hwt_adv, _hwt_btn_download
 ]
-
-def hwt_cmb_pc_changed(index):
-    if not _is_license_valid():
-        return
-    _auto_hwt_call('_set_pc_id_from_ui', index)
 
 def hwt_cbx_toggle_enabled(checked):
     if not _is_license_valid():

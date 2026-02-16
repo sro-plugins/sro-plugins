@@ -30,27 +30,21 @@ def _get_pc_id():
         if cmbPC is not None:
             idx = QtBind.currentIndex(gui, cmbPC)
             if 0 <= idx <= 3:
-                return str(idx + 1)
+                v = str(idx + 1)
+                pf2 = _get_pc_id_file()
+                if pf2:
+                    try:
+                        with open(pf2, 'w', encoding='utf-8') as f:
+                            f.write(v)
+                    except Exception:
+                        pass
+                return v
     except Exception:
         pass
     try:
         return os.environ.get('COMPUTERNAME', os.environ.get('HOSTNAME', '1'))
     except Exception:
         return '1'
-
-def _set_pc_id_from_ui(index):
-    """Bilgisayar No seçildiğinde yerel dosyaya kaydet."""
-    global FGW_FOLDER
-    try:
-        v = str(index + 1)
-        pf = _get_pc_id_file()
-        if pf:
-            with open(pf, 'w', encoding='utf-8') as f:
-                f.write(v)
-            FGW_FOLDER = None  # Yeni klasör yolu için sıfırla
-            log('[%s] Bilgisayar No kaydedildi: %s' % (pName, v))
-    except Exception as ex:
-        log('[%s] PC No kaydedilemedi: %s' % (pName, ex))
 
 def _get_fgw_folder():
     cfg = get_config_dir()
