@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Auto Hwt (Tab 4) - SROMaster FGW & HWT mantığı, UI sromanager'da.
 # Enjekte: gui, QtBind, log, pName, get_config_dir, get_position, get_monsters,
-# set_training_script, set_training_position, start_bot, stop_bot,
+# set_training_script, set_training_position, set_training_radius, start_bot, stop_bot,
 # create_notification, get_training_script, time, os, _is_license_valid,
 # cbEnabled, cbP1..cbP8, cbPC1..cbPC4
 
@@ -239,6 +239,14 @@ def _set_training_script_from_file(display_name, filename, script_var_name):
         return
     try:
         set_training_script(path)
+        pos = get_position()
+        if pos:
+            try:
+                set_training_position(int(pos.get('region', 0)),
+                    float(pos.get('x', 0)), float(pos.get('y', 0)), float(pos.get('z', 0)))
+                set_training_radius(100.0)
+            except Exception:
+                pass
         _last_fgw_script_path = path
         _current_state = 'fgw'
         log('[%s] Eğitim scripti ayarlandı: %s' % (pName, display_name))
@@ -342,6 +350,7 @@ def event_loop():
                 _write_attackarea_walk(attack_path, x, y, z)
                 set_training_script(attack_path)
                 set_training_position(region, x, y, z)
+                set_training_radius(100.0)  # phBot "uzaktasın" kontrolü için gerekli
             except Exception:
                 pass
         else:
@@ -362,7 +371,9 @@ def event_loop():
         pos = get_position()
         if pos:
             try:
-                set_training_position(int(pos.get('region', 0)), 0.0, 0.0, 0.0)
+                set_training_position(int(pos.get('region', 0)),
+                    float(pos.get('x', 0)), float(pos.get('y', 0)), float(pos.get('z', 0)))
+                set_training_radius(100.0)
             except Exception:
                 pass
         _current_state = 'fgw'
