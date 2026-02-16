@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Auto Hwt (Tab 4) - SROMaster FGW & HWT mantığı, UI sromanager'da.
-# Enjekte: gui, QtBind, log, pName, get_config_dir, get_position, get_monsters,
-# set_training_script, set_training_position, set_training_radius, start_bot, stop_bot,
-# create_notification, get_training_script, time, os, _is_license_valid,
+# Enjekte: gui, QtBind, log, pName, get_config_dir, get_config_path, get_position, get_monsters,
+# get_training_area, set_training_area, set_training_script, set_training_position, set_training_radius,
+# start_bot, stop_bot, create_notification, get_training_script, time, os, json, _is_license_valid,
 # cbEnabled, cbP1..cbP8, cbPC1..cbPC4
 
 # FGW klasörü: Config/SROManager/FGW_<PC>/ - Bilgisayar No ile 2+ PC çakışması önlenir
@@ -238,15 +238,21 @@ def _set_training_script_from_file(display_name, filename, script_var_name):
     if not path:
         return
     try:
-        set_training_script(path)
         pos = get_position()
         if pos:
             try:
-                set_training_position(int(pos.get('region', 0)),
-                    float(pos.get('x', 0)), float(pos.get('y', 0)), float(pos.get('z', 0)))
+                region = int(pos.get('region', 0))
+                x = float(pos.get('x', 0))
+                y = float(pos.get('y', 0))
+                z = float(pos.get('z', 0))
+                _ensure_training_area(region, x, y, z, path)
+                set_training_script(path)
+                set_training_position(region, x, y, z)
                 set_training_radius(100.0)
             except Exception:
                 pass
+        else:
+            set_training_script(path)
         _last_fgw_script_path = path
         _current_state = 'fgw'
         log('[%s] Eğitim scripti ayarlandı: %s' % (pName, display_name))
@@ -304,6 +310,56 @@ def _get_valid_monsters():
         return []
     return [(mid, m) for mid, m in mobs.items() if m.get('name') and not _is_ignored_monster(m.get('name', ''))]
 
+def _ensure_training_area(region, x, y, z, script_path):
+    """Aktif kasılma alanı yoksa config'den seç veya FGW ekle. phBot sadece aktif alana script atar."""
+    if get_training_area():
+        return True
+    cfg_path = get_config_path()
+    if cfg_path and os.path.exists(cfg_path):
+        try:
+            with open(cfg_path, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+            script_cfg = (cfg.get('Loop') or {}).get('Script') or {}
+            if isinstance(script_cfg, dict):
+                for name in list(script_cfg.keys()):
+                    if name and set_training_area(name):
+                        log('[%s] Kasılma alanı seçildi: %s' % (pName, name))
+                        return True
+        except Exception:
+            pass
+    if not cfg_path or not os.path.exists(cfg_path):
+        return False
+    try:
+        with open(cfg_path, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+        loop = cfg.get('Loop')
+        if not isinstance(loop, dict):
+            loop = {}
+            cfg['Loop'] = loop
+        script_cfg = loop.get('Script')
+        if not isinstance(script_cfg, dict):
+            script_cfg = {}
+            loop['Script'] = script_cfg
+        abspath = os.path.abspath(script_path).replace('/', '\\')
+        fgw_area = {
+            'Data': [], 'Enabled': True, 'Path': abspath,
+            'Pick Radius': 50, 'Polygon': [], 'Radius': 100.0,
+            'Region': int(region), 'Type': 0,
+            'X': float(x), 'Y': float(y), 'Z': float(z),
+        }
+        for name in list(script_cfg.keys()):
+            if isinstance(script_cfg.get(name), dict):
+                script_cfg[name]['Enabled'] = False
+        script_cfg['FGW'] = fgw_area
+        with open(cfg_path, 'w', encoding='utf-8') as f:
+            json.dump(cfg, f, indent=4, ensure_ascii=False)
+        if set_training_area('FGW'):
+            log('[%s] Config\'e FGW kasılma alanı eklendi.' % pName)
+            return True
+    except Exception as ex:
+        log('[%s] FGW kasılma alanı eklenemedi: %s' % (pName, str(ex)))
+    return False
+
 def _get_nearest_monster_position():
     pos = get_position()
     if not pos:
@@ -339,7 +395,6 @@ def event_loop():
         stop_bot()
         attack_path = _attackarea_path_for_slot(_my_slot)
         _ensure_attackarea_files()
-        # Karakterin BULUNDUĞU noktayı kullan (phBot "alanından uzaktasın" hatasını önler)
         pos = get_position()
         if pos:
             try:
@@ -348,9 +403,10 @@ def event_loop():
                 y = float(pos.get('y', 0))
                 z = float(pos.get('z', 0))
                 _write_attackarea_walk(attack_path, x, y, z)
+                _ensure_training_area(region, x, y, z, attack_path)
                 set_training_script(attack_path)
                 set_training_position(region, x, y, z)
-                set_training_radius(100.0)  # phBot "uzaktasın" kontrolü için gerekli
+                set_training_radius(100.0)
             except Exception:
                 pass
         else:
@@ -359,24 +415,31 @@ def event_loop():
             except Exception:
                 pass
         _current_state = 'attack'
+        time.sleep(0.2)
         start_bot()
         return
     if not has_mobs and _current_state == 'attack':
         stop_bot()
-        if _last_fgw_script_path:
+        pos = get_position()
+        if pos and _last_fgw_script_path:
+            try:
+                region = int(pos.get('region', 0))
+                x = float(pos.get('x', 0))
+                y = float(pos.get('y', 0))
+                z = float(pos.get('z', 0))
+                _ensure_training_area(region, x, y, z, _last_fgw_script_path)
+                set_training_script(_last_fgw_script_path)
+                set_training_position(region, x, y, z)
+                set_training_radius(100.0)
+            except Exception:
+                pass
+        elif _last_fgw_script_path:
             try:
                 set_training_script(_last_fgw_script_path)
             except Exception:
                 pass
-        pos = get_position()
-        if pos:
-            try:
-                set_training_position(int(pos.get('region', 0)),
-                    float(pos.get('x', 0)), float(pos.get('y', 0)), float(pos.get('z', 0)))
-                set_training_radius(100.0)
-            except Exception:
-                pass
         _current_state = 'fgw'
+        time.sleep(0.2)
         start_bot()
 
 # Init: kayıtlı Bilgisayar No'yu checkbox'lara uygula

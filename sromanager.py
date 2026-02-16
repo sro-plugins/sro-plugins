@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.11'
+pVersion = '1.7.12'
 
 MOVE_DELAY = 0.25
 
@@ -1234,9 +1234,12 @@ def _get_auto_hwt_namespace():
         'gui': gui, 'QtBind': QtBind,
         'get_config_dir': get_config_dir, 'get_character_data': get_character_data,
         'get_position': get_position, 'get_monsters': get_monsters,
+        'get_training_area': get_training_area, 'set_training_area': set_training_area,
+        'get_config_path': get_config_path,
         'set_training_script': set_training_script, 'set_training_position': set_training_position,
         'set_training_radius': set_training_radius,
         'start_bot': start_bot, 'stop_bot': stop_bot,
+        'json': json,
         'create_notification': globals().get('create_notification', lambda x: log('[%s] %s' % (pName, x))),
         'get_training_script': globals().get('get_training_script', lambda: None),
         'time': time, 'os': os,
