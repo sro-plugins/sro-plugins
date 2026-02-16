@@ -3,15 +3,54 @@
 # Enjekte: gui, QtBind, log, pName, get_config_dir, get_position, get_monsters,
 # set_training_script, set_training_position, start_bot, stop_bot,
 # create_notification, get_training_script, time, os, _is_license_valid,
-# cbEnabled, cbP1..cbP8
+# cbEnabled, cbP1..cbP8, cmbPC
 
-# FGW klasörü: Config/SROManager/FGW_<PC>/ - Her bilgisayar kendi klasörünü kullanır (2+ PC çakışması önlenir)
-def _get_pc_id():
-    """Bilgisayar adı - 2 PC'de aynı config kullanılırsa her biri kendi FGW klasörüne yazar."""
+# FGW klasörü: Config/SROManager/FGW_<PC>/ - Bilgisayar No ile 2+ PC çakışması önlenir
+def _get_pc_id_file():
+    """PC No kayıt dosyası - yerel AppData (sync edilmez, her PC kendi değerini tutar)."""
     try:
-        return os.environ.get('COMPUTERNAME', os.environ.get('HOSTNAME', 'PC1'))
+        base = os.environ.get('LOCALAPPDATA', os.environ.get('APPDATA', ''))
+        if base:
+            d = os.path.join(base, 'SROManager')
+            os.makedirs(d, exist_ok=True)
+            return os.path.join(d, 'hwt_pc_id.txt')
     except Exception:
-        return 'PC1'
+        pass
+    return None
+
+def _get_pc_id():
+    """Önce yerel dosyadan, yoksa UI'dan, yoksa bilgisayar adından PC ID al."""
+    try:
+        pf = _get_pc_id_file()
+        if pf and os.path.exists(pf):
+            with open(pf, 'r', encoding='utf-8') as f:
+                v = f.read().strip()
+            if v in ('1', '2', '3', '4'):
+                return v
+        if cmbPC is not None:
+            idx = QtBind.currentIndex(gui, cmbPC)
+            if 0 <= idx <= 3:
+                return str(idx + 1)
+    except Exception:
+        pass
+    try:
+        return os.environ.get('COMPUTERNAME', os.environ.get('HOSTNAME', '1'))
+    except Exception:
+        return '1'
+
+def _set_pc_id_from_ui(index):
+    """Bilgisayar No seçildiğinde yerel dosyaya kaydet."""
+    global FGW_FOLDER
+    try:
+        v = str(index + 1)
+        pf = _get_pc_id_file()
+        if pf:
+            with open(pf, 'w', encoding='utf-8') as f:
+                f.write(v)
+            FGW_FOLDER = None  # Yeni klasör yolu için sıfırla
+            log('[%s] Bilgisayar No kaydedildi: %s' % (pName, v))
+    except Exception as ex:
+        log('[%s] PC No kaydedilemedi: %s' % (pName, ex))
 
 def _get_fgw_folder():
     cfg = get_config_dir()
@@ -313,3 +352,19 @@ def event_loop():
                 pass
         _current_state = 'fgw'
         start_bot()
+
+# Init: kayıtlı Bilgisayar No'yu combobox'a uygula
+try:
+    if cmbPC:
+        pf = _get_pc_id_file()
+        if pf and os.path.exists(pf):
+            with open(pf, 'r', encoding='utf-8') as f:
+                v = f.read().strip()
+            if v == '2':
+                QtBind.setIndex(gui, cmbPC, 1)
+            elif v == '3':
+                QtBind.setIndex(gui, cmbPC, 2)
+            elif v == '4':
+                QtBind.setIndex(gui, cmbPC, 3)
+except Exception:
+    pass
