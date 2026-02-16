@@ -1,12 +1,7 @@
-## v1.7.14 (Multi-PC Config Sync)
-
-### Yeni Özellikler
-- **Config Sync (Auto Hwt)**: 1. PC'de config Yükle, 2. PC'de İndir. Config `sc/sync_config.json` olarak kaydedilir.
-- **Path remapping**: İndirilen config'teki FGW path'leri otomatik olarak 2. PC'ye uyarlanır.
-- **Retry mantığı**: İndir 5 sn arayla 5 deneme yapar, bulamazsa logta hata gösterir.
+## v1.7.14 (Auto Hwt - Config Sync kaldırıldı)
 
 ### Değişiklikler
-- Party ID kaldırıldı, tek sabit dosya kullanımı
+- **Config Sync kaldırıldı** (çalışmadığı için)
 
 ---
 

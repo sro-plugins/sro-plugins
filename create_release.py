@@ -21,7 +21,7 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 # Release oluştur
 release_data = {
     'tag_name': 'v1.7.14',
-    'name': 'v1.7.14 - Multi-PC Config Sync',
+    'name': 'v1.7.14 - Config Sync kaldırıldı',
     'body': release_notes,
     'draft': False,
     'prerelease': False
