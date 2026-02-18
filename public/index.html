@@ -26,9 +26,13 @@
                     <i class="fas fa-users"></i>
                     <span>User Management</span>
                 </div>
+                <div class="nav-item" id="filesTab">
+                    <i class="fas fa-folder-tree"></i>
+                    <span>File Manager</span>
+                </div>
                 <div class="nav-item" id="testerTab">
-                    <i class="fas fa-flask"></i>
-                    <span>Download Tester</span>
+                    <i class="fas fa-shield-halved"></i>
+                    <span>API Tester</span>
                 </div>
                 <a href="/docs" target="_blank" class="nav-item" style="text-decoration: none;">
                     <i class="fas fa-code"></i>
@@ -98,18 +102,149 @@
                 </div>
             </div>
 
+            <!-- File Manager Section -->
+            <div id="filesSection" style="display: none;">
+                <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 25px;">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(255, 167, 38, 0.1); color: #ffa726;">
+                            <i class="fas fa-horse-head"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Caravan Scripts</h3>
+                            <p id="caravanFileCount">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(0, 230, 118, 0.1); color: #00e676;">
+                            <i class="fas fa-scroll"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>SC Scripts</h3>
+                            <p id="scFileCount">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(131, 56, 236, 0.1); color: #8338ec;">
+                            <i class="fas fa-puzzle-piece"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Feature Scripts</h3>
+                            <p id="featureFileCount">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CARAVAN Section -->
+                <div class="glass" style="border-radius: 24px; padding: 30px; margin-bottom: 25px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div
+                                style="width: 40px; height: 40px; border-radius: 12px; background: rgba(255, 167, 38, 0.15); display: flex; align-items: center; justify-content: center; color: #ffa726;">
+                                <i class="fas fa-horse-head"></i>
+                            </div>
+                            <div>
+                                <h2 style="font-size: 20px; margin: 0;">Caravan Scripts</h2>
+                                <p style="color: var(--text-dim); font-size: 13px; margin: 0;">Trade route scripts for
+                                    caravan runs</p>
+                            </div>
+                        </div>
+                        <label class="btn primary" style="cursor: pointer;">
+                            <i class="fas fa-upload"></i> Upload
+                            <input type="file" id="caravanUploadInput" accept=".txt,.json,.py" multiple
+                                style="display: none;">
+                        </label>
+                    </div>
+                    <div id="caravanDropZone" class="drop-zone">
+                        <i class="fas fa-cloud-upload-alt" style="font-size: 28px; color: var(--text-dim);"></i>
+                        <p style="color: var(--text-dim); margin-top: 10px;">Drag & drop .txt, .json or .py files here
+                        </p>
+                    </div>
+                    <div id="caravanFileList" class="file-grid">
+                        <div style="text-align: center; padding: 30px; color: var(--text-dim); grid-column: 1 / -1;">
+                            Loading...</div>
+                    </div>
+                </div>
+
+                <!-- SC Section -->
+                <div class="glass" style="border-radius: 24px; padding: 30px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div
+                                style="width: 40px; height: 40px; border-radius: 12px; background: rgba(0, 230, 118, 0.15); display: flex; align-items: center; justify-content: center; color: #00e676;">
+                                <i class="fas fa-scroll"></i>
+                            </div>
+                            <div>
+                                <h2 style="font-size: 20px; margin: 0;">SC Scripts</h2>
+                                <p style="color: var(--text-dim); font-size: 13px; margin: 0;">Garden dungeon and
+                                    special scripts</p>
+                            </div>
+                        </div>
+                        <label class="btn primary" style="cursor: pointer;">
+                            <i class="fas fa-upload"></i> Upload
+                            <input type="file" id="scUploadInput" accept=".txt,.json,.py" multiple
+                                style="display: none;">
+                        </label>
+                    </div>
+                    <div id="scDropZone" class="drop-zone">
+                        <i class="fas fa-cloud-upload-alt" style="font-size: 28px; color: var(--text-dim);"></i>
+                        <p style="color: var(--text-dim); margin-top: 10px;">Drag & drop .txt, .json or .py files here
+                        </p>
+                    </div>
+                    <div id="scFileList" class="file-grid">
+                        <div style="text-align: center; padding: 30px; color: var(--text-dim); grid-column: 1 / -1;">
+                            Loading...</div>
+                    </div>
+                </div>
+
+                <!-- FEATURE Section -->
+                <div class="glass" style="border-radius: 24px; padding: 30px; margin-top: 25px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div
+                                style="width: 40px; height: 40px; border-radius: 12px; background: rgba(131, 56, 236, 0.15); display: flex; align-items: center; justify-content: center; color: #8338ec;">
+                                <i class="fas fa-puzzle-piece"></i>
+                            </div>
+                            <div>
+                                <h2 style="font-size: 20px; margin: 0;">Feature Scripts</h2>
+                                <p style="color: var(--text-dim); font-size: 13px; margin: 0;">Plugin feature modules
+                                    (.py)</p>
+                            </div>
+                        </div>
+                        <label class="btn primary" style="cursor: pointer;">
+                            <i class="fas fa-upload"></i> Upload
+                            <input type="file" id="featureUploadInput" accept=".txt,.json,.py" multiple
+                                style="display: none;">
+                        </label>
+                    </div>
+                    <div id="featureDropZone" class="drop-zone">
+                        <i class="fas fa-cloud-upload-alt" style="font-size: 28px; color: var(--text-dim);"></i>
+                        <p style="color: var(--text-dim); margin-top: 10px;">Drag & drop .txt, .json or .py files here
+                        </p>
+                    </div>
+                    <div id="featureFileList" class="file-grid">
+                        <div style="text-align: center; padding: 30px; color: var(--text-dim); grid-column: 1 / -1;">
+                            Loading...</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tester Section -->
             <div id="testerSection" style="display: none;">
-                <div class="glass" style="padding: 40px; border-radius: 24px; max-width: 600px; margin: 0 auto;">
-                    <h2 style="margin-bottom: 25px;"><i class="fas fa-flask"></i> API Download Tester</h2>
-                    <p style="color: var(--text-dim); margin-bottom: 30px;">
-                        Buradan botun dosya çekme isteğini simüle edebilirsiniz. Linki test etmek için bilgileri
-                        doldurun.
+                <div class="glass" style="padding: 40px; border-radius: 24px; max-width: 700px; margin: 0 auto;">
+                    <h2 style="margin-bottom: 8px;"><i class="fas fa-shield-halved"></i> Signed API Client Simulator
+                    </h2>
+                    <p style="color: var(--text-dim); margin-bottom: 30px; font-size: 14px;">
+                        Simulates the phBot-SROManager plugin's signed requests. Generates proper
+                        <code style="color: var(--secondary);">X-SROMANAGER-Payload</code> and
+                        <code style="color: var(--secondary);">X-SROMANAGER-Signature</code> headers.
                     </p>
 
                     <div class="input-group">
-                        <label>Public ID (User License Key)</label>
-                        <input type="text" id="testPublicId" placeholder="User Public ID girin...">
+                        <label>Public ID (License Key)</label>
+                        <input type="text" id="testPublicId" placeholder="Paste a user's Public ID here...">
                     </div>
 
                     <div class="input-group">
@@ -117,39 +252,100 @@
                         <input type="text" id="testIp" value="127.0.0.1">
                     </div>
 
-                    <div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 20px;">
-                        <div class="input-group" style="margin-bottom:0">
-                            <label>File Type</label>
-                            <select id="testType"
-                                style="width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; color: #fff; outline: none;">
-                                <option value="CARAVAN">CARAVAN</option>
-                                <option value="SC">SC</option>
-                            </select>
+                    <div class="input-group">
+                        <label>API Endpoint</label>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn secondary endpoint-btn active" data-endpoint="validate"
+                                onclick="selectEndpoint('validate')">
+                                <i class="fas fa-check-circle"></i> Validate
+                            </button>
+                            <button class="btn secondary endpoint-btn" data-endpoint="download"
+                                onclick="selectEndpoint('download')">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                            <button class="btn secondary endpoint-btn" data-endpoint="list"
+                                onclick="selectEndpoint('list')">
+                                <i class="fas fa-list"></i> List
+                            </button>
                         </div>
-                        <div class="input-group" style="margin-bottom:0">
-                            <label>Filename</label>
-                            <select id="testFilename"
-                                style="width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; color: #fff; outline: none;">
-                                <option value="">Önce Tür Seçin...</option>
-                            </select>
-                        </div>
+                    </div>
 
+                    <!-- Download/List specific fields -->
+                    <div id="downloadFields" style="display: none;">
+                        <div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 20px;">
+                            <div class="input-group" style="margin-bottom:0">
+                                <label>File Type</label>
+                                <select id="testType"
+                                    style="width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; color: #fff; outline: none;">
+                                    <option value="CARAVAN">CARAVAN</option>
+                                    <option value="SC">SC</option>
+                                    <option value="FEATURE">FEATURE</option>
+                                </select>
+                            </div>
+                            <div class="input-group" style="margin-bottom:0">
+                                <label>Filename</label>
+                                <select id="testFilename"
+                                    style="width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; color: #fff; outline: none;">
+                                    <option value="">Select type first...</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payload Editor -->
+                    <div id="payloadEditorSection" style="margin-top: 25px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <label style="color: var(--text-dim); font-size: 13px;">
+                                <i class="fas fa-edit"></i> Edit Payload (JSON)
+                            </label>
+                            <button class="btn secondary" style="padding: 4px 10px; font-size: 11px; height: auto;"
+                                onclick="updateDefaultPayload()">
+                                <i class="fas fa-sync-alt"></i> Regenerate Default
+                            </button>
+                        </div>
+                        <textarea id="payloadTextarea"
+                            style="width: 100%; height: 160px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; color: #4ade80; font-family: 'Courier New', monospace; font-size: 12px; outline: none; resize: vertical; margin-bottom: 20px;"
+                            spellcheck="false"></textarea>
                     </div>
 
                     <button class="btn primary" style="width: 100%; justify-content: center; height: 55px;"
-                        onclick="testDownload()">
-                        <i class="fas fa-download"></i> Download Linkini Test Et
+                        onclick="runSignedTest()" id="runTestBtn">
+                        <i class="fas fa-paper-plane"></i> Sign & Send Request
                     </button>
 
-                    <div id="testResult" style="margin-top: 25px; display: none;">
-                        <label style="display: block; margin-bottom: 10px; color: var(--text-dim);">Oluşturulan API
-                            URL:</label>
-                        <div class="key-badge" id="testUrlResult"
-                            style="word-break: break-all; font-size: 13px; margin-bottom: 15px;"></div>
-                        <a id="testDownloadLink" href="#" target="_blank" class="btn secondary"
-                            style="justify-content: center;">
-                            Dosyayı Yeni Sekmede Aç
-                        </a>
+                    <!-- Generated Headers (Read-only) -->
+                    <div id="testHeadersSection" style="margin-top: 25px; display: none;">
+                        <label style="display: block; margin-bottom: 10px; color: var(--text-dim); font-size: 13px;">
+                            <i class="fas fa-lock"></i> Final Security Headers
+                        </label>
+                        <div
+                            style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px; border: 1px solid var(--glass-border); margin-bottom: 15px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.8; overflow-x: auto;">
+                            <div><span style="color: #ffa726;">User-Agent:</span> <span id="hdrUserAgent"
+                                    style="color: var(--text-dim);"></span></div>
+                            <div style="margin-top: 6px;"><span style="color: #ffa726;">X-SROMANAGER-Payload:</span>
+                            </div>
+                            <div id="hdrPayload"
+                                style="color: var(--secondary); word-break: break-all; padding-left: 12px;"></div>
+                            <div style="margin-top: 6px;"><span style="color: #ffa726;">X-SROMANAGER-Signature:</span>
+                            </div>
+                            <div id="hdrSignature" style="color: #4ade80; word-break: break-all; padding-left: 12px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Response -->
+                    <div id="testResponseSection" style="margin-top: 15px; display: none;">
+                        <label style="display: block; margin-bottom: 10px; color: var(--text-dim); font-size: 13px;">
+                            <i class="fas fa-reply"></i> Server Response
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                            <span id="responseStatus" class="status-tag"></span>
+                            <span id="responseTime" style="color: var(--text-dim); font-size: 13px;"></span>
+                        </div>
+                        <div id="responseBody"
+                            style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px; border: 1px solid var(--glass-border); font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.8; color: var(--text-dim); white-space: pre-wrap; max-height: 300px; overflow-y: auto;">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -200,6 +396,25 @@
                     <i class="fas fa-trash-sweep"></i> Clear All Sessions
                 </button>
                 <button class="btn primary" id="dismissSessionModal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Preview Modal -->
+    <div id="filePreviewModal" class="modal">
+        <div class="modal-content glass"
+            style="max-width: 750px; max-height: 85vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div>
+                    <h2 style="margin: 0; font-size: 18px;" id="previewFileName">filename.txt</h2>
+                    <p style="color: var(--text-dim); font-size: 13px; margin-top: 4px;" id="previewFileMeta"></p>
+                </div>
+                <button class="btn secondary" id="closePreviewModal" style="padding: 8px 14px;"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <div id="previewContent"
+                style="flex: 1; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 20px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.8; white-space: pre-wrap; word-break: break-all; border: 1px solid var(--glass-border);">
+                Loading...
             </div>
         </div>
     </div>
