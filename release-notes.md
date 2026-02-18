@@ -1,3 +1,35 @@
+## v1.7.16 (Auto Hwt - FGW/HWT sc/ GitHub entegrasyonu)
+
+### Değişiklikler
+- **FGW/HWT scriptleri GitHub sc/ klasöründe**: Togui, Gemi, Alev, HWT scriptleri repoda
+- **Scriptleri İndir**: GitHub'dan sc/'ye indirir (sabit path yok)
+- **4 PC uyumlu**: Attack Area FGW_<PC>/ ile her PC kendi klasörüne yazar
+
+---
+
+## v1.7.14 (Auto Hwt - Config Sync kaldırıldı)
+
+### Değişiklikler
+- **Config Sync kaldırıldı** (çalışmadığı için)
+
+---
+
+## v1.7.2 (Script Command Maker güncellemesi)
+
+### Değişiklikler
+- **Script Command Maker**: Modül güncellemeleri
+
+---
+
+## v1.7.1 (SSL düzeltmesi, cacert.pem, güncelleme iyileştirmesi)
+
+### Değişiklikler
+- **SSL / CERTIFICATE_VERIFY_FAILED**: Plugin ile gelen `cacert.pem` ile HTTPS doğrulaması (ek paket kurulumu gerekmez)
+- **Güncelleme**: Otomatik güncellemede `cacert.pem` da indirilir
+- **Release**: `sromanager.py` ve `cacert.pem` birlikte yayınlanır
+
+---
+
 ## v1.7.0 (SROManager: plugin adı ve dosya yeniden adlandırıldı)
 
 ### Değişiklikler

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-# Auto Dungeon (Tab 2) - Sunucudan indirilip exec ile çalıştırılır.
-# Enjekte edilenler: gui, QtBind, log, pName, get_config_dir, get_character_data,
-# get_drops, get_monsters, get_position, start_bot, stop_bot, set_training_position,
+# Auto Dungeon (Tab 2) - xAutoDungeon mantığı, UI sromanager'da.
+# Enjekte: gui, QtBind, log, pName, get_config_dir, get_character_data, get_drops,
+# get_monsters, get_position, start_bot, stop_bot, set_training_position,
 # set_training_radius, move_to, get_inventory, get_item, get_npcs, inject_joymax,
-# get_locale, get_party, sqlite3, struct, time, threading, json, os,
+# get_locale, sqlite3, struct, time, threading, json, os,
 # WAIT_DROPS_DELAY_MAX, COUNT_MOBS_DELAY, _is_license_valid,
 # set_item_used_by_plugin, get_dimensional_item_activated,
-# + Tab2 widget refs: lstMobs, tbxMobs, lstMonsterCounter, cbxIgnoreGeneral, ...
+# lstMobs, tbxMobs, lstMonsterCounter, cbxIgnore*, cbxOnlyCount*, cbxAcceptForgottenWorld
 
 character_data = None
 lstMobsData = []
@@ -45,7 +45,7 @@ def IsPickable(filterCursor, ItemID):
 
 def WaitPickableDrops(filterCursor, waiting=0):
     if waiting >= WAIT_DROPS_DELAY_MAX:
-        log('[%s] Dropları bekleme süresi doldu!' % pName)
+        log('[%s] Timeout for picking up drops!' % pName)
         return
     drops = get_drops()
     if drops:
@@ -56,13 +56,13 @@ def WaitPickableDrops(filterCursor, waiting=0):
                 drop = value
                 break
         if drop:
-            log('[%s] "%s" toplanması bekleniyor...' % (pName, drop['name']))
+            log('[%s] Waiting for picking up "%s"...' % (pName, drop['name']))
             time.sleep(1.0)
             WaitPickableDrops(filterCursor, waiting + 1)
 
 def getMobCount(position, radius):
     QtBind.clear(gui, lstMonsterCounter)
-    QtBind.append(gui, lstMonsterCounter, 'İsim (Tür)')
+    QtBind.append(gui, lstMonsterCounter, 'Name (Type)')
     count = 0
     p = position if radius != None else None
     monsters = get_monsters()
@@ -87,39 +87,19 @@ def AttackMobs(wait, isAttacking, position, radius):
     if count > 0:
         if not isAttacking:
             start_bot()
-            log("[%s] Bu bölgede (%d) canavar öldürülüyor. Yarıçap: %s" % (pName, count, str(radius) if radius != None else "Max."))
+            log('[%s] Starting to kill (%d) mobs at this area. Radius: %s' % (pName, count, str(radius) if radius != None else 'Max.'))
         threading.Timer(wait, AttackMobs, [wait, True, position, radius]).start()
     else:
-        log("[%s] Tüm canavarlar öldürüldü!" % pName)
+        log('[%s] All mobs killed!' % pName)
         conn = GetFilterConnection()
         cursor = conn.cursor()
         WaitPickableDrops(cursor)
         conn.close()
         stop_bot()
         set_training_position(0, 0, 0, 0)
-        log("[%s] Script konumuna geri dönülüyor..." % pName)
+        log('[%s] Getting back to the script...' % pName)
         threading.Timer(2.5, move_to, [position['x'], position['y'], position['z']]).start()
         threading.Timer(5.0, start_bot).start()
-
-def AttackArea(args):
-    if not _is_license_valid():
-        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
-        return 0
-    radius = None
-    if len(args) >= 2:
-        radius = round(float(args[1]), 2)
-    p = get_position()
-    if getMobCount(p, radius) > 0:
-        stop_bot()
-        set_training_position(p['region'], p['x'], p['y'], p['z'])
-        if radius != None:
-            set_training_radius(radius)
-        else:
-            set_training_radius(100.0)
-        threading.Timer(0.001, AttackMobs, [COUNT_MOBS_DELAY, False, p, radius]).start()
-    else:
-        log("[%s] Bu bölgede canavar yok. Yarıçap: %s" % (pName, str(radius) if radius != None else "Max."))
-    return 0
 
 def GetDimensionalHole(Name):
     searchByName = Name != ''
@@ -131,7 +111,7 @@ def GetDimensionalHole(Name):
                 match = (Name == item['name'])
             else:
                 itemData = get_item(item['model'])
-                match = (itemData['tid1'] == 3 and itemData['tid2'] == 12 and itemData['tid3'] == 7)
+                match = (itemData and itemData.get('tid1') == 3 and itemData.get('tid2') == 12 and itemData.get('tid3') == 7)
             if match:
                 item['slot'] = slot
                 return item
@@ -142,35 +122,35 @@ def GetDimensionalPillarUID(Name):
     if npcs:
         for uid, npc in npcs.items():
             item = get_item(npc['model'])
-            if item and item['name'] == Name:
+            if item and item.get('name') == Name:
                 return uid
     return 0
 
 def EnterToDimensional(Name):
     uid = GetDimensionalPillarUID(Name)
     if uid:
-        log('[%s] Boyutsal delik seçiliyor...' % pName)
+        log('[%s] Selecting dimensional hole...' % pName)
         packet = struct.pack('I', uid)
         inject_joymax(0x7045, packet, False)
         time.sleep(1.0)
-        log('[%s] Boyutsal deliğe giriliyor...' % pName)
+        log('[%s] Entering to dimensional hole...' % pName)
         inject_joymax(0x704B, packet, False)
         packet += struct.pack('H', 3)
         inject_joymax(0x705A, packet, False)
         threading.Timer(5.0, start_bot).start()
         return
-    log('[%s] "%s" yakınınızda bulunamadı!' % (pName, Name))
+    log('[%s] "%s" cannot be found around you!' % (pName, Name))
 
 def GoDimensionalThread(Name):
     dim_activated = get_dimensional_item_activated()
     if dim_activated:
-        Name = dim_activated['name']
-        log('[%s] %s hala açık!' % (pName, '"' + Name + '"' if Name else 'Boyutsal Delik'))
+        Name = dim_activated.get('name', '')
+        log('[%s] %s still opened!' % (pName, '"' + Name + '"' if Name else 'Dimensional Hole'))
         EnterToDimensional(Name)
         return
     item = GetDimensionalHole(Name)
     if item:
-        log('[%s] "%s" kullanılıyor...' % (pName, item['name']))
+        log('[%s] Using "%s"...' % (pName, item['name']))
         p = struct.pack('B', item['slot'])
         locale = get_locale()
         if locale in [56, 18, 61]:
@@ -180,43 +160,7 @@ def GoDimensionalThread(Name):
         set_item_used_by_plugin(item)
         inject_joymax(0x704C, p, True)
     else:
-        log('[%s] %s envanterinizde bulunamadı' % (pName, '"' + Name + '"' if Name else 'Boyutsal Delik'))
-
-def GoDimensional(args):
-    if not _is_license_valid():
-        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
-        return 0
-    stop_bot()
-    name = ''
-    if len(args) > 1:
-        name = args[1]
-    threading.Timer(0.001, GoDimensionalThread, [name]).start()
-    return 0
-
-def btnAddMob_clicked():
-    if not _is_license_valid():
-        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
-        return
-    global lstMobsData
-    text = QtBind.text(gui, tbxMobs)
-    if text and not ListContains(text, lstMobsData):
-        lstMobsData.append(text)
-        QtBind.append(gui, lstMobs, text)
-        QtBind.setText(gui, tbxMobs, "")
-        saveConfigs()
-        log('[%s] Canavar eklendi [%s]' % (pName, text))
-
-def btnRemMob_clicked():
-    if not _is_license_valid():
-        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
-        return
-    global lstMobsData
-    selected = QtBind.text(gui, lstMobs)
-    if selected:
-        lstMobsData.remove(selected)
-        QtBind.remove(gui, lstMobs, selected)
-        saveConfigs()
-        log('[%s] Canavar kaldırıldı [%s]' % (pName, selected))
+        log('[%s] %s cannot be found at your inventory' % (pName, '"' + Name + '"' if Name else 'Dimensional Hole'))
 
 def Checkbox_Checked(checked, gListName, mobType):
     gListReference = globals()[gListName]
@@ -231,6 +175,31 @@ def _cbx_clicked(checked, gListName, mobType):
         log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
         return
     Checkbox_Checked(checked, gListName, mobType)
+
+def btnAddMob_clicked():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
+    global lstMobsData
+    text = QtBind.text(gui, tbxMobs)
+    if text and not ListContains(text, lstMobsData):
+        lstMobsData.append(text)
+        QtBind.append(gui, lstMobs, text)
+        QtBind.setText(gui, tbxMobs, "")
+        saveConfigs()
+        log('[%s] Monster added [%s]' % (pName, text))
+
+def btnRemMob_clicked():
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
+    global lstMobsData
+    selected = QtBind.text(gui, lstMobs)
+    if selected:
+        lstMobsData.remove(selected)
+        QtBind.remove(gui, lstMobs, selected)
+        saveConfigs()
+        log('[%s] Monster removed [%s]' % (pName, selected))
 
 def cbxIgnoreGeneral_clicked(checked):
     _cbx_clicked(checked, "lstIgnore", 0)
@@ -309,8 +278,7 @@ def loadDefaultConfig():
 def loadConfigs():
     loadDefaultConfig()
     if isJoined() and os.path.exists(getConfig()):
-        data = {}
-        with open(getConfig(), "r") as f:
+        with open(getConfig(), "r", encoding='utf-8') as f:
             data = json.load(f)
         if "Ignore Names" in data:
             global lstMobsData
@@ -379,5 +347,36 @@ def saveConfigs():
         data['Ignore Types'] = lstIgnore
         data['Ignore Names'] = lstMobsData
         data['Accept ForgottenWorld'] = QtBind.isChecked(gui, cbxAcceptForgottenWorld)
-        with open(getConfig(), "w") as f:
+        with open(getConfig(), "w", encoding='utf-8') as f:
             f.write(json.dumps(data, indent=4, sort_keys=True))
+
+def AttackArea(args):
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return 0
+    radius = None
+    if len(args) >= 2:
+        radius = round(float(args[1]), 2)
+    p = get_position()
+    if getMobCount(p, radius) > 0:
+        stop_bot()
+        set_training_position(p['region'], p['x'], p['y'], p['z'])
+        if radius != None:
+            set_training_radius(radius)
+        else:
+            set_training_radius(100.0)
+        threading.Timer(0.001, AttackMobs, [COUNT_MOBS_DELAY, False, p, radius]).start()
+    else:
+        log('[%s] No mobs at this area. Radius: %s' % (pName, str(radius) if radius != None else 'Max.'))
+    return 0
+
+def GoDimensional(args):
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return 0
+    stop_bot()
+    name = ''
+    if len(args) > 1:
+        name = args[1]
+    threading.Timer(0.001, GoDimensionalThread, [name]).start()
+    return 0

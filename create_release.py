@@ -20,8 +20,8 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.7.0',
-    'name': 'v1.7.0 - SROManager: plugin adı ve dosya yeniden adlandırıldı',
+    'tag_name': 'v1.7.16',
+    'name': 'v1.7.16 - FGW/HWT sc/ GitHub entegrasyonu',
     'body': release_notes,
     'draft': False,
     'prerelease': False
@@ -49,24 +49,33 @@ try:
         
         # Asset yükleme URL'i
         upload_url = result['upload_url'].replace('{?name,label}', '')
-        print(f"\nŞimdi sromanager.py dosyasını asset olarak yüklüyoruz...")
-        
-        # Dosyayı yükle
-        with open('sromanager.py', 'rb') as f:
-            file_data = f.read()
-        
         upload_headers = headers.copy()
         upload_headers['Content-Type'] = 'application/octet-stream'
-        
-        upload_req = urllib.request.Request(
-            upload_url + '?name=sromanager.py',
-            data=file_data,
-            headers=upload_headers,
-            method='POST'
-        )
-        
-        with urllib.request.urlopen(upload_req) as upload_response:
-            print("Asset başarıyla yüklendi!")
+
+        # sromanager.py yükle
+        print(f"\nsromanager.py yükleniyor...")
+        with open('sromanager.py', 'rb') as f:
+            upload_req = urllib.request.Request(
+                upload_url + '?name=sromanager.py',
+                data=f.read(),
+                headers=upload_headers,
+                method='POST'
+            )
+        with urllib.request.urlopen(upload_req) as r:
+            print("sromanager.py yüklendi.")
+
+        # cacert.pem yükle (SSL doğrulama için - CERTIFICATE_VERIFY_FAILED önlenir)
+        if os.path.isfile('cacert.pem'):
+            print("cacert.pem yükleniyor...")
+            with open('cacert.pem', 'rb') as f:
+                upload_req = urllib.request.Request(
+                    upload_url + '?name=cacert.pem',
+                    data=f.read(),
+                    headers=upload_headers,
+                    method='POST'
+                )
+            with urllib.request.urlopen(upload_req) as r:
+                print("cacert.pem yüklendi.")
             
 except urllib.error.HTTPError as e:
     print(f"Hata: {e.code}")

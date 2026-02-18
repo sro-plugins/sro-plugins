@@ -136,6 +136,36 @@ def _caravan_update_profile_display():
 
 CARAVAN_JOIN_STEP = 5
 CARAVAN_ON_PATH_THRESHOLD = 15
+CARAVAN_ARRIVAL_THRESHOLD = 5  # Varış noktasına bu mesafede sayılır (birim)
+
+def _caravan_get_last_waypoint(script_path, current_region):
+    """
+    Script dosyasındaki son walk koordinatlarını döndürür.
+    Return: (region, x, y, z) veya None (parse edilemezse)
+    """
+    try:
+        with open(script_path, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = [ln.strip() for ln in f.readlines() if ln.strip()]
+        for i in range(len(lines) - 1, -1, -1):
+            parts = lines[i].split(',')
+            if len(parts) < 2:
+                continue
+            cmd = parts[0].strip().lower()
+            if cmd != 'walk':
+                continue
+            try:
+                if len(parts) == 4:
+                    x, y, z = float(parts[1]), float(parts[2]), float(parts[3])
+                    return (current_region, x, y, z)
+                if len(parts) >= 5:
+                    reg = int(parts[1])
+                    x, y, z = float(parts[2]), float(parts[3]), float(parts[4])
+                    return (reg, x, y, z)
+            except (ValueError, IndexError):
+                continue
+    except Exception:
+        pass
+    return None
 
 def _caravan_script_from_nearest(script_path, current_region, current_x, current_y, current_z):
     """
@@ -647,11 +677,30 @@ def _caravan_loop():
         start_bot()
         _caravan_running = True
         log('[%s] [Oto-Kervan] Karavan scripti dosyadan çalışıyor (training script).' % pName)
+        last_waypoint = _caravan_get_last_waypoint(script_path, region)
         while not _caravan_stop_event.is_set():
+            if last_waypoint:
+                pos_now = get_position()
+                if pos_now:
+                    r = int(pos_now.get('region', 0))
+                    px = float(pos_now.get('x', 0))
+                    py = float(pos_now.get('y', 0))
+                    pz = float(pos_now.get('z', 0))
+                    wr, wx, wy, wz = last_waypoint[0], last_waypoint[1], last_waypoint[2], last_waypoint[3]
+                    if r == wr:
+                        dist = math.sqrt((px - wx) ** 2 + (py - wy) ** 2 + (pz - wz) ** 2)
+                        if dist <= CARAVAN_ARRIVAL_THRESHOLD:
+                            log('[%s] [Oto-Kervan] Varış noktasına ulaşıldı (mesafe ~%.0f). Otomatik durduruluyor...' % (pName, dist))
+                            stop_bot()
+                            _caravan_stop_event.set()
+                            _caravan_running = False
+                            QtBind.setText(gui, lblKervanStatus, 'Durum: Varışa ulaşıldı ■')
+                            break
             time.sleep(1)
-        log('[%s] [Oto-Kervan] Karavan durduruluyor...' % pName)
-        stop_bot()
-        _caravan_running = False
+        if _caravan_running:
+            log('[%s] [Oto-Kervan] Karavan durduruluyor...' % pName)
+            stop_bot()
+            _caravan_running = False
     except Exception as ex:
         log('[%s] [Oto-Kervan] Hata: %s' % (pName, str(ex)))
         _caravan_running = False

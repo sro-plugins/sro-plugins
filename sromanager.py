@@ -10,9 +10,32 @@ import copy
 import json
 import os
 import shutil
+import ssl
 import urllib.request
 import urllib.parse
+
+# SSL: Windows'ta CERTIFICATE_VERIFY_FAILED için CA paketi kullan (ek kurulum gerekmez)
+# Önce plugin dizinindeki cacert.pem, yoksa certifi (başka paketlerle gelmiş olabilir)
+try:
+    from urllib.request import HTTPSHandler, build_opener, install_opener
+    _ssl_dir = os.path.dirname(os.path.abspath(__file__))
+    _cacert_path = os.path.join(_ssl_dir, 'cacert.pem')
+    if os.path.isfile(_cacert_path):
+        _cafile = _cacert_path
+    else:
+        try:
+            import certifi
+            _cafile = certifi.where()
+        except ImportError:
+            _cafile = None
+    if _cafile:
+        _ssl_ctx = ssl.create_default_context(cafile=_cafile)
+        _opener = build_opener(HTTPSHandler(context=_ssl_ctx))
+        install_opener(_opener)
+except Exception:
+    pass
 import base64
+import ctypes
 import hmac
 import hashlib
 import sqlite3
@@ -23,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.0'
+pVersion = '1.7.16'
 
 MOVE_DELAY = 0.25
 
@@ -50,6 +73,13 @@ GITHUB_SCRIPT_COMMAND_MAKER_URL = 'https://raw.githubusercontent.com/%s/main/fea
 GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
 GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
 GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
+# Auto Hwt (FGW/HWT): GitHub sc/ klasöründeki scriptler
+GITHUB_FGW_RAW_TEMPLATE = 'https://raw.githubusercontent.com/%s/main/sc/%s' % (GITHUB_REPO, '%s')
+GITHUB_FGW_SCRIPT_FILENAMES = [
+    'Togui Village Forgotten World.txt', 'Ship Wreck 1-2 Stars Forgotten World.txt',
+    'Ship Wreck 3-4 Stars Forgotten World.txt', 'Flame Mountain Forgotten World.txt',
+    'Holy Water Temple Beginner.txt', 'Holy Water Temple Intermediate.txt', 'Holy Water Temple Advanced.txt',
+]
 # Oto Kervan: GitHub'daki karavan scriptleri klasörü (API ile liste, raw ile indirme)
 # GitHub'da klasör yoksa veya 404 alırsa yerel "caravan" klasörü kullanılır (plugin yanında).
 GITHUB_CARAVAN_FOLDER = 'caravan'
@@ -101,7 +131,8 @@ def _fetch_github_latest():
         log('[%s] Güncelleme kontrolü hatası: %s' % (pName, str(ex)))
         return None
 
-def _get_update_download_url():
+def _get_release_asset_urls():
+    """Son release'taki asset'lerin {isim: url} sözlüğünü döndürür."""
     try:
         req = urllib.request.Request(
             GITHUB_API_LATEST,
@@ -110,14 +141,21 @@ def _get_update_download_url():
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read().decode('utf-8'))
         assets = data.get('assets') or []
+        result = {}
         for a in assets:
-            name = (a.get('name') or '').lower()
-            if name == PLUGIN_FILENAME.lower() or name.endswith('.py'):
-                u = a.get('browser_download_url')
-                if u:
-                    return u
+            name = (a.get('name') or '').strip()
+            url = a.get('browser_download_url')
+            if name and url:
+                result[name] = url
+        return result
     except Exception:
-        pass
+        return {}
+
+def _get_update_download_url():
+    urls = _get_release_asset_urls()
+    for name, url in urls.items():
+        if name.lower() == PLUGIN_FILENAME.lower() or name.lower().endswith('.py'):
+            return url
     return GITHUB_RAW_MAIN
 
 _update_label_ref = None
@@ -290,6 +328,13 @@ def _validate_license():
         
         # İmzalı payload header'ları (sunucu doğrulama için)
         signed_headers = _create_signed_headers(license_key, user_ip, endpoint="validate")
+        payload_b64 = signed_headers.get("X-SROMANAGER-Payload", "")
+        if payload_b64:
+            try:
+                payload_raw = base64.b64decode(payload_b64).decode('utf-8')
+                log('[%s] [Server] Payload (base64 öncesi): %s' % (pName, payload_raw))
+            except Exception:
+                pass
         headers = {
             'User-Agent': 'phBot-SROManager/' + pVersion,
             'Accept': 'application/json',
@@ -631,6 +676,7 @@ def _do_auto_update_thread():
             except Exception:
                 pass
         log('[%s] Güncelleme indiriliyor...' % pName)
+        asset_urls = _get_release_asset_urls()
         download_url = _get_update_download_url()
         req = urllib.request.Request(download_url, headers={'User-Agent': 'phBot-SROManager/1.0'})
         with urllib.request.urlopen(req, timeout=15) as r:
@@ -645,8 +691,23 @@ def _do_auto_update_thread():
                     pass
             return
         plugin_path = os.path.abspath(__file__)
+        plugin_dir = os.path.dirname(plugin_path)
         with open(plugin_path, 'wb') as f:
             f.write(new_content)
+        # cacert.pem'i de indir (SSL doğrulama için)
+        cacert_url = asset_urls.get('cacert.pem')
+        if cacert_url:
+            try:
+                req_ca = urllib.request.Request(cacert_url, headers={'User-Agent': 'phBot-SROManager/1.0'})
+                with urllib.request.urlopen(req_ca, timeout=15) as r_ca:
+                    cacert_content = r_ca.read()
+                if cacert_content and len(cacert_content) > 100:
+                    cacert_path = os.path.join(plugin_dir, 'cacert.pem')
+                    with open(cacert_path, 'wb') as f:
+                        f.write(cacert_content)
+                    log('[%s] cacert.pem güncellendi.' % pName)
+            except Exception as ex:
+                log('[%s] cacert.pem indirilemedi (SSL çalışmaya devam eder): %s' % (pName, str(ex)))
         log('[%s] Güncelleme tamamlandı. Eklentiyi yeniden yükleyin.' % pName)
         _update_status_text = 'Güncellendi - yeniden yükleyin'
         if _update_label_ref is not None:
@@ -1140,26 +1201,57 @@ def garden_dungeon_stop():
     if ns and 'garden_dungeon_stop' in ns:
         ns['garden_dungeon_stop']()
 
-# Auto Hwt (Tab 4): GitHub'dan indirilip exec ile çalıştırılır (şu an placeholder)
+# Auto Hwt (Tab 4): SROMaster FGW & HWT - feature/auto_hwt.py (yerel önce, GitHub yedek)
 _auto_hwt_namespace = None
 
 def _get_auto_hwt_namespace():
     global _auto_hwt_namespace
     if _auto_hwt_namespace is not None:
         return _auto_hwt_namespace
-    try:
-        req = urllib.request.Request(
-            GITHUB_AUTO_HWT_URL,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-    except Exception as ex:
-        log('[%s] Auto Hwt modülü indirilemedi: %s' % (pName, str(ex)))
-        return None
+    code = None
+    auto_hwt_path = None
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
+        local_path = os.path.join(base, 'feature', 'auto_hwt.py')
+        if os.path.exists(local_path):
+            try:
+                with open(local_path, 'r', encoding='utf-8') as f:
+                    code = f.read()
+                auto_hwt_path = local_path
+                break
+            except Exception as ex:
+                log('[%s] [Auto Hwt] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    if not code:
+        try:
+            req = urllib.request.Request(
+                GITHUB_AUTO_HWT_URL,
+                headers={'User-Agent': 'phBot-SROManager/1.0'}
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                code = r.read().decode('utf-8')
+        except Exception as ex:
+            log('[%s] Auto Hwt modülü indirilemedi: %s' % (pName, str(ex)))
+            return None
+    if auto_hwt_path is None:
+        auto_hwt_path = os.path.join(plugin_dir, 'feature', 'auto_hwt.py')
+    g = globals()
     namespace = {
+        '__file__': auto_hwt_path,
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         'gui': gui, 'QtBind': QtBind,
+        'get_config_dir': get_config_dir, 'get_character_data': get_character_data,
+        'get_position': get_position, 'get_monsters': get_monsters,
+        'set_training_script': set_training_script, 'set_training_position': set_training_position,
+        'start_bot': start_bot, 'stop_bot': stop_bot,
+        'create_notification': globals().get('create_notification', lambda x: log('[%s] %s' % (pName, x))),
+        'get_training_script': globals().get('get_training_script', lambda: None),
+        'time': time, 'os': os, 'urllib': __import__('urllib'),
+        'plugin_dir': plugin_dir,
+        'GITHUB_FGW_RAW_TEMPLATE': GITHUB_FGW_RAW_TEMPLATE,
+        'GITHUB_FGW_SCRIPT_FILENAMES': GITHUB_FGW_SCRIPT_FILENAMES,
+        'cbEnabled': g.get('_hwt_cbEnabled'), 'cbP1': g.get('_hwt_cbP1'), 'cbP2': g.get('_hwt_cbP2'),
+        'cbP3': g.get('_hwt_cbP3'), 'cbP4': g.get('_hwt_cbP4'), 'cbP5': g.get('_hwt_cbP5'),
+        'cbP6': g.get('_hwt_cbP6'), 'cbP7': g.get('_hwt_cbP7'), 'cbP8': g.get('_hwt_cbP8'),
     }
     try:
         exec(code, namespace)
@@ -1168,6 +1260,13 @@ def _get_auto_hwt_namespace():
         return None
     _auto_hwt_namespace = namespace
     return _auto_hwt_namespace
+
+def _auto_hwt_call(name, *args, **kwargs):
+    ns = _get_auto_hwt_namespace()
+    if ns and name in ns:
+        fn = ns[name]
+        return fn(*args, **kwargs) if args or kwargs else fn()
+    return None
 
 # ______________________________ Oto Kervan (Tab 5 - GitHub'dan uzaktan) ______________________________ #
 _caravan_namespace = None
@@ -1756,118 +1855,118 @@ _btn_bank_sort_stop = QtBind.createButton(gui, 'bank_sort_stop', 'Durdur', _bank
 _add_tab1(_btn_bank_sort_stop, _bank_container_x + (_container_w - 160) // 2 + 80, _by2 + 25)
 _protected_buttons[1].extend([_btn_bank_sort_start, _btn_bank_sort_stop])
 
-# Tab 2 - Auto Dungeon
-_t2_y = _content_y + 10
-_t2_x = _tab_bar_x + 20
+# Tab 2 - Auto Dungeon (xAutoDungeon UI tasarımı)
+_t2_y = _content_y + 6
+_t2_x = _tab_bar_x + 31
 
-# Sol taraf - Canavar isimleri
-lblMobs = QtBind.createLabel(gui, '#  Sayılmayacak canavar adları  #\n#       Canavar Sayacından       #', _t2_x, _t2_y)
+# Sol - Add monster names to ignore (xAutoDungeon layout)
+lblMobs = QtBind.createLabel(gui, '#   Add monster names to ignore    #\n#          from Monster Counter         #', _t2_x, _t2_y)
 _add_tab2(lblMobs, _t2_x, _t2_y)
-tbxMobs = QtBind.createLineEdit(gui, "", _t2_x, _t2_y + 35, 100, 20)
-_add_tab2(tbxMobs, _t2_x, _t2_y + 35)
-lstMobs = QtBind.createList(gui, _t2_x, _t2_y + 56, 176, 170)
-_add_tab2(lstMobs, _t2_x, _t2_y + 56)
-btnAddMob = QtBind.createButton(gui, 'btnAddMob_clicked', "    Ekle    ", _t2_x + 101, _t2_y + 34)
-_add_tab2(btnAddMob, _t2_x + 101, _t2_y + 34)
-btnRemMob = QtBind.createButton(gui, 'btnRemMob_clicked', "   Kaldır   ", _t2_x + 49, _t2_y + 226)
-_add_tab2(btnRemMob, _t2_x + 49, _t2_y + 226)
+tbxMobs = QtBind.createLineEdit(gui, "", _t2_x, _t2_y + 29, 100, 20)
+_add_tab2(tbxMobs, _t2_x, _t2_y + 29)
+lstMobs = QtBind.createList(gui, _t2_x, _t2_y + 50, 176, 203)
+_add_tab2(lstMobs, _t2_x, _t2_y + 50)
+btnAddMob = QtBind.createButton(gui, 'btnAddMob_clicked', "    Add    ", _t2_x + 101, _t2_y + 28)
+_add_tab2(btnAddMob, _t2_x + 101, _t2_y + 28)
+btnRemMob = QtBind.createButton(gui, 'btnRemMob_clicked', "     Remove     ", _t2_x + 49, _t2_y + 253)
+_add_tab2(btnRemMob, _t2_x + 49, _t2_y + 253)
 
-# Orta - Canavar Sayacı tercihleri
-_t2_mid_x = _t2_x + 210
-lblPreferences = QtBind.createLabel(gui, '#  Canavar Sayacı tercihleri  #', _t2_mid_x, _t2_y)
+# Orta - Monster Counter preferences (xAutoDungeon layout)
+_t2_mid_x = _t2_x + 209
+lblPreferences = QtBind.createLabel(gui, '#             Monster Counter preferences            #', _t2_mid_x, _t2_y)
 _add_tab2(lblPreferences, _t2_mid_x, _t2_y)
 
 _y = _t2_y + 26
 lblGeneral = QtBind.createLabel(gui, 'General (0)', _t2_mid_x, _y)
 _add_tab2(lblGeneral, _t2_mid_x, _y)
-cbxIgnoreGeneral = QtBind.createCheckBox(gui, 'cbxIgnoreGeneral_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreGeneral = QtBind.createCheckBox(gui, 'cbxIgnoreGeneral_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreGeneral, _t2_mid_x + 105, _y)
-cbxOnlyCountGeneral = QtBind.createCheckBox(gui, 'cbxOnlyCountGeneral_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountGeneral = QtBind.createCheckBox(gui, 'cbxOnlyCountGeneral_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountGeneral, _t2_mid_x + 165, _y)
 
 _y += 20
 lblChampion = QtBind.createLabel(gui, 'Champion (1)', _t2_mid_x, _y)
 _add_tab2(lblChampion, _t2_mid_x, _y)
-cbxIgnoreChampion = QtBind.createCheckBox(gui, 'cbxIgnoreChampion_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreChampion = QtBind.createCheckBox(gui, 'cbxIgnoreChampion_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreChampion, _t2_mid_x + 105, _y)
-cbxOnlyCountChampion = QtBind.createCheckBox(gui, 'cbxOnlyCountChampion_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountChampion = QtBind.createCheckBox(gui, 'cbxOnlyCountChampion_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountChampion, _t2_mid_x + 165, _y)
 
 _y += 20
 lblGiant = QtBind.createLabel(gui, 'Giant (4)', _t2_mid_x, _y)
 _add_tab2(lblGiant, _t2_mid_x, _y)
-cbxIgnoreGiant = QtBind.createCheckBox(gui, 'cbxIgnoreGiant_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreGiant = QtBind.createCheckBox(gui, 'cbxIgnoreGiant_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreGiant, _t2_mid_x + 105, _y)
-cbxOnlyCountGiant = QtBind.createCheckBox(gui, 'cbxOnlyCountGiant_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountGiant = QtBind.createCheckBox(gui, 'cbxOnlyCountGiant_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountGiant, _t2_mid_x + 165, _y)
 
 _y += 20
 lblTitan = QtBind.createLabel(gui, 'Titan (5)', _t2_mid_x, _y)
 _add_tab2(lblTitan, _t2_mid_x, _y)
-cbxIgnoreTitan = QtBind.createCheckBox(gui, 'cbxIgnoreTitan_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreTitan = QtBind.createCheckBox(gui, 'cbxIgnoreTitan_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreTitan, _t2_mid_x + 105, _y)
-cbxOnlyCountTitan = QtBind.createCheckBox(gui, 'cbxOnlyCountTitan_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountTitan = QtBind.createCheckBox(gui, 'cbxOnlyCountTitan_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountTitan, _t2_mid_x + 165, _y)
 
 _y += 20
 lblStrong = QtBind.createLabel(gui, 'Strong (6)', _t2_mid_x, _y)
 _add_tab2(lblStrong, _t2_mid_x, _y)
-cbxIgnoreStrong = QtBind.createCheckBox(gui, 'cbxIgnoreStrong_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreStrong = QtBind.createCheckBox(gui, 'cbxIgnoreStrong_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreStrong, _t2_mid_x + 105, _y)
-cbxOnlyCountStrong = QtBind.createCheckBox(gui, 'cbxOnlyCountStrong_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountStrong = QtBind.createCheckBox(gui, 'cbxOnlyCountStrong_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountStrong, _t2_mid_x + 165, _y)
 
 _y += 20
 lblElite = QtBind.createLabel(gui, 'Elite (7)', _t2_mid_x, _y)
 _add_tab2(lblElite, _t2_mid_x, _y)
-cbxIgnoreElite = QtBind.createCheckBox(gui, 'cbxIgnoreElite_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreElite = QtBind.createCheckBox(gui, 'cbxIgnoreElite_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreElite, _t2_mid_x + 105, _y)
-cbxOnlyCountElite = QtBind.createCheckBox(gui, 'cbxOnlyCountElite_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountElite = QtBind.createCheckBox(gui, 'cbxOnlyCountElite_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountElite, _t2_mid_x + 165, _y)
 
 _y += 20
 lblUnique = QtBind.createLabel(gui, 'Unique (8)', _t2_mid_x, _y)
 _add_tab2(lblUnique, _t2_mid_x, _y)
-cbxIgnoreUnique = QtBind.createCheckBox(gui, 'cbxIgnoreUnique_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreUnique = QtBind.createCheckBox(gui, 'cbxIgnoreUnique_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreUnique, _t2_mid_x + 105, _y)
-cbxOnlyCountUnique = QtBind.createCheckBox(gui, 'cbxOnlyCountUnique_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountUnique = QtBind.createCheckBox(gui, 'cbxOnlyCountUnique_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountUnique, _t2_mid_x + 165, _y)
 
 _y += 20
 lblParty = QtBind.createLabel(gui, 'Party (16)', _t2_mid_x, _y)
 _add_tab2(lblParty, _t2_mid_x, _y)
-cbxIgnoreParty = QtBind.createCheckBox(gui, 'cbxIgnoreParty_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreParty = QtBind.createCheckBox(gui, 'cbxIgnoreParty_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreParty, _t2_mid_x + 105, _y)
-cbxOnlyCountParty = QtBind.createCheckBox(gui, 'cbxOnlyCountParty_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountParty = QtBind.createCheckBox(gui, 'cbxOnlyCountParty_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountParty, _t2_mid_x + 165, _y)
 
 _y += 20
 lblChampionParty = QtBind.createLabel(gui, 'ChampionParty (17)', _t2_mid_x, _y)
 _add_tab2(lblChampionParty, _t2_mid_x, _y)
-cbxIgnoreChampionParty = QtBind.createCheckBox(gui, 'cbxIgnoreChampionParty_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreChampionParty = QtBind.createCheckBox(gui, 'cbxIgnoreChampionParty_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreChampionParty, _t2_mid_x + 105, _y)
-cbxOnlyCountChampionParty = QtBind.createCheckBox(gui, 'cbxOnlyCountChampionParty_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountChampionParty = QtBind.createCheckBox(gui, 'cbxOnlyCountChampionParty_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountChampionParty, _t2_mid_x + 165, _y)
 
 _y += 20
 lblGiantParty = QtBind.createLabel(gui, 'GiantParty (20)', _t2_mid_x, _y)
 _add_tab2(lblGiantParty, _t2_mid_x, _y)
-cbxIgnoreGiantParty = QtBind.createCheckBox(gui, 'cbxIgnoreGiantParty_clicked', 'Yoksay', _t2_mid_x + 105, _y)
+cbxIgnoreGiantParty = QtBind.createCheckBox(gui, 'cbxIgnoreGiantParty_clicked', 'Ignore', _t2_mid_x + 105, _y)
 _add_tab2(cbxIgnoreGiantParty, _t2_mid_x + 105, _y)
-cbxOnlyCountGiantParty = QtBind.createCheckBox(gui, 'cbxOnlyCountGiantParty_clicked', 'Sadece Say', _t2_mid_x + 165, _y)
+cbxOnlyCountGiantParty = QtBind.createCheckBox(gui, 'cbxOnlyCountGiantParty_clicked', 'Only Count', _t2_mid_x + 165, _y)
 _add_tab2(cbxOnlyCountGiantParty, _t2_mid_x + 165, _y)
 
 _y += 30
-cbxAcceptForgottenWorld = QtBind.createCheckBox(gui, 'cbxAcceptForgottenWorld_checked', 'Unutulmuş Dünya davetlerini kabul et', _t2_mid_x, _y)
+cbxAcceptForgottenWorld = QtBind.createCheckBox(gui, 'cbxAcceptForgottenWorld_checked', 'Accept Forgotten World invitations', _t2_mid_x, _y)
 _add_tab2(cbxAcceptForgottenWorld, _t2_mid_x, _y)
 
-# Sağ taraf - Canavar Sayacı
-_t2_right_x = _t2_mid_x + 260
-lblMonsterCounter = QtBind.createLabel(gui, '#       Canavar Sayacı       #', _t2_right_x, _t2_y)
+# Sağ - Monster Counter (xAutoDungeon layout)
+_t2_right_x = _t2_mid_x + 280
+lblMonsterCounter = QtBind.createLabel(gui, "#                 Monster Counter                 #", _t2_right_x, _t2_y)
 _add_tab2(lblMonsterCounter, _t2_right_x, _t2_y)
-lstMonsterCounter = QtBind.createList(gui, _t2_right_x, _t2_y + 23, 197, 237)
-_add_tab2(lstMonsterCounter, _t2_right_x, _t2_y + 23)
-QtBind.append(gui, lstMonsterCounter, 'İsim (Tür)')
+lstMonsterCounter = QtBind.createList(gui, _t2_right_x, _t2_y + 17, 197, 237)
+_add_tab2(lstMonsterCounter, _t2_right_x, _t2_y + 17)
+QtBind.append(gui, lstMonsterCounter, 'Name (Type)')
 
 # Tab 2 butonlarını lisans korumasına ekle
 _protected_buttons[2] = [btnAddMob, btnRemMob, cbxIgnoreGeneral, cbxOnlyCountGeneral, cbxIgnoreChampion, cbxOnlyCountChampion,
@@ -1926,23 +2025,136 @@ _add_tab3(QtBind.createLabel(gui, 'Script türünü seç, sonra Başlat', _gd_ti
 # Tab 3 butonlarını lisans korumasına ekle
 _protected_buttons[3] = [_btn_garden_wizz, _btn_garden_normal, _btn_garden_start, _btn_garden_stop]
 
-# Tab 4 - Auto Hwt
-_hwt_container_w = 380
-_hwt_container_h = 240
-_hwt_container_x = _tab_bar_x + (_tab_bar_w - _hwt_container_w) // 2
-_hwt_container_y = _content_y + 15
+# Tab 4 - Auto Hwt (SROMaster FGW & HWT tasarımı)
+_hwt_x = _tab_bar_x + 15
+_hwt_y = _content_y + 10
 
-_hwt_container = QtBind.createList(gui, _hwt_container_x, _hwt_container_y, _hwt_container_w, _hwt_container_h)
-_add_tab4(_hwt_container, _hwt_container_x, _hwt_container_y)
+_add_tab4(QtBind.createLabel(gui, '%s FGW / HWT v2.0' % pName, _hwt_x, _hwt_y), _hwt_x, _hwt_y)
 
-_hwt_title_x = _hwt_container_x + 20
-_hwt_title_y = _hwt_container_y + 15
+_hwt_cbEnabled = QtBind.createCheckBox(gui, 'hwt_cbx_toggle_enabled', 'Eklentiyi Etkinleştir (Ghost Curse Yoksayılır)', _hwt_x, _hwt_y + 25)
+_add_tab4(_hwt_cbEnabled, _hwt_x, _hwt_y + 25)
 
-_add_tab4(QtBind.createLabel(gui, 'Auto Hwt', _hwt_title_x, _hwt_title_y), _hwt_title_x, _hwt_title_y)
-_add_tab4(QtBind.createLabel(gui, 'Yakında eklenecek...', _hwt_title_x, _hwt_title_y + 30), _hwt_title_x, _hwt_title_y + 30)
+_add_tab4(QtBind.createLabel(gui, 'FGW / HWT Scriptleri (Eğitim scriptine yüklenecek):', _hwt_x, _hwt_y + 60), _hwt_x, _hwt_y + 60)
+_add_tab4(QtBind.createLabel(gui, 'PC Hesabı:', _hwt_x + 290, _hwt_y + 60), _hwt_x + 290, _hwt_y + 60)
 
-# Tab 4 butonları lisans korumasına (şu an boş; özellik eklenince eklenecek)
-_protected_buttons[4] = []
+_hwt_cbP1 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_1', '1', _hwt_x + 360, _hwt_y + 58)
+_hwt_cbP2 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_2', '2', _hwt_x + 390, _hwt_y + 58)
+_hwt_cbP3 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_3', '3', _hwt_x + 420, _hwt_y + 58)
+_hwt_cbP4 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_4', '4', _hwt_x + 450, _hwt_y + 58)
+_hwt_cbP5 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_5', '5', _hwt_x + 480, _hwt_y + 58)
+_hwt_cbP6 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_6', '6', _hwt_x + 510, _hwt_y + 58)
+_hwt_cbP7 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_7', '7', _hwt_x + 540, _hwt_y + 58)
+_hwt_cbP8 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_8', '8', _hwt_x + 570, _hwt_y + 58)
+QtBind.setChecked(gui, _hwt_cbP1, True)
+_add_tab4(_hwt_cbP1, _hwt_x + 360, _hwt_y + 58)
+_add_tab4(_hwt_cbP2, _hwt_x + 390, _hwt_y + 58)
+_add_tab4(_hwt_cbP3, _hwt_x + 420, _hwt_y + 58)
+_add_tab4(_hwt_cbP4, _hwt_x + 450, _hwt_y + 58)
+_add_tab4(_hwt_cbP5, _hwt_x + 480, _hwt_y + 58)
+_add_tab4(_hwt_cbP6, _hwt_x + 510, _hwt_y + 58)
+_add_tab4(_hwt_cbP7, _hwt_x + 540, _hwt_y + 58)
+_add_tab4(_hwt_cbP8, _hwt_x + 570, _hwt_y + 58)
+
+_hwt_btn_togui = QtBind.createButton(gui, 'hwt_btn_togui', 'Togui Köyü', _hwt_x, _hwt_y + 85)
+_hwt_btn_ship12 = QtBind.createButton(gui, 'hwt_btn_ship12', 'Gemi Enkazı 1-2★', _hwt_x + 120, _hwt_y + 85)
+_hwt_btn_ship34 = QtBind.createButton(gui, 'hwt_btn_ship34', 'Gemi Enkazı 3-4★', _hwt_x + 270, _hwt_y + 85)
+_hwt_btn_flame = QtBind.createButton(gui, 'hwt_btn_flame', 'Alev Dağı', _hwt_x + 420, _hwt_y + 85)
+_hwt_btn_hwt_beg = QtBind.createButton(gui, 'hwt_btn_hwt_beginner', 'HWT Başlangıç', _hwt_x, _hwt_y + 118)
+_hwt_btn_hwt_int = QtBind.createButton(gui, 'hwt_btn_hwt_intermediate', 'HWT Orta', _hwt_x + 120, _hwt_y + 118)
+_hwt_btn_hwt_adv = QtBind.createButton(gui, 'hwt_btn_hwt_advanced', 'HWT İleri', _hwt_x + 270, _hwt_y + 118)
+
+_add_tab4(_hwt_btn_togui, _hwt_x, _hwt_y + 85)
+_add_tab4(_hwt_btn_ship12, _hwt_x + 120, _hwt_y + 85)
+_add_tab4(_hwt_btn_ship34, _hwt_x + 270, _hwt_y + 85)
+_add_tab4(_hwt_btn_flame, _hwt_x + 420, _hwt_y + 85)
+_add_tab4(_hwt_btn_hwt_beg, _hwt_x, _hwt_y + 118)
+_add_tab4(_hwt_btn_hwt_int, _hwt_x + 120, _hwt_y + 118)
+_add_tab4(_hwt_btn_hwt_adv, _hwt_x + 270, _hwt_y + 118)
+
+_hwt_btn_download = QtBind.createButton(gui, 'hwt_btn_download', 'Scriptleri İndir', _hwt_x + 420, _hwt_y + 32)
+_add_tab4(_hwt_btn_download, _hwt_x + 420, _hwt_y + 32)
+
+_add_tab4(QtBind.createLabel(gui, 'Nasıl kullanılır SROMaster FGW Yöneticisi:', _hwt_x, _hwt_y + 165), _hwt_x, _hwt_y + 165)
+_add_tab4(QtBind.createLabel(gui, '1. Adım: "Scriptleri İndir" tuşuna basın', _hwt_x, _hwt_y + 185), _hwt_x, _hwt_y + 185)
+_add_tab4(QtBind.createLabel(gui, '2. Adım: İstediğiniz FGW butonuna basın (Togui / Gemi / Alev / HWT)', _hwt_x, _hwt_y + 203), _hwt_x, _hwt_y + 203)
+_add_tab4(QtBind.createLabel(gui, '3. Adım: PC Hesabı 1~8 seçin (takılmamak için her karakter kendi scripti)', _hwt_x, _hwt_y + 221), _hwt_x, _hwt_y + 221)
+_add_tab4(QtBind.createLabel(gui, '4. Adım: Attack Area etkin > Bot Başlat', _hwt_x, _hwt_y + 239), _hwt_x, _hwt_y + 239)
+
+# Tab 4 butonları lisans korumasına
+_protected_buttons[4] = [
+    _hwt_cbEnabled, _hwt_cbP1, _hwt_cbP2, _hwt_cbP3, _hwt_cbP4, _hwt_cbP5, _hwt_cbP6, _hwt_cbP7, _hwt_cbP8,
+    _hwt_btn_togui, _hwt_btn_ship12, _hwt_btn_ship34, _hwt_btn_flame, _hwt_btn_hwt_beg, _hwt_btn_hwt_int, _hwt_btn_hwt_adv, _hwt_btn_download
+]
+
+def hwt_cbx_toggle_enabled(checked):
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('cbx_toggle_enabled', checked)
+
+def hwt_cbx_slot_1(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 1)
+def hwt_cbx_slot_2(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 2)
+def hwt_cbx_slot_3(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 3)
+def hwt_cbx_slot_4(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 4)
+def hwt_cbx_slot_5(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 5)
+def hwt_cbx_slot_6(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 6)
+def hwt_cbx_slot_7(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 7)
+def hwt_cbx_slot_8(checked):
+    if checked and _is_license_valid():
+        _auto_hwt_call('_set_slot', 8)
+
+def hwt_btn_download():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_download_all_scripts')
+
+def hwt_btn_togui():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'Togui Köyü', 'Togui Village Forgotten World.txt', 'SCRIPT_TOGUI')
+
+def hwt_btn_ship12():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 1-2★', 'Ship Wreck 1-2 Stars Forgotten World.txt', 'SCRIPT_SHIP12')
+
+def hwt_btn_ship34():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 3-4★', 'Ship Wreck 3-4 Stars Forgotten World.txt', 'SCRIPT_SHIP34')
+
+def hwt_btn_flame():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'Alev Dağı', 'Flame Mountain Forgotten World.txt', 'SCRIPT_FLAME')
+
+def hwt_btn_hwt_beginner():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'HWT Başlangıç', 'Holy Water Temple Beginner.txt', 'SCRIPT_HWT_BEGINNER')
+
+def hwt_btn_hwt_intermediate():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'HWT Orta', 'Holy Water Temple Intermediate.txt', 'SCRIPT_HWT_INTERMEDIATE')
+
+def hwt_btn_hwt_advanced():
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('_set_training_script_from_file', 'HWT İleri', 'Holy Water Temple Advanced.txt', 'SCRIPT_HWT_ADVANCED')
 
 # Tab 5 - Oto Kervan (GitHub'dan script listesi, seçilen ile Başla/Durdur)
 _kervan_x = _tab_bar_x + 30
@@ -2613,12 +2825,12 @@ _add_tab11(_scm_btnHideDel, _scm_x + 370, _scm_y + 192)
 _scm_lstHide = QtBind.createList(gui, _scm_x + 490, _scm_y + 168, 190, 52)
 _add_tab11(_scm_lstHide, _scm_x + 490, _scm_y + 168)
 _add_tab11(QtBind.createLabel(gui, 'Lider:', _scm_x, _scm_y + 228), _scm_x, _scm_y + 228)
-_scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 130, 20)
+_scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 200, 20)
 _add_tab11(_scm_tbLeader, _scm_x + 55, _scm_y + 224)
+_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_commands_help_clicked', 'Yardım', _scm_x + 270, _scm_y + 223)
+_add_tab11(_scm_btnHelp, _scm_x + 270, _scm_y + 223)
 _scm_lblStatus = QtBind.createLabel(gui, 'Hazır', _scm_x, _scm_y + 248)
 _add_tab11(_scm_lblStatus, _scm_x, _scm_y + 248)
-_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_help_clicked', 'Yardım', _scm_x + 680, _scm_y)
-_add_tab11(_scm_btnHelp, _scm_x + 680, _scm_y)
 
 _script_command_maker_namespace = None
 
@@ -2648,10 +2860,16 @@ def _get_script_command_maker_namespace():
         except Exception as ex:
             log('[%s] [Script-Command] Modül indirilemedi: %s' % (pName, str(ex)))
             return None
+    script_cmds_path = get_config_dir()[:-7] if get_config_dir() else ''
     namespace = {
         'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         'get_config_dir': get_config_dir, 'get_character_data': get_character_data,
         'inject_joymax': inject_joymax, 'os': os, 'json': json, 're': __import__('re'), 'time': time,
+        'start_bot': start_bot, 'stop_bot': stop_bot, 'start_trace': start_trace, 'stop_trace': stop_trace,
+        'get_position': get_position, 'set_training_position': set_training_position,
+        'set_training_radius': set_training_radius, 'set_training_script': set_training_script,
+        'set_training_area': set_training_area, 'set_profile': set_profile, 'get_party': get_party,
+        'get_pets': get_pets, 'move_to': move_to, 'phBotChat': phBotChat, 'script_cmds_path': script_cmds_path,
         'tbChat': _scm_tbChat, 'tbScript': _scm_tbScript, 'tbOpcode': _scm_tbOpcode, 'tbData': _scm_tbData,
         'tbLeader': _scm_tbLeader, 'tbHide': _scm_tbHide, 'lstMap': _scm_lstMap, 'lstHide': _scm_lstHide,
         'btnSave': _scm_btnSave, 'btnLoad': _scm_btnLoad, 'btnRemove': _scm_btnRemove, 'btnEdit': _scm_btnEdit,
@@ -2680,6 +2898,32 @@ def _scm_ns_call(name, *args):
     except Exception:
         return None
 
+def scm_btn_commands_help_clicked():
+    """Varsayılan komutlar dialog'u açar."""
+    try:
+        text = (
+            "Varsayılan komutlar (lider listesindeki oyunculardan gelen parti sohbeti mesajları):\r\n\r\n"
+            "START – Botu başlatır\r\n"
+            "STOP – Botu durdurur\r\n"
+            "TRACE [Oyuncu] – Parti liderine veya belirtilen oyuncuya trace (parametre yoksa komutu yazan oyuncuya)\r\n"
+            "NOTRACE – Trace'i durdurur\r\n"
+            "ZERK – Berserker (Fury) modunu açar\r\n"
+            "SETPOS [X Y Region Z] – Antrenman alanını ayarlar (parametre yoksa mevcut pozisyon)\r\n"
+            "GETPOS – Mevcut pozisyonu özel mesajla gönderir\r\n"
+            "SETRADIUS [m] – Farm yarıçapını ayarlar (varsayılan 35)\r\n"
+            "SETSCRIPT [yol] – Script yolunu ayarlar\r\n"
+            "SETAREA [isim] – Config'teki alan adına göre alanı değiştirir\r\n"
+            "PROFILE [isim] – Profili değiştirir\r\n"
+            "FOLLOW [Oyuncu] [mesafe] – Belirtilen oyuncuyu mesafeyle takip eder (varsayılan: komutu yazan, 10 m)\r\n"
+            "NOFOLLOW – Takibi durdurur"
+        )
+        ctypes.windll.user32.MessageBoxW(None, str(text), "%s — Varsayılan Komutlar" % pName, 0x40)
+    except Exception as ex:
+        try:
+            log('[%s] Script-Command yardım penceresi açılamadı: %s' % (pName, str(ex)))
+        except Exception:
+            pass
+
 def scm_btn_help_clicked():
     try:
         text = (
@@ -2697,7 +2941,8 @@ def scm_btn_help_clicked():
             "Chat + Opcode (ve isteğe Data) girip Kaydet'e basın. "
             "Bu eşleme JSON dosyasına kaydedilir:\r\n"
             "  Config/SROManager/script_command_Server_Karakter.json\r\n"
-            "Lider alanına parti liderinin adını yazın; sadece o kişi Chat komutlarını tetikleyebilir.\r\n\r\n"
+            "Lider alanına parti liderinin adını yazın; sadece o kişi Chat komutlarını tetikleyebilir. "
+            "Birden fazla isim: A,B,C şeklinde virgülle ayırarak girin.\r\n\r\n"
             "SROManager:\r\n"
             "Script komutunda 'sromanager <anahtar>' yazarsanız, phBot script panelinden "
             "ör. sromanager bless çağrıldığında o eşleme çalışır (paket enjekte edilir).\r\n\r\n"
@@ -2705,7 +2950,14 @@ def scm_btn_help_clicked():
             "1) 'Tüm C2S paketlerini göster' işaretleyin\r\n"
             "2) Oyunda yapmak istediğiniz işlemi yapın (log'dan opcode/data kopyalayın)\r\n"
             "3) Chat + Script + Opcode + Data girin, Kaydet\r\n"
-            "4) Lider adını yazın (Chat için) veya sromanager kullanın (Script için)"
+            "4) Lider adını yazın (Chat için, birden fazlaysa A,B,C) veya sromanager kullanın (Script için)\r\n\r\n"
+            "Varsayılan komutlar (liderler parti sohbetinde yazabilir):\r\n"
+            "- START, STOP : Bot başlat/durdur\r\n"
+            "- TRACE [Oyuncu], NOTRACE : Trace başlat/durdur\r\n"
+            "- ZERK : Berserker modu\r\n"
+            "- SETPOS [X Y Region Z], GETPOS : Antrenman alanı/pozisyon\r\n"
+            "- SETRADIUS [m], SETSCRIPT [yol], SETAREA [isim], PROFILE [isim]\r\n"
+            "- FOLLOW [Oyuncu] [mesafe], NOFOLLOW : Takip"
         )
         ctypes.windll.user32.MessageBoxW(None, str(text), "%s — Script-Command Yardım" % pName, 0x40)
     except Exception as ex:
@@ -2856,6 +3108,10 @@ def event_loop():
     scm_ns = _get_script_command_maker_namespace()
     if scm_ns and 'event_loop' in scm_ns:
         scm_ns['event_loop']()
+    # Auto Hwt: FGW/HWT mob kontrolü, AttackArea geçişi
+    hwt_ns = _get_auto_hwt_namespace()
+    if hwt_ns and 'event_loop' in hwt_ns:
+        hwt_ns['event_loop']()
 
 def handle_silkroad(opcode, data):
     """Script Komutları: paket kaydı; Script-Command: C2S log"""
@@ -2908,9 +3164,9 @@ def handle_joymax(opcode, data):
         ns = _get_target_support_namespace()
         if ns and 'ts_handle_joymax' in ns:
             ns['ts_handle_joymax'](opcode, data)
-    # SERVER_DIMENSIONAL_INVITATION_REQUEST
+    # SERVER_DIMENSIONAL_INVITATION_REQUEST (licence kontrolü)
     elif opcode == 0x751A:
-        if QtBind.isChecked(gui, cbxAcceptForgottenWorld):
+        if _is_license_valid() and QtBind.isChecked(gui, cbxAcceptForgottenWorld):
             packet = data[:4]
             packet += b'\x00\x00\x00\x00'
             packet += b'\x01'
