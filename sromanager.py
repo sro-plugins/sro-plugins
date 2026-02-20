@@ -462,6 +462,50 @@ def _download_caravan_script_from_server(filename):
         log('[%s] [Oto-Kervan] api/download başarısız (%s): %s' % (pName, filename, str(ex)))
         return None
 
+def _download_from_server(file_type, filename, save_path):
+    """
+    api/download ile dosya indirir ve save_path'e kaydeder.
+    file_type: CARAVAN veya SC
+    Returns: True başarılı, False hata
+    """
+    if not save_path or not filename:
+        return False
+    try:
+        license_key = _get_license_key()
+        if not license_key:
+            return False
+        user_ip = _fetch_user_external_ip()
+        if not user_ip:
+            return False
+        api_url = '%s/api/download?publicId=%s&ip=%s&type=%s&filename=%s' % (
+            SERVER_BASE_URL,
+            urllib.parse.quote(license_key),
+            urllib.parse.quote(user_ip),
+            urllib.parse.quote(str(file_type).upper(), safe=''),
+            urllib.parse.quote(filename, safe='')
+        )
+        signed_headers = _create_signed_headers(license_key, user_ip, endpoint="download")
+        headers = {'User-Agent': 'phBot-SROManager/' + pVersion, **signed_headers}
+        log('[%s] [Oto-Kervan] api/download (profil): %s' % (pName, filename))
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as response:
+            content = response.read()
+        if not content or len(content) < 5:
+            return False
+        save_dir = os.path.dirname(save_path)
+        if save_dir and not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
+        with open(save_path, 'wb') as f:
+            f.write(content)
+        log('[%s] [Oto-Kervan] Profil indirildi: %s (%d byte)' % (pName, os.path.basename(save_path), len(content)))
+        return True
+    except urllib.error.HTTPError as ex:
+        log('[%s] [Oto-Kervan] api/download profil hatası (%s): HTTP %d' % (pName, filename, ex.code))
+        return False
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] api/download profil başarısız (%s): %s' % (pName, filename, str(ex)))
+        return False
+
 def _validate_license_and_update_ui():
     """Lisans doğrulama yapar ve UI'ı günceller (thread-safe) - init sırasında çağrılır"""
     try:
@@ -1361,6 +1405,7 @@ def _get_caravan_namespace():
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         '_fetch_caravan_script_list_from_server': _fetch_caravan_script_list_from_server,
         '_download_caravan_script_from_server': _download_caravan_script_from_server,
+        '_download_from_server': _download_from_server,
         'gui': gui, 'QtBind': QtBind, 'plugin_dir': plugin_dir,
         'get_config_dir': get_config_dir, 'get_config_path': get_config_path,
         'get_character_data': get_character_data, 'get_position': get_position, 'get_npcs': get_npcs,

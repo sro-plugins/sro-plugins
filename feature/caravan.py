@@ -6,7 +6,7 @@
 # generate_script, lblKervanProfile, lstKervanScripts, lblKervanStatus,
 # GITHUB_REPO, GITHUB_CARAVAN_FOLDER, GITHUB_CARAVAN_BRANCH, GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE,
 # GITHUB_CARAVAN_PROFILE_FOLDER, GITHUB_CARAVAN_PROFILE_JSON_FILENAME, GITHUB_CARAVAN_PROFILE_DB3_FILENAME,
-# _fetch_caravan_script_list_from_server, _download_caravan_script_from_server,
+# _fetch_caravan_script_list_from_server, _download_caravan_script_from_server, _download_from_server,
 # os, json, time, threading, urllib, shutil, copy, math, _is_license_valid, ctypes
 
 _caravan_script_list = []
@@ -369,22 +369,7 @@ def _caravan_db3_karavan_named_path():
     return os.path.join(_caravan_db3_dir(), fn + '.Karavan.db3')
 
 def _caravan_download_profile_db3(save_path):
-    if not save_path:
-        return False
-    for folder in ('sc', GITHUB_CARAVAN_FOLDER):
-        try:
-            path_encoded = urllib.parse.quote(folder, safe='')
-            url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, GITHUB_CARAVAN_PROFILE_DB3_FILENAME)
-            req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
-            with urllib.request.urlopen(req, timeout=15) as r:
-                data = r.read()
-            if data:
-                with open(save_path, 'wb') as f:
-                    f.write(data)
-                log('[%s] [Oto-Kervan] Karavan profili (db3) indirildi: %s' % (pName, folder + '/' + GITHUB_CARAVAN_PROFILE_DB3_FILENAME))
-                return True
-        except Exception:
-            continue
+    """db3 profili için sunucu/indirme yok; mevcut config'ten kopyalanır."""
     return False
 
 def _caravan_switch_to_caravan_db3():
@@ -409,7 +394,7 @@ def _caravan_switch_to_caravan_db3():
             else:
                 shutil.copy2(current, caravan)
                 source_db3 = caravan
-                log('[%s] [Oto-Kervan] Karavan db3 profili oluşturuldu (mevcut ayarlardan); repoda %s yoksa ekleyebilirsiniz.' % (pName, GITHUB_CARAVAN_PROFILE_DB3_FILENAME))
+                log('[%s] [Oto-Kervan] Karavan db3 profili oluşturuldu (mevcut ayarlardan).' % pName)
         shutil.copy2(current, backup)
         shutil.copy2(source_db3, current)
         if source_db3 != karavan_named:
@@ -493,28 +478,16 @@ def _caravan_char_has_any_config():
     return False
 
 def _caravan_download_profile_json(save_path):
+    """Sunucudan (api/download, type=CARAVAN) ServerName_CharName.karavan.json indirir."""
     if not save_path:
         return False
-    config_dir = os.path.dirname(save_path)
-    if config_dir and not os.path.exists(config_dir):
-        try:
-            os.makedirs(config_dir, exist_ok=True)
-        except Exception:
-            pass
-    try:
-        folder_enc = urllib.parse.quote(GITHUB_CARAVAN_PROFILE_FOLDER, safe='')
-        url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, folder_enc, GITHUB_CARAVAN_PROFILE_JSON_FILENAME)
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            data = r.read()
-        if data:
-            with open(save_path, 'wb') as f:
-                f.write(data)
-            basename = os.path.basename(save_path)
-            log('[%s] [Oto-Kervan] Karavan profili indirildi; Config içine %s olarak kaydedildi.' % (pName, basename))
-            return True
-    except Exception:
-        pass
+    fn = _caravan_db3_filename()
+    if not fn:
+        return False
+    filename = fn + '.karavan.json'
+    fn_dl = globals().get('_download_from_server')
+    if callable(fn_dl) and fn_dl('CARAVAN', filename, save_path):
+        return True
     return False
 
 def _caravan_ensure_karavan_profile_on_init():
