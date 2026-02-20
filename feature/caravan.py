@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # Oto Kervan (Tab 5) - GitHub'dan indirilip exec ile çalıştırılır.
 # Enjekte: gui, QtBind, log, pName, plugin_dir, get_config_dir, get_config_path,
-# get_character_data, get_position, get_training_area, set_training_area,
+# get_character_data, get_position, get_npcs, get_training_area, set_training_area,
 # set_training_script, set_training_position, set_training_radius, start_bot, stop_bot,
 # generate_script, lblKervanProfile, lstKervanScripts, lblKervanStatus,
 # GITHUB_REPO, GITHUB_CARAVAN_FOLDER, GITHUB_CARAVAN_BRANCH, GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE,
 # GITHUB_CARAVAN_PROFILE_FOLDER, GITHUB_CARAVAN_PROFILE_JSON_FILENAME, GITHUB_CARAVAN_PROFILE_DB3_FILENAME,
-# os, json, time, threading, urllib, shutil, copy, math, _is_license_valid
+# os, json, time, threading, urllib, shutil, copy, math, _is_license_valid, ctypes
 
 _caravan_script_list = []
 _caravan_running = False
@@ -115,8 +115,26 @@ def kervan_refresh_list():
         QtBind.append(gui, lstKervanScripts, display)
     QtBind.setText(gui, lblKervanStatus, 'Durum: %d script listelendi' % len(names))
     log('[%s] [Oto-Kervan] %d karavan scripti listelendi.' % (pName, len(names)))
-    _caravan_ensure_karavan_profile_on_init()
     _caravan_update_profile_display()
+
+def _caravan_show_no_profile_dialog():
+    """Karavan profili yoksa veya seçili değilse kullanıcıya talimat dialogu gösterir."""
+    msg = (
+        "Karavan profili bulunamadı veya seçili değil.\n\n"
+        "Lütfen şunları yapın:\n\n"
+        "1. phBot ana penceresinde Profil/Config bölümüne gidin\n"
+        "2. Mevcut profilinizden 'Yeni Oluştur' veya 'Kopyala' ile yeni profil oluşturun\n"
+        "3. Profil adına 'karavan' ekleyin (örn: Sunucu_Karakter.karavan)\n"
+        "4. Loop ayarlarında 'Şehir döngüsünü atla' (Skip Town Script) seçeneğini açın\n"
+        "5. Profili kaydedin ve listeden bu profili seçin\n"
+        "6. Bu pencerede Başlat'a tekrar basın\n\n"
+        "Not: phBot profil listesi yeni dosyayı anlık göstermeyebilir; yeni profil oluşturduktan sonra listede görünecektir."
+    )
+    try:
+        ctypes.windll.user32.MessageBoxW(None, msg, "Oto Kervan - Karavan Profili Gerekli", 0x40)
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] Dialog gösterilemedi: %s' % (pName, str(ex)))
+        log('[%s] [Oto-Kervan] %s' % (pName, msg.replace('\n', ' ')))
 
 def _caravan_update_profile_display():
     """Aktif profil adını gösterir."""
@@ -136,17 +154,89 @@ def _caravan_update_profile_display():
 
 CARAVAN_JOIN_STEP = 5
 CARAVAN_ON_PATH_THRESHOLD = 15
-CARAVAN_ARRIVAL_THRESHOLD = 5  # Varış noktasına bu mesafede sayılır (birim)
+CARAVAN_ARRIVAL_NPC_THRESHOLD = 5    # Hedef NPC'ye bu mesafede dur (düşük tutulur - NPC önünde)
+CARAVAN_ARRIVAL_WAYPOINT_THRESHOLD = 5  # Fallback: waypoint'e bu mesafede (NPC yoksa)
+CARAVAN_ARRIVAL_CONFIRM_COUNT = 2  # Ardışık bu kadar kontrol yakınsa tetiklenir
 
-def _caravan_get_last_waypoint(script_path, current_region):
+# Varış şehrine göre hedef NPC isimleri (Specialty Shop/Trader - ticaret NPC'leri)
+# Downhang: Leegak (Specialty Shop), Jangan: Jodaesan (Specialty Trader)
+CARAVAN_TARGET_NPCS = {
+    'downhang': ['leegak', 'specialty shop'],
+    'jangan': ['jodaesan', 'specialty trader'],
+    'hotan': ['specialty', 'trader', 'shop'],  # Hotan ticaret NPC'si
+    'alexandria': ['specialty', 'trader', 'shop'],
+    'samarkand': ['specialty', 'trader', 'shop'],
+    'constantinople': ['specialty', 'trader', 'shop'],
+}
+
+def _caravan_destination_from_filename(filename):
+    """Script dosya adından varış şehrini çıkarır: Hotan_to_Jangan.txt -> jangan"""
+    name = (filename or '').replace('.txt', '').replace('_PHBOT', '')
+    parts = name.lower().split('_')
+    for i, p in enumerate(parts):
+        if p == 'to' and i + 1 < len(parts):
+            return parts[i + 1]
+    return None
+
+def _caravan_get_nearest_target_npc_distance(destination, pos):
     """
-    Script dosyasındaki son walk koordinatlarını döndürür.
-    Return: (region, x, y, z) veya None (parse edilemezse)
+    Hedef şehrin ticaret NPC'sine (Leegak, Jodaesan vb.) mesafeyi döndürür.
+    NPC bulunamazsa None. Bulunursa (distance, npc_name).
     """
+    if not destination or not pos:
+        return None
+    keywords = CARAVAN_TARGET_NPCS.get(destination.lower(), [])
+    if not keywords:
+        return None
+    try:
+        npcs = get_npcs()
+    except Exception:
+        return None
+    if not npcs or not isinstance(npcs, dict):
+        return None
+    r = int(pos.get('region', 0))
+    px = float(pos.get('x', 0))
+    py = float(pos.get('y', 0))
+    pz = float(pos.get('z', 0))
+    nearest = None
+    nearest_dist = float('inf')
+    for _, npc in npcs.items():
+        if not isinstance(npc, dict):
+            continue
+        npc_name = (npc.get('name') or '').lower()
+        npc_region = int(npc.get('region', 0))
+        if npc_region != r:
+            continue
+        match = any(kw in npc_name for kw in keywords)
+        if not match:
+            continue
+        nx = float(npc.get('x', 0))
+        ny = float(npc.get('y', 0))
+        nz = npc.get('z')
+        if nz is not None:
+            d = math.sqrt((px - nx) ** 2 + (py - ny) ** 2 + (pz - float(nz)) ** 2)
+        else:
+            d = math.sqrt((px - nx) ** 2 + (py - ny) ** 2)
+        if d < nearest_dist:
+            nearest_dist = d
+            nearest = npc.get('name', 'NPC')
+    if nearest is not None:
+        return (nearest_dist, nearest)
+    return None
+
+def _caravan_get_last_waypoints(script_path, current_region, count=8):
+    """
+    Script dosyasındaki son N walk koordinatını döndürür.
+    Varış bölgesinde genelde birden fazla waypoint vardır; hepsini kontrol ederiz.
+    Return: [(region, x, y, z), ...] veya []
+    """
+    result = []
     try:
         with open(script_path, 'r', encoding='utf-8', errors='ignore') as f:
             lines = [ln.strip() for ln in f.readlines() if ln.strip()]
         for i in range(len(lines) - 1, -1, -1):
+            if len(result) >= count:
+                break
             parts = lines[i].split(',')
             if len(parts) < 2:
                 continue
@@ -156,16 +246,16 @@ def _caravan_get_last_waypoint(script_path, current_region):
             try:
                 if len(parts) == 4:
                     x, y, z = float(parts[1]), float(parts[2]), float(parts[3])
-                    return (current_region, x, y, z)
-                if len(parts) >= 5:
+                    result.append((current_region, x, y, z))
+                elif len(parts) >= 5:
                     reg = int(parts[1])
                     x, y, z = float(parts[2]), float(parts[3]), float(parts[4])
-                    return (reg, x, y, z)
+                    result.append((reg, x, y, z))
             except (ValueError, IndexError):
                 continue
     except Exception:
         pass
-    return None
+    return result
 
 def _caravan_script_from_nearest(script_path, current_region, current_x, current_y, current_z):
     """
@@ -384,7 +474,12 @@ def _caravan_apply_tweaks_to_dict(data):
         return data
     out = copy.deepcopy(data)
     attack_keys = ('Attack', 'attack', 'Combat', 'combat')
-    skip_keys = ('SkipTownScript', 'SkipTown', 'SkipTownLoop', 'NoTownScript', 'SkipTownScriptLoop')
+    skip_keys = ('SkipTownScript', 'SkipTown', 'SkipTownLoop', 'NoTownScript', 'SkipTownScriptLoop',
+                 'Skip Town Script', 'Skip Town Loop', 'Skip Town')
+
+    def _is_skip_key(k):
+        k_lower = (k or '').lower().replace(' ', '')
+        return k in skip_keys or 'skiptown' in k_lower or 'notown' in k_lower
 
     def apply(obj):
         if not isinstance(obj, dict):
@@ -393,16 +488,11 @@ def _caravan_apply_tweaks_to_dict(data):
             if isinstance(v, dict):
                 apply(v)
             elif isinstance(v, bool):
-                if k in attack_keys and v:
+                k_lower = (k or '').lower()
+                if (k in attack_keys or k_lower in ('attack', 'combat')) and v:
                     obj[k] = False
-                elif k in skip_keys and not v:
+                elif _is_skip_key(k) and not v:
                     obj[k] = True
-                else:
-                    k_lower = k.lower()
-                    if k_lower in ('attack', 'combat') and v:
-                        obj[k] = False
-                    elif 'skiptown' in k_lower or 'notown' in k_lower:
-                        obj[k] = True
     apply(out)
     return out
 
@@ -543,6 +633,50 @@ def _caravan_switch_to_profile():
         log('[%s] [Oto-Kervan] Profil uygulanamadı: %s' % (pName, str(ex)))
         return None
 
+def _caravan_apply_tweaks_to_current_config():
+    """
+    Kullanıcı karavan profilindeyken mevcut config'e tweak uygular (Attack kapat, Skip Town aç).
+    Profil üstüne yazar, backup almaz.
+    """
+    path = get_config_path()
+    if not path or not os.path.exists(path):
+        return False
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        data = _caravan_apply_tweaks_to_dict(data)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        log('[%s] [Oto-Kervan] Karavan ayarları profilin üzerine uygulandı.' % pName)
+        return True
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] Profil güncellenemedi: %s' % (pName, str(ex)))
+        return False
+
+def _caravan_clear_script_area_from_config():
+    """
+    Caravan bittikten sonra config'teki geçici Caravan script alanını temizler
+    (silinen temp dosyaya referans kalmasın).
+    """
+    path = get_config_path()
+    if not path or not os.path.exists(path):
+        return
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+        loop = cfg.get('Loop')
+        if not isinstance(loop, dict):
+            return
+        script_cfg = loop.get('Script')
+        if isinstance(script_cfg, dict) and 'Caravan' in script_cfg:
+            script_cfg['Caravan']['Enabled'] = False
+            script_cfg['Caravan']['Path'] = ''
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(cfg, f, indent=2, ensure_ascii=False)
+            log('[%s] [Oto-Kervan] Config\'teki geçici Caravan alanı temizlendi.' % pName)
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] Config temizlenemedi: %s' % (pName, str(ex)))
+
 def _caravan_restore_from_backup(backup_path):
     if not backup_path or not os.path.exists(backup_path):
         return
@@ -579,9 +713,8 @@ def _caravan_loop():
                 except Exception:
                     pass
 
-        backup_path = _caravan_switch_to_profile()
-        if not backup_path:
-            log('[%s] [Oto-Kervan] Config profil uygulanamadı; mevcut ayarlarla devam ediliyor.' % pName)
+        backup_path = None
+        _caravan_apply_tweaks_to_current_config()
 
         script_path = _caravan_script_path
         log('[%s] [Oto-Kervan] Karavan yürüyüşü başlatılıyor: %s' % (pName, script_path))
@@ -611,18 +744,20 @@ def _caravan_loop():
         with open(temp_path, 'w', encoding='utf-8', newline='\n') as f:
             f.write(script_content)
         current_area = get_training_area()
-        if not current_area and backup_path and os.path.exists(backup_path):
-            try:
-                with open(backup_path, 'r', encoding='utf-8') as f:
-                    cfg = json.load(f)
-                script_cfg = (cfg.get('Loop') or {}).get('Script') or {}
-                if isinstance(script_cfg, dict):
-                    for area_name in list(script_cfg.keys()):
-                        if area_name and set_training_area(area_name):
-                            log('[%s] [Oto-Kervan] Aktif training area seçildi: %s' % (pName, area_name))
-                            break
-            except Exception:
-                pass
+        if not current_area:
+            cfg_path = get_config_path()
+            if cfg_path and os.path.exists(cfg_path):
+                try:
+                    with open(cfg_path, 'r', encoding='utf-8') as f:
+                        cfg = json.load(f)
+                    script_cfg = (cfg.get('Loop') or {}).get('Script') or {}
+                    if isinstance(script_cfg, dict):
+                        for area_name in list(script_cfg.keys()):
+                            if area_name and set_training_area(area_name):
+                                log('[%s] [Oto-Kervan] Aktif training area seçildi: %s' % (pName, area_name))
+                                break
+                except Exception:
+                    pass
         set_training_position(region, cx, cy, cz)
         set_training_radius(600.0)
         script_path_for_bot = os.path.abspath(temp_path)
@@ -677,25 +812,46 @@ def _caravan_loop():
         start_bot()
         _caravan_running = True
         log('[%s] [Oto-Kervan] Karavan scripti dosyadan çalışıyor (training script).' % pName)
-        last_waypoint = _caravan_get_last_waypoint(script_path, region)
+        script_basename = os.path.basename(script_path)
+        destination = _caravan_destination_from_filename(script_basename)
+        last_waypoints = _caravan_get_last_waypoints(script_path, region)
+        arrival_confirm = 0
         while not _caravan_stop_event.is_set():
-            if last_waypoint:
-                pos_now = get_position()
-                if pos_now:
-                    r = int(pos_now.get('region', 0))
-                    px = float(pos_now.get('x', 0))
-                    py = float(pos_now.get('y', 0))
-                    pz = float(pos_now.get('z', 0))
-                    wr, wx, wy, wz = last_waypoint[0], last_waypoint[1], last_waypoint[2], last_waypoint[3]
-                    if r == wr:
-                        dist = math.sqrt((px - wx) ** 2 + (py - wy) ** 2 + (pz - wz) ** 2)
-                        if dist <= CARAVAN_ARRIVAL_THRESHOLD:
-                            log('[%s] [Oto-Kervan] Varış noktasına ulaşıldı (mesafe ~%.0f). Otomatik durduruluyor...' % (pName, dist))
-                            stop_bot()
-                            _caravan_stop_event.set()
-                            _caravan_running = False
-                            QtBind.setText(gui, lblKervanStatus, 'Durum: Varışa ulaşıldı ■')
-                            break
+            pos_now = get_position()
+            if pos_now:
+                r = int(pos_now.get('region', 0))
+                px = float(pos_now.get('x', 0))
+                py = float(pos_now.get('y', 0))
+                pz = float(pos_now.get('z', 0))
+                near_any = False
+                min_dist = float('inf')
+                npc_result = _caravan_get_nearest_target_npc_distance(destination, pos_now)
+                if npc_result:
+                    dist, npc_name = npc_result
+                    if dist <= CARAVAN_ARRIVAL_NPC_THRESHOLD:
+                        near_any = True
+                        min_dist = dist
+                        if arrival_confirm == 0:
+                            log('[%s] [Oto-Kervan] Hedef NPC yakınında: %s (%.0f birim)' % (pName, npc_name, dist))
+                if not near_any and last_waypoints:
+                    for wr, wx, wy, wz in last_waypoints:
+                        if r == wr:
+                            d = math.sqrt((px - wx) ** 2 + (py - wy) ** 2 + (pz - wz) ** 2)
+                            if d <= CARAVAN_ARRIVAL_WAYPOINT_THRESHOLD:
+                                near_any = True
+                                min_dist = min(min_dist, d)
+                                break
+                if near_any:
+                    arrival_confirm += 1
+                    if arrival_confirm >= CARAVAN_ARRIVAL_CONFIRM_COUNT:
+                        log('[%s] [Oto-Kervan] Varış noktasına ulaşıldı (mesafe ~%.0f). Otomatik durduruluyor...' % (pName, min_dist))
+                        stop_bot()
+                        _caravan_stop_event.set()
+                        _caravan_running = False
+                        QtBind.setText(gui, lblKervanStatus, 'Durum: Varışa ulaşıldı ■')
+                        break
+                else:
+                    arrival_confirm = 0
             time.sleep(1)
         if _caravan_running:
             log('[%s] [Oto-Kervan] Karavan durduruluyor...' % pName)
@@ -709,8 +865,7 @@ def _caravan_loop():
         except Exception:
             pass
     finally:
-        if backup_path:
-            _caravan_restore_from_backup(backup_path)
+        _caravan_clear_script_area_from_config()
         if temp_path and os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
@@ -732,8 +887,9 @@ def kervan_start():
         if profile_name.endswith('.json'):
             profile_name = profile_name[:-5]
         if 'karavan' not in profile_name.lower():
-            log('[%s] [Oto-Kervan] Karavan profili seçili değil! Ana pencereden karavan profilini seçin, sonra Başlat\'a basın.' % pName)
-            QtBind.setText(gui, lblKervanStatus, 'Durum: Karavan profili seçili değil!')
+            _caravan_show_no_profile_dialog()
+            log('[%s] [Oto-Kervan] Karavan profili seçili değil. Dialog gösterildi.' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Karavan profili seçili değil')
             return
     except Exception:
         log('[%s] [Oto-Kervan] Profil kontrolü yapılamadı.' % pName)

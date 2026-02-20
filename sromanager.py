@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.16'
+pVersion = '1.7.17'
 
 MOVE_DELAY = 0.25
 
@@ -1290,7 +1290,7 @@ def _get_caravan_namespace():
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         'gui': gui, 'QtBind': QtBind, 'plugin_dir': plugin_dir,
         'get_config_dir': get_config_dir, 'get_config_path': get_config_path,
-        'get_character_data': get_character_data, 'get_position': get_position,
+        'get_character_data': get_character_data, 'get_position': get_position, 'get_npcs': get_npcs,
         'get_training_area': get_training_area, 'set_training_area': set_training_area,
         'set_training_script': set_training_script, 'set_training_position': set_training_position,
         'set_training_radius': set_training_radius, 'start_bot': start_bot, 'stop_bot': stop_bot,
@@ -1303,7 +1303,7 @@ def _get_caravan_namespace():
         'GITHUB_CARAVAN_PROFILE_JSON_FILENAME': GITHUB_CARAVAN_PROFILE_JSON_FILENAME,
         'GITHUB_CARAVAN_PROFILE_DB3_FILENAME': GITHUB_CARAVAN_PROFILE_DB3_FILENAME,
         'os': os, 'json': json, 'time': time, 'threading': threading,
-        'urllib': urllib, 'shutil': shutil, 'copy': copy, 'math': math,
+        'urllib': urllib, 'shutil': shutil, 'copy': copy, 'math': math, 'ctypes': ctypes,
     }
     try:
         exec(code, namespace)
@@ -2189,12 +2189,9 @@ _add_tab5(lblKervanStatus, _kervan_x, _kervan_btn_y + 28)
 _protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop]
 
 def _caravan_init_load():
-    """Init sonrası karavan profilini (yoksa) oluşturur, ardından script listesini arka planda yükler (uzaktan modül)."""
+    """Init sonrası script listesini arka planda yükler (uzaktan modül). Karavan profili artık otomatik oluşturulmaz."""
     time.sleep(2)
     try:
-        ns = _get_caravan_namespace()
-        if ns and '_caravan_ensure_karavan_profile_on_init' in ns:
-            ns['_caravan_ensure_karavan_profile_on_init']()
         kervan_refresh_list()
     except Exception:
         pass
@@ -2825,9 +2822,11 @@ _add_tab11(_scm_btnHideDel, _scm_x + 370, _scm_y + 192)
 _scm_lstHide = QtBind.createList(gui, _scm_x + 490, _scm_y + 168, 190, 52)
 _add_tab11(_scm_lstHide, _scm_x + 490, _scm_y + 168)
 _add_tab11(QtBind.createLabel(gui, 'Lider:', _scm_x, _scm_y + 228), _scm_x, _scm_y + 228)
-_scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 200, 20)
+_scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 140, 20)
 _add_tab11(_scm_tbLeader, _scm_x + 55, _scm_y + 224)
-_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_commands_help_clicked', 'Yardım', _scm_x + 270, _scm_y + 223)
+_scm_btnSaveLeader = QtBind.createButton(gui, 'scm_ui_save_leader', 'Lideri Kaydet', _scm_x + 200, _scm_y + 223)
+_add_tab11(_scm_btnSaveLeader, _scm_x + 200, _scm_y + 223)
+_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_commands_help_clicked', 'Yardım', _scm_x + 310, _scm_y + 223)
 _add_tab11(_scm_btnHelp, _scm_x + 270, _scm_y + 223)
 _scm_lblStatus = QtBind.createLabel(gui, 'Hazır', _scm_x, _scm_y + 248)
 _add_tab11(_scm_lblStatus, _scm_x, _scm_y + 248)
@@ -2968,6 +2967,8 @@ def scm_btn_help_clicked():
 
 def scm_ui_save():
     _scm_ns_call('ui_save')
+def scm_ui_save_leader():
+    _scm_ns_call('ui_save_leader')
 def scm_ui_load():
     _scm_ns_call('ui_load')
 def scm_ui_remove():
@@ -3070,7 +3071,7 @@ _protected_buttons[10] = [
 _protected_buttons[11] = [
     _scm_tbChat, _scm_tbScript, _scm_tbOpcode, _scm_tbData, _scm_tbLeader, _scm_tbHide,
     _scm_lstMap, _scm_lstHide, _scm_btnSave, _scm_btnLoad, _scm_btnRemove, _scm_btnEdit,
-    _scm_btnHideAdd, _scm_btnHideDel, _scm_cbLog
+    _scm_btnHideAdd, _scm_btnHideDel, _scm_btnSaveLeader, _scm_cbLog
 ]
 
 _tab_move(_tab2_widgets, True)
