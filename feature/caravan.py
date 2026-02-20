@@ -6,7 +6,7 @@
 # generate_script, lblKervanProfile, lstKervanScripts, lblKervanStatus,
 # GITHUB_REPO, GITHUB_CARAVAN_FOLDER, GITHUB_CARAVAN_BRANCH, GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE,
 # GITHUB_CARAVAN_PROFILE_FOLDER, GITHUB_CARAVAN_PROFILE_JSON_FILENAME, GITHUB_CARAVAN_PROFILE_DB3_FILENAME,
-# os, json, time, threading, urllib, shutil, copy, math, _is_license_valid, ctypes
+# _fetch_caravan_script_list_from_server, os, json, time, threading, urllib, shutil, copy, math, _is_license_valid, ctypes
 
 _caravan_script_list = []
 _caravan_running = False
@@ -34,7 +34,12 @@ def _caravan_filename_to_display_name(filename):
     return from_name + ' --> ' + to_name
 
 def _fetch_caravan_script_list():
-    """GitHub API veya yerel klasör ile caravan .txt listesini döndürür."""
+    """Önce ana sunucudan (api/list type=CARAVAN) çeker, hata durumunda GitHub/yerel fallback."""
+    fn = globals().get('_fetch_caravan_script_list_from_server')
+    if callable(fn):
+        names = fn()
+        if names is not None:
+            return names
     path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
     api_url = 'https://api.github.com/repos/%s/contents/%s?ref=%s' % (
         GITHUB_REPO, path_encoded, GITHUB_CARAVAN_BRANCH

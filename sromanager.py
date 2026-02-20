@@ -373,6 +373,48 @@ def _validate_license():
         log('[%s] [Server] Lisans doğrulama hatası: %s' % (pName, error_msg))
         return {"valid": False, "message": error_msg}
 
+def _fetch_caravan_script_list_from_server():
+    """
+    Ana sunucudan caravan script listesini çeker (api/list, type=CARAVAN).
+    Licence validate ile aynı imzalı header yapısı kullanılır.
+    
+    Returns:
+        list: .txt dosya adları listesi, hata durumunda None
+    """
+    try:
+        license_key = _get_license_key()
+        if not license_key:
+            return None
+        user_ip = _fetch_user_external_ip()
+        if not user_ip:
+            return None
+        api_url = '%s/api/list?publicId=%s&ip=%s&type=CARAVAN' % (
+            SERVER_BASE_URL,
+            urllib.parse.quote(license_key),
+            urllib.parse.quote(user_ip)
+        )
+        signed_headers = _create_signed_headers(license_key, user_ip, endpoint="list")
+        headers = {
+            'User-Agent': 'phBot-SROManager/' + pVersion,
+            'Accept': 'application/json',
+            **signed_headers
+        }
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=12) as response:
+            data = json.loads(response.read().decode('utf-8'))
+        if not isinstance(data, list):
+            return None
+        names = [f for f in data if isinstance(f, str) and f.endswith('.txt')]
+        names.sort(key=lambda x: x.lower())
+        log('[%s] [Oto-Kervan] Sunucudan %d script listelendi.' % (pName, len(names)))
+        return names
+    except urllib.error.HTTPError as ex:
+        log('[%s] [Oto-Kervan] Sunucu listesi hatası: HTTP %d' % (pName, ex.code))
+        return None
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] Sunucu listesi alınamadı: %s' % (pName, str(ex)))
+        return None
+
 def _validate_license_and_update_ui():
     """Lisans doğrulama yapar ve UI'ı günceller (thread-safe) - init sırasında çağrılır"""
     try:
@@ -1288,6 +1330,7 @@ def _get_caravan_namespace():
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
     namespace = {
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
+        '_fetch_caravan_script_list_from_server': _fetch_caravan_script_list_from_server,
         'gui': gui, 'QtBind': QtBind, 'plugin_dir': plugin_dir,
         'get_config_dir': get_config_dir, 'get_config_path': get_config_path,
         'get_character_data': get_character_data, 'get_position': get_position, 'get_npcs': get_npcs,

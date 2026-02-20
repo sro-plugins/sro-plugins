@@ -245,18 +245,25 @@ async def list_files_public(
 ):
 
     """Public endpoint for the bot to list files of a certain type."""
-    # Validate License
     user = db.query(models.User).filter(models.User.public_id == publicId, models.User.is_active == True).first()
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    # Check session
     session = db.query(models.ActiveSession).filter(
         models.ActiveSession.user_id == user.id,
         models.ActiveSession.ip_address == ip
     ).first()
     if not session:
-        raise HTTPException(status_code=401, detail="No active session")
+        active_count = db.query(models.ActiveSession).filter(models.ActiveSession.user_id == user.id).count()
+        if active_count >= 2:
+            db.query(models.ActiveSession).filter(models.ActiveSession.user_id == user.id).delete()
+            db.commit()
+        session = models.ActiveSession(user_id=user.id, ip_address=ip)
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+    else:
+        session.last_active = datetime.utcnow()
+        db.commit()
 
     # List files
     if type.upper() not in enum_files:
