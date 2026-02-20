@@ -399,6 +399,7 @@ def _fetch_caravan_script_list_from_server():
             'Accept': 'application/json',
             **signed_headers
         }
+        log('[%s] [Oto-Kervan] api/list isteği gönderiliyor (type=CARAVAN)...' % pName)
         req = urllib.request.Request(api_url, headers=headers)
         with urllib.request.urlopen(req, timeout=12) as response:
             data = json.loads(response.read().decode('utf-8'))
@@ -413,6 +414,52 @@ def _fetch_caravan_script_list_from_server():
         return None
     except Exception as ex:
         log('[%s] [Oto-Kervan] Sunucu listesi alınamadı: %s' % (pName, str(ex)))
+        return None
+
+def _download_caravan_script_from_server(filename):
+    """
+    Ana sunucudan caravan script indirir (api/download, type=CARAVAN, filename).
+    Returns:
+        str: Yerel script dosya yolu, hata durumunda None
+    """
+    try:
+        license_key = _get_license_key()
+        if not license_key:
+            return None
+        user_ip = _fetch_user_external_ip()
+        if not user_ip:
+            return None
+        api_url = '%s/api/download?publicId=%s&ip=%s&type=CARAVAN&filename=%s' % (
+            SERVER_BASE_URL,
+            urllib.parse.quote(license_key),
+            urllib.parse.quote(user_ip),
+            urllib.parse.quote(filename, safe='')
+        )
+        signed_headers = _create_signed_headers(license_key, user_ip, endpoint="download")
+        headers = {
+            'User-Agent': 'phBot-SROManager/' + pVersion,
+            **signed_headers
+        }
+        log('[%s] [Oto-Kervan] api/download isteği gönderiliyor (filename=%s)...' % (pName, filename))
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as response:
+            content = response.read()
+        if not content or len(content) < 10:
+            log('[%s] [Oto-Kervan] Sunucudan indirilen dosya geçersiz (boş/kısa)' % pName)
+            return None
+        folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), GITHUB_CARAVAN_FOLDER)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        script_path = os.path.join(folder, filename)
+        with open(script_path, 'wb') as f:
+            f.write(content)
+        log('[%s] [Oto-Kervan] Sunucudan indirildi: %s (%d byte)' % (pName, filename, len(content)))
+        return script_path
+    except urllib.error.HTTPError as ex:
+        log('[%s] [Oto-Kervan] api/download hatası (filename=%s): HTTP %d' % (pName, filename, ex.code))
+        return None
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] api/download başarısız (%s): %s' % (pName, filename, str(ex)))
         return None
 
 def _validate_license_and_update_ui():
@@ -518,29 +565,11 @@ def _download_garden_script(script_type="normal"):
         return False
 
 def _download_caravan_script(filename):
-    """GitHub'dan tek bir karavan scriptini indirir (Oto Kervan modülü yüklüyse oradan, yoksa yerel fallback)."""
+    """Sunucudan (api/download) karavan script indirir (Oto Kervan modülü yüklüyse oradan, yoksa doğrudan)."""
     ns = _get_caravan_namespace()
     if ns and '_download_caravan_script' in ns:
         return ns['_download_caravan_script'](filename)
-    try:
-        folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), GITHUB_CARAVAN_FOLDER)
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        script_path = os.path.join(folder, filename)
-        path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
-        url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, filename)
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            content = r.read()
-        if not content or len(content) < 10:
-            return False
-        with open(script_path, 'wb') as f:
-            f.write(content)
-        log('[%s] [Oto-Kervan] Script indirildi: %s' % (pName, filename))
-        return script_path
-    except Exception as ex:
-        log('[%s] [Oto-Kervan] İndirme hatası (%s): %s' % (pName, filename, str(ex)))
-        return False
+    return _download_caravan_script_from_server(filename)
 
 def _get_script_versions_cache_path():
     """Sürüm önbelleği dosya yolu (kullanıcı sc/ klasöründe görmez; phBot config içinde)"""
@@ -1331,6 +1360,7 @@ def _get_caravan_namespace():
     namespace = {
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         '_fetch_caravan_script_list_from_server': _fetch_caravan_script_list_from_server,
+        '_download_caravan_script_from_server': _download_caravan_script_from_server,
         'gui': gui, 'QtBind': QtBind, 'plugin_dir': plugin_dir,
         'get_config_dir': get_config_dir, 'get_config_path': get_config_path,
         'get_character_data': get_character_data, 'get_position': get_position, 'get_npcs': get_npcs,

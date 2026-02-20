@@ -6,7 +6,8 @@
 # generate_script, lblKervanProfile, lstKervanScripts, lblKervanStatus,
 # GITHUB_REPO, GITHUB_CARAVAN_FOLDER, GITHUB_CARAVAN_BRANCH, GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE,
 # GITHUB_CARAVAN_PROFILE_FOLDER, GITHUB_CARAVAN_PROFILE_JSON_FILENAME, GITHUB_CARAVAN_PROFILE_DB3_FILENAME,
-# _fetch_caravan_script_list_from_server, os, json, time, threading, urllib, shutil, copy, math, _is_license_valid, ctypes
+# _fetch_caravan_script_list_from_server, _download_caravan_script_from_server,
+# os, json, time, threading, urllib, shutil, copy, math, _is_license_valid, ctypes
 
 _caravan_script_list = []
 _caravan_running = False
@@ -34,43 +35,13 @@ def _caravan_filename_to_display_name(filename):
     return from_name + ' --> ' + to_name
 
 def _fetch_caravan_script_list():
-    """Önce ana sunucudan (api/list type=CARAVAN) çeker, hata durumunda GitHub/yerel fallback."""
+    """Ana sunucudan (api/list type=CARAVAN) caravan script listesini çeker."""
     fn = globals().get('_fetch_caravan_script_list_from_server')
     if callable(fn):
         names = fn()
         if names is not None:
             return names
-    path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
-    api_url = 'https://api.github.com/repos/%s/contents/%s?ref=%s' % (
-        GITHUB_REPO, path_encoded, GITHUB_CARAVAN_BRANCH
-    )
-    try:
-        req = urllib.request.Request(
-            api_url,
-            headers={'User-Agent': 'phBot-SROManager/1.0', 'Accept': 'application/vnd.github.v3+json'}
-        )
-        with urllib.request.urlopen(req, timeout=12) as r:
-            data = json.loads(r.read().decode('utf-8'))
-        names = []
-        for item in (data if isinstance(data, list) else []):
-            if isinstance(item, dict) and item.get('type') == 'file':
-                name = item.get('name') or ''
-                if name.endswith('.txt'):
-                    names.append(name)
-        names.sort(key=lambda x: x.lower())
-        return names
-    except Exception as ex:
-        log('[%s] [Oto-Kervan] GitHub listesi alınamadı: %s' % (pName, str(ex)))
-    folder = _get_caravan_script_folder()
-    if os.path.isdir(folder):
-        try:
-            names = [f for f in os.listdir(folder) if f.endswith('.txt')]
-            names.sort(key=lambda x: x.lower())
-            if names:
-                log('[%s] [Oto-Kervan] Yerel klasörden %d script listelendi.' % (pName, len(names)))
-                return names
-        except Exception as ex:
-            log('[%s] [Oto-Kervan] Yerel liste okunamadı: %s' % (pName, str(ex)))
+        log('[%s] [Oto-Kervan] Sunucu listesi alınamadı.' % pName)
     return []
 
 def _get_caravan_script_folder():
@@ -78,29 +49,15 @@ def _get_caravan_script_folder():
     return os.path.join(plugin_dir, GITHUB_CARAVAN_FOLDER)
 
 def _download_caravan_script(filename):
-    """GitHub'dan tek bir karavan scriptini indirir; yerel yol döndürür veya False."""
-    try:
-        folder = _get_caravan_script_folder()
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        script_path = os.path.join(folder, filename)
-        path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
-        url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, filename)
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            content = r.read()
-        if not content or len(content) < 10:
-            return False
-        with open(script_path, 'wb') as f:
-            f.write(content)
-        log('[%s] [Oto-Kervan] Script indirildi: %s' % (pName, filename))
-        return script_path
-    except Exception as ex:
-        log('[%s] [Oto-Kervan] Script indirilemedi (%s): %s' % (pName, filename, str(ex)))
-        return False
+    """Ana sunucudan (api/download) caravan script indirir. Yerel yol veya False."""
+    fn_dl = globals().get('_download_caravan_script_from_server')
+    if callable(fn_dl):
+        return fn_dl(filename)
+    log('[%s] [Oto-Kervan] Sunucudan indirme fonksiyonu bulunamadı.' % pName)
+    return False
 
 def kervan_refresh_list():
-    """GitHub'dan karavan script listesini çeker ve listeyi günceller (gösterim: From --> To)."""
+    """Sunucudan karavan script listesini çeker ve listeyi günceller (gösterim: From --> To)."""
     if not _is_license_valid():
         log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
         return
