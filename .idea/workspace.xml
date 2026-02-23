@@ -4,79 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="add jsons enum type">
-      <change beforePath="$PROJECT_DIR$/caravan/Bandit_to_Downhang.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/caravan/Bandit_to_Downhang.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/caravan/Bandit_to_Jangan.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/caravan/Bandit_to_Jangan.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/caravan/Downhang_to_Jangan.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/caravan/Downhang_to_Jangan.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/caravan/Hotan_to_Jangan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/caravan/Jangan_to_Downhang.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/caravan/Jangan_to_Downhang.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/caravan/Jangan_to_Hotan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/auto_base_dungeon.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/auto_base_dungeon.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/auto_hwt.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/auto_hwt.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/bank_features.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/bank_features.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/bless_queue.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/bless_queue.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/caravan.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/caravan.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/garden_dungeon.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/garden_dungeon.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/inventory_counter.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/inventory_counter.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/jewel_merge_sort.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/jewel_merge_sort.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/script_command_maker.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/script_command_maker.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/script_commands.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/script_commands.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/feature/target_support.py" beforeDir="false" afterPath="$PROJECT_DIR$/files/feature/target_support.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/(SRO-R)Jangan_Hotan_Hunter.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/1a_Downhang_to_Hotan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/1a_Downhang_to_Hotan_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/1b_Hotan_to_Downhang.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/1b_Hotan_to_Downhang_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/2a_Downhang_to_Jangan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/2a_Downhang_to_Jangan_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/2b_Jangan_to_Downhang.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/2b_Jangan_to_Downhang_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/3a_Downhang_to_Hotan_Oasis_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/3b_Hotan_to_Downhang_Oasis_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/4a_Alexandria_to_Jangan_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/4b_Jangan_To_Alexandria_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/5a_Hotan_Samarkand_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/5b_Samarkand_Hotan_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/6a_Alex_to_Samarkand_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/6b_Samarkand_to_Alex_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/7a_Special_Togui_Beginning_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/7a_Special_Tougue_Beginning_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/7b_Special_Togui_Ending_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/7b_Special_Tougue_Ending_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/8a_Hontan_to_Jangan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/8a_Hontan_to_Jangan_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/8a_Hotan_to_Jangan_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/8b_Jangan_to_Hotan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/8b_Jangan_to_Hotan_PHBOT.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Alex_to_Jangan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Alex_to_Samar.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Bandit_To_Cons_NOSTUCk.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Bandit_To_Cons_special_trade_underworld.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Bandit_to_Alex.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Cons_to_Samar.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Donwhang_to_Hotan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Donwhang_to_Hotan_Oasis.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Donwhang_to_Jangan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Hotan_to_Donwhang.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Hotan_to_Donwhang_Oasis.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Hotan_to_Jangan.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/caravan/Hotan_to_Jangan.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Hotan_to_Samar.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Jangan_to_Donwhang.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Jangan_to_Hotan.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/caravan/Jangan_to_Hotan.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Samar_To_Hotan.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/caravan/Samar_to_Alex.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/jsons/versions.json" beforeDir="false" afterPath="$PROJECT_DIR$/files/jsons/versions.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/Flame Mountain Forgotten World.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/sc/Flame Mountain Forgotten World.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/Holy Water Temple Advanced.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/sc/Holy Water Temple Advanced.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/Holy Water Temple Beginner.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/sc/Holy Water Temple Beginner.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/Holy Water Temple Intermediate.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/sc/Holy Water Temple Intermediate.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/Ship Wreck 1-2 Stars Forgotten World.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/sc/Ship Wreck 1-2 Stars Forgotten World.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/Ship Wreck 3-4 Stars Forgotten World.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/sc/Ship Wreck 3-4 Stars Forgotten World.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/Togui Village Forgotten World.txt" beforeDir="false" afterPath="$PROJECT_DIR$/files/sc/Togui Village Forgotten World.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/garden-dungeon-wizz-cleric.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/garden-dungeon.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/sc/versions.json" beforeDir="false" />
-    </list>
+    <list default="true" id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="fix jsons" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -121,28 +49,28 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "vps",
-    "javascript.preferred.runtime.type.id": "node",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "/Users/hamurcuabi/Documents/SroBot/jsons",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "to.speed.mode.migration.done": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;vps&quot;,
+    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/hamurcuabi/Documents/SroBot/jsons&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecapSpentCounter">
     <option name="endsOfQuotaMs" value="1770724894184" />
     <option name="spentUsd" value="0.034430098" />
@@ -491,7 +419,15 @@
       <option name="project" value="LOCAL" />
       <updated>1771880383867</updated>
     </task>
-    <option name="localTasksCounter" value="40" />
+    <task id="LOCAL-00040" summary="fix jsons">
+      <option name="closed" value="true" />
+      <created>1771881305050</created>
+      <option name="number" value="00040" />
+      <option name="presentableId" value="LOCAL-00040" />
+      <option name="project" value="LOCAL" />
+      <updated>1771881305050</updated>
+    </task>
+    <option name="localTasksCounter" value="41" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -515,6 +451,7 @@
     <MESSAGE value="add session manager" />
     <MESSAGE value="update security" />
     <MESSAGE value="add jsons enum type" />
-    <option name="LAST_COMMIT_MESSAGE" value="add jsons enum type" />
+    <MESSAGE value="fix jsons" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix jsons" />
   </component>
 </project>
