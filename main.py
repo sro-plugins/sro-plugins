@@ -142,7 +142,7 @@ FILE_CATEGORIES = {
     "CARAVAN": "files/caravan",
     "SC": "files/sc",
     "FEATURE": "files/feature",
-    "JSONS": "jsons"
+    "JSONS": "files/jsons"
 }
 
 ALLOWED_EXTENSIONS = ('.txt', '.json', '.py')
@@ -232,7 +232,7 @@ async def upload_file(
     if not file.filename.endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail="Only .txt, .json and .py files are allowed.")
     
-    dir_path = f"files/{category.lower()}"
+    dir_path = FILE_CATEGORIES[category]
     os.makedirs(dir_path, exist_ok=True)
     
     file_path = os.path.join(dir_path, file.filename)
@@ -258,7 +258,7 @@ def delete_file(category: str, filename: str, auth: bool = Depends(authenticate_
     if category not in FILE_CATEGORIES:
         raise HTTPException(status_code=400, detail="Invalid category")
     
-    file_path = os.path.join(f"files/{category.lower()}", filename)
+    file_path = os.path.join(FILE_CATEGORIES[category], filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     
@@ -273,7 +273,7 @@ def get_file_content(category: str, filename: str, auth: bool = Depends(authenti
     if category not in FILE_CATEGORIES:
         raise HTTPException(status_code=400, detail="Invalid category")
     
-    file_path = os.path.join(f"files/{category.lower()}", filename)
+    file_path = os.path.join(FILE_CATEGORIES[category], filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     
