@@ -15,7 +15,7 @@ RUN pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic python-multi
 COPY . .
 
 # Create directory for files if they don't exist
-RUN mkdir -p files/sc files/caravan files/feature
+RUN mkdir -p files/sc files/caravan files/feature files/jsons
 
 # Expose port
 EXPOSE 8000

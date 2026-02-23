@@ -136,11 +136,13 @@ class FileType(str, Enum):
     CARAVAN = "CARAVAN"
     SC = "SC"
     FEATURE = "FEATURE"
+    JSONS = "JSONS"
 
 FILE_CATEGORIES = {
     "CARAVAN": "files/caravan",
     "SC": "files/sc",
-    "FEATURE": "files/feature"
+    "FEATURE": "files/feature",
+    "JSONS": "jsons"
 }
 
 ALLOWED_EXTENSIONS = ('.txt', '.json', '.py')
@@ -225,7 +227,7 @@ async def upload_file(
     """Upload a file to caravan, sc or feature directory."""
     category = category.upper()
     if category not in FILE_CATEGORIES:
-        raise HTTPException(status_code=400, detail="Invalid category. Use CARAVAN, SC or FEATURE.")
+        raise HTTPException(status_code=400, detail="Invalid category. Use CARAVAN, SC, FEATURE or JSONS.")
     
     if not file.filename.endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail="Only .txt, .json and .py files are allowed.")
@@ -407,7 +409,7 @@ async def download_file(
 
     # 4. Serve File
     if type.upper() not in enum_files:
-        raise HTTPException(status_code=400, detail="Invalid enum type. Use CARAVAN, SC or FEATURE.")
+        raise HTTPException(status_code=400, detail="Invalid enum type. Use CARAVAN, SC, FEATURE or JSONS.")
     
     file_dir = enum_files[type.upper()]
     file_path = os.path.join(file_dir, filename)

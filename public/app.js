@@ -26,15 +26,19 @@ const elements = {
     caravanFileList: document.getElementById('caravanFileList'),
     scFileList: document.getElementById('scFileList'),
     featureFileList: document.getElementById('featureFileList'),
+    jsonsFileList: document.getElementById('jsonsFileList'),
     caravanFileCount: document.getElementById('caravanFileCount'),
     scFileCount: document.getElementById('scFileCount'),
     featureFileCount: document.getElementById('featureFileCount'),
+    jsonsFileCount: document.getElementById('jsonsFileCount'),
     caravanUploadInput: document.getElementById('caravanUploadInput'),
     scUploadInput: document.getElementById('scUploadInput'),
     featureUploadInput: document.getElementById('featureUploadInput'),
+    jsonsUploadInput: document.getElementById('jsonsUploadInput'),
     caravanDropZone: document.getElementById('caravanDropZone'),
     scDropZone: document.getElementById('scDropZone'),
     featureDropZone: document.getElementById('featureDropZone'),
+    jsonsDropZone: document.getElementById('jsonsDropZone'),
     // File preview modal
     filePreviewModal: document.getElementById('filePreviewModal'),
     closePreviewModal: document.getElementById('closePreviewModal'),
@@ -45,8 +49,8 @@ const elements = {
 
 // State
 let users = [];
-let availableFiles = { CARAVAN: [], SC: [], FEATURE: [] };
-let managedFiles = { CARAVAN: [], SC: [], FEATURE: [] };
+let availableFiles = { CARAVAN: [], SC: [], FEATURE: [], JSONS: [] };
+let managedFiles = { CARAVAN: [], SC: [], FEATURE: [], JSONS: [] };
 
 
 // ==============================
@@ -267,9 +271,12 @@ async function fetchManagedFiles() {
         renderFileList('CARAVAN', managedFiles.CARAVAN || [], elements.caravanFileList);
         renderFileList('SC', managedFiles.SC || [], elements.scFileList);
         renderFileList('FEATURE', managedFiles.FEATURE || [], elements.featureFileList);
+        renderFileList('JSONS', managedFiles.JSONS || [], elements.jsonsFileList);
+
         elements.caravanFileCount.textContent = (managedFiles.CARAVAN || []).length;
         elements.scFileCount.textContent = (managedFiles.SC || []).length;
         elements.featureFileCount.textContent = (managedFiles.FEATURE || []).length;
+        elements.jsonsFileCount.textContent = (managedFiles.JSONS || []).length;
     } catch (error) {
         console.error('Error fetching files:', error);
     }
@@ -444,7 +451,8 @@ async function fetchFiles() {
         availableFiles = {
             CARAVAN: (data.CARAVAN || []).map(f => f.name || f),
             SC: (data.SC || []).map(f => f.name || f),
-            FEATURE: (data.FEATURE || []).map(f => f.name || f)
+            FEATURE: (data.FEATURE || []).map(f => f.name || f),
+            JSONS: (data.JSONS || []).map(f => f.name || f)
         };
         updateFileDropdown();
     } catch (error) {
@@ -739,6 +747,9 @@ if (elements.scDropZone && elements.scUploadInput) {
 }
 if (elements.featureDropZone && elements.featureUploadInput) {
     setupDropZone(elements.featureDropZone, 'FEATURE', elements.featureUploadInput);
+}
+if (elements.jsonsDropZone && elements.jsonsUploadInput) {
+    setupDropZone(elements.jsonsDropZone, 'JSONS', elements.jsonsUploadInput);
 }
 
 // Modal close on backdrop click
