@@ -20,8 +20,8 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.7.21',
-    'name': 'v1.7.21 - Oto Kervan GUI düzeni, 2Captcha test modu',
+    'tag_name': 'v1.7.22',
+    'name': 'v1.7.22 - CAPTCHA dinamik input, Confirm butonu tıklama',
     'body': release_notes,
     'draft': False,
     'prerelease': False

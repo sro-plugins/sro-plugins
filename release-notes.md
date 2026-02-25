@@ -1,3 +1,12 @@
+## v1.7.22 (CAPTCHA – Dinamik input, Confirm butonu)
+
+### Oto Kervan / CAPTCHA
+- **Input konumu dinamik**: Sabit (x,y) kaldırıldı; önce penceredeki Edit kontrolü aranır, yoksa pencere merkezi + ofset (`input_relative_center`) kullanılır
+- **Confirm butonu**: Enter yerine input'un sağındaki Confirm butonuna tıklanır; `confirm_button_offset` (varsayılan dx: 80, dy: 0) ile ayarlanır
+- **Config**: `input_relative_center`, `confirm_button_offset` eklendi
+
+---
+
 ## v1.7.21 (Oto Kervan – GUI düzeni, 2Captcha test modu)
 
 ### Oto Kervan

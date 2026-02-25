@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.21'
+pVersion = '1.7.22'
 
 MOVE_DELAY = 0.25
 
@@ -1477,8 +1477,9 @@ def _caravan_captcha_config_path():
 
 def _caravan_captcha_load_config():
     path = _caravan_captcha_config_path()
+    default = {'api_key': '', 'auto_solve': False, 'npc_manual_open': True, 'region': {'x': 350, 'y': 280, 'w': 320, 'h': 80}, 'input_click': {'x': 0, 'y': 0}, 'input_relative_center': {'dx': 0, 'dy': 60}, 'confirm_button_offset': {'dx': 80, 'dy': 0}}
     if not path or not os.path.isfile(path):
-        return {'api_key': '', 'auto_solve': False, 'npc_manual_open': True, 'region': {'x': 350, 'y': 280, 'w': 320, 'h': 80}}
+        return default
     try:
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -1486,9 +1487,15 @@ def _caravan_captcha_load_config():
             data['region'] = {'x': 350, 'y': 280, 'w': 320, 'h': 80}
         if 'npc_manual_open' not in data:
             data['npc_manual_open'] = True
+        if not isinstance(data.get('input_click'), dict):
+            data['input_click'] = {'x': 0, 'y': 0}
+        if not isinstance(data.get('input_relative_center'), dict):
+            data['input_relative_center'] = {'dx': 0, 'dy': 60}
+        if not isinstance(data.get('confirm_button_offset'), dict):
+            data['confirm_button_offset'] = {'dx': 80, 'dy': 0}
         return data
     except Exception:
-        return {'api_key': '', 'auto_solve': False, 'npc_manual_open': True, 'region': {'x': 350, 'y': 280, 'w': 320, 'h': 80}}
+        return default
 
 def _caravan_captcha_save_config(cfg):
     path = _caravan_captcha_config_path()
@@ -1573,14 +1580,103 @@ def _caravan_captcha_solve_2captcha(api_key, image_base64):
         log('[%s] [CAPTCHA] 2Captcha istek hatası: %s' % (pName, ex))
         return None
 
-def _caravan_captcha_send_keys(hwnd, text):
-    """Oyun penceresine metni tuş basımı ile yazar (Windows SendInput)."""
+def _caravan_captcha_find_edit_center(hwnd):
+    """Oyun penceresindeki ilk Edit kontrolünü bulur; merkezinin client koordinatlarını (x, y) döndürür. Bulunamazsa None."""
+    if not hwnd:
+        return None
+    try:
+        user32 = ctypes.windll.user32
+        edits = []
+        def _enum_cb(child_hwnd, _lparam):
+            buf = ctypes.create_unicode_buffer(256)
+            if user32.GetClassNameW(child_hwnd, buf, 256):
+                if buf.value.strip().lower() == 'edit':
+                    edits.append(child_hwnd)
+            return 1
+        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+        user32.EnumChildWindows(hwnd, WNDENUMPROC(_enum_cb), 0)
+        if not edits:
+            return None
+        class RECT(ctypes.Structure):
+            _fields_ = [('left', ctypes.c_long), ('top', ctypes.c_long), ('right', ctypes.c_long), ('bottom', ctypes.c_long)]
+        class POINT(ctypes.Structure):
+            _fields_ = [('x', ctypes.c_long), ('y', ctypes.c_long)]
+        rect = RECT()
+        if not user32.GetWindowRect(edits[0], ctypes.byref(rect)):
+            return None
+        sx = (rect.left + rect.right) // 2
+        sy = (rect.top + rect.bottom) // 2
+        pt = POINT(sx, sy)
+        if not user32.ScreenToClient(hwnd, ctypes.byref(pt)):
+            return None
+        return (pt.x, pt.y)
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Edit kontrolü aranırken hata: %s' % (pName, ex))
+        return None
+
+def _caravan_captcha_input_from_center(hwnd, dx, dy):
+    """Oyun penceresinin client merkezine göre tıklama noktası: (width/2 + dx, height/2 + dy)."""
+    if not hwnd:
+        return (0, 0)
+    try:
+        class RECT(ctypes.Structure):
+            _fields_ = [('left', ctypes.c_long), ('top', ctypes.c_long), ('right', ctypes.c_long), ('bottom', ctypes.c_long)]
+        user32 = ctypes.windll.user32
+        r = RECT()
+        if not user32.GetClientRect(hwnd, ctypes.byref(r)):
+            return (0, 0)
+        w, h = r.right - r.left, r.bottom - r.top
+        return (max(0, w // 2 + int(dx)), max(0, h // 2 + int(dy)))
+    except Exception:
+        return (0, 0)
+
+def _caravan_captcha_click_input(hwnd, client_x, client_y):
+    """Oyun penceresinde (client_x, client_y) noktasına tıklar; Image Code input alanı odaklanır."""
+    if not hwnd or (client_x == 0 and client_y == 0):
+        return
+    try:
+        user32 = ctypes.windll.user32
+        user32.SetForegroundWindow(hwnd)
+        time.sleep(0.15)
+        class POINT(ctypes.Structure):
+            _fields_ = [('x', ctypes.c_long), ('y', ctypes.c_long)]
+        pt = POINT(client_x, client_y)
+        if user32.ClientToScreen(hwnd, ctypes.byref(pt)):
+            user32.SetCursorPos(pt.x, pt.y)
+            time.sleep(0.05)
+            user32.mouse_event(0x0002, 0, 0, 0, 0)
+            time.sleep(0.05)
+            user32.mouse_event(0x0004, 0, 0, 0, 0)
+            time.sleep(0.2)
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Input tıklama hatası: %s' % (pName, ex))
+    try:
+        user32 = ctypes.windll.user32
+        user32.SetForegroundWindow(hwnd)
+        time.sleep(0.15)
+        class POINT(ctypes.Structure):
+            _fields_ = [('x', ctypes.c_long), ('y', ctypes.c_long)]
+        pt = POINT(client_x, client_y)
+        if user32.ClientToScreen(hwnd, ctypes.byref(pt)):
+            user32.SetCursorPos(pt.x, pt.y)
+            time.sleep(0.05)
+            user32.mouse_event(0x0002, 0, 0, 0, 0)
+            time.sleep(0.05)
+            user32.mouse_event(0x0004, 0, 0, 0, 0)
+            time.sleep(0.2)
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Input tıklama hatası: %s' % (pName, ex))
+
+def _caravan_captcha_send_keys(hwnd, text, input_click_x=0, input_click_y=0, confirm_offset_x=0, confirm_offset_y=0):
+    """Input'a tıkla, kodu yaz; Confirm için Enter yerine input'un sağındaki butona tıkla (confirm_offset verilmişse)."""
     if not hwnd or not text:
         return
     try:
         user32 = ctypes.windll.user32
         user32.SetForegroundWindow(hwnd)
         time.sleep(0.2)
+        if input_click_x != 0 or input_click_y != 0:
+            _caravan_captcha_click_input(hwnd, input_click_x, input_click_y)
         VK_SHIFT = 0x10
         for ch in text:
             code = user32.VkKeyScanW(ord(ch))
@@ -1593,8 +1689,15 @@ def _caravan_captcha_send_keys(hwnd, text):
             if shift:
                 user32.keybd_event(VK_SHIFT, 0, 2, 0)
             time.sleep(0.05)
-        user32.keybd_event(0x0D, 0, 0, 0)
-        user32.keybd_event(0x0D, 0, 2, 0)
+        time.sleep(0.1)
+        if confirm_offset_x != 0 or confirm_offset_y != 0:
+            btn_x = input_click_x + confirm_offset_x
+            btn_y = input_click_y + confirm_offset_y
+            _caravan_captcha_click_input(hwnd, btn_x, btn_y)
+            log('[%s] [CAPTCHA] Confirm butonuna tıklandı (input + %s, %s)' % (pName, confirm_offset_x, confirm_offset_y))
+        else:
+            user32.keybd_event(0x0D, 0, 0, 0)
+            user32.keybd_event(0x0D, 0, 2, 0)
     except Exception as ex:
         log('[%s] [CAPTCHA] Tuş gönderme hatası: %s' % (pName, ex))
 
@@ -1647,9 +1750,29 @@ def _caravan_captcha_solve_thread_fn():
         if text:
             _caravan_captcha_last_solve_time = time.time()
             _caravan_captcha_auto_solving = False
-            log('[%s] [CAPTCHA] Çözüm: %s (input\'a yazılıyor + Confirm)' % (pName, text))
+            ix, iy = 0, 0
+            edit_center = _caravan_captcha_find_edit_center(hwnd)
+            if edit_center:
+                ix, iy = edit_center
+                log('[%s] [CAPTCHA] Input konumu: penceredeki Edit kontrolü (dinamik)' % pName)
+            else:
+                rel = cfg.get('input_relative_center') or {}
+                dx, dy = int(rel.get('dx', 0)), int(rel.get('dy', 60))
+                if dx != 0 or dy != 0:
+                    ix, iy = _caravan_captcha_input_from_center(hwnd, dx, dy)
+                    log('[%s] [CAPTCHA] Input konumu: pencere merkezi + (%s, %s)' % (pName, dx, dy))
+            if ix == 0 and iy == 0:
+                inp = cfg.get('input_click') or {}
+                ix, iy = int(inp.get('x', 0)), int(inp.get('y', 0))
+                if ix != 0 or iy != 0:
+                    log('[%s] [CAPTCHA] Input konumu: config sabit (x,y)' % pName)
+            cbo = cfg.get('confirm_button_offset') or {}
+            cdx, cdy = int(cbo.get('dx', 80)), int(cbo.get('dy', 0))
+            if ix == 0 and iy == 0:
+                cdx, cdy = 0, 0
+            log('[%s] [CAPTCHA] Çözüm: %s (input\'a %s + Confirm butonu)' % (pName, text, 'tıklanıp yazılıyor' if (ix != 0 or iy != 0) else 'yazılıyor'))
             QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Kod yazılıyor, Confirm...')
-            _caravan_captcha_send_keys(hwnd, text)
+            _caravan_captcha_send_keys(hwnd, text, ix, iy, cdx, cdy)
             time.sleep(2.0)
             if _caravan_captcha_last_npc_id_bytes:
                 log('[%s] [CAPTCHA] Confirm sonrası tekrar mal alma denemesi.' % pName)
