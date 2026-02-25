@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.20'
+pVersion = '1.7.21'
 
 MOVE_DELAY = 0.25
 
@@ -1635,9 +1635,15 @@ def _caravan_captcha_solve_thread_fn():
         b64 = _caravan_captcha_capture_region(hwnd, x, y, w, h)
         if not b64 or len(b64) < 100:
             return
-        log('[%s] [CAPTCHA] 2Captcha\'ya gönderiliyor...' % pName)
-        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: CAPTCHA çözülüyor...')
-        text = _caravan_captcha_solve_2captcha(api_key, b64)
+        test_mode = (api_key or '').strip().upper() == 'TEST'
+        if test_mode:
+            log('[%s] [CAPTCHA] Test modu: 2Captcha atlandı, sahte kod yazılıyor (akış testi).' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Test modu – kod yazılıyor')
+            text = 'TEST123'
+        else:
+            log('[%s] [CAPTCHA] 2Captcha\'ya gönderiliyor...' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: CAPTCHA çözülüyor...')
+            text = _caravan_captcha_solve_2captcha(api_key, b64)
         if text:
             _caravan_captcha_last_solve_time = time.time()
             _caravan_captcha_auto_solving = False
@@ -2630,6 +2636,8 @@ def hwt_btn_hwt_advanced():
 # Tab 5 - Oto Kervan (GitHub'dan script listesi, seçilen ile Başla/Durdur)
 _kervan_x = _tab_bar_x + 30
 _kervan_y = _content_y + 20
+_kervan_list_w = 200
+_kervan_captcha_col_x = _kervan_x + _kervan_list_w + 12
 
 # Aktif profil gösterimi
 _kervan_profile_y = _kervan_y
@@ -2637,40 +2645,40 @@ _add_tab5(QtBind.createLabel(gui, 'Aktif Profil:', _kervan_x, _kervan_profile_y)
 lblKervanProfile = QtBind.createLabel(gui, 'Yükleniyor...', _kervan_x + 75, _kervan_profile_y)
 _add_tab5(lblKervanProfile, _kervan_x + 75, _kervan_profile_y)
 
-# Script listesi
+# Script listesi (genişlik %50 düşürüldü)
 _kervan_list_y = _kervan_profile_y + 25
 _add_tab5(QtBind.createLabel(gui, 'Script listesi:', _kervan_x, _kervan_list_y), _kervan_x, _kervan_list_y)
-lstKervanScripts = QtBind.createList(gui, _kervan_x, _kervan_list_y + 20, 400, 120)
+lstKervanScripts = QtBind.createList(gui, _kervan_x, _kervan_list_y + 20, _kervan_list_w, 120)
 _add_tab5(lstKervanScripts, _kervan_x, _kervan_list_y + 20)
 QtBind.append(gui, lstKervanScripts, '(Önce "Yenile" ile listeyi yükleyin)')
 
-# Yenile / Başla / Durdur
+# CAPTCHA / API Key bloğu listenin sağında
+_kervan_captcha_y = _kervan_list_y + 20
+_add_tab5(QtBind.createLabel(gui, '2Captcha API Key (TEST=test):', _kervan_captcha_col_x, _kervan_captcha_y), _kervan_captcha_col_x, _kervan_captcha_y)
+_caravan_captcha_api_key_edit = QtBind.createLineEdit(gui, '', _kervan_captcha_col_x, _kervan_captcha_y + 18, 165, 20)
+_add_tab5(_caravan_captcha_api_key_edit, _kervan_captcha_col_x, _kervan_captcha_y + 18)
+_btn_caravan_captcha_save = QtBind.createButton(gui, 'caravan_captcha_save_config', ' Kaydet ', _kervan_captcha_col_x + 170, _kervan_captcha_y + 17)
+_add_tab5(_btn_caravan_captcha_save, _kervan_captcha_col_x + 170, _kervan_captcha_y + 17)
+_cbx_caravan_captcha_auto = QtBind.createCheckBox(gui, 'caravan_captcha_auto_clicked', 'CAPTCHA otomatik çöz (2Captcha)', _kervan_captcha_col_x, _kervan_captcha_y + 42)
+_add_tab5(_cbx_caravan_captcha_auto, _kervan_captcha_col_x, _kervan_captcha_y + 42)
+_cbx_caravan_npc_manual_open = QtBind.createCheckBox(gui, 'caravan_npc_manual_open_clicked', 'NPC\'yi manuel aç', _kervan_captcha_col_x, _kervan_captcha_y + 62)
+_add_tab5(_cbx_caravan_npc_manual_open, _kervan_captcha_col_x, _kervan_captcha_y + 62)
+
+# Yenile / Başla / Durdur / CAPTCHA Test / Mal al
 _kervan_btn_y = _kervan_list_y + 145
 _btn_kervan_refresh = QtBind.createButton(gui, 'kervan_refresh_list', ' Yenile ', _kervan_x, _kervan_btn_y)
 _add_tab5(_btn_kervan_refresh, _kervan_x, _kervan_btn_y)
-_btn_kervan_start = QtBind.createButton(gui, 'kervan_start', ' Başla ', _kervan_x + 80, _kervan_btn_y)
-_add_tab5(_btn_kervan_start, _kervan_x + 80, _kervan_btn_y)
-_btn_kervan_stop = QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_x + 160, _kervan_btn_y)
-_add_tab5(_btn_kervan_stop, _kervan_x + 160, _kervan_btn_y)
-_btn_kervan_captcha_test = QtBind.createButton(gui, 'kervan_captcha_test', ' CAPTCHA Test ', _kervan_x + 250, _kervan_btn_y)
-_add_tab5(_btn_kervan_captcha_test, _kervan_x + 250, _kervan_btn_y)
-_btn_kervan_mal_al = QtBind.createButton(gui, 'kervan_captcha_mal_al', ' Mal al ', _kervan_x + 360, _kervan_btn_y)
-_add_tab5(_btn_kervan_mal_al, _kervan_x + 360, _kervan_btn_y)
+_btn_kervan_start = QtBind.createButton(gui, 'kervan_start', ' Başla ', _kervan_x + 58, _kervan_btn_y)
+_add_tab5(_btn_kervan_start, _kervan_x + 58, _kervan_btn_y)
+_btn_kervan_stop = QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_x + 116, _kervan_btn_y)
+_add_tab5(_btn_kervan_stop, _kervan_x + 116, _kervan_btn_y)
+_btn_kervan_captcha_test = QtBind.createButton(gui, 'kervan_captcha_test', ' CAPTCHA Test ', _kervan_x + 174, _kervan_btn_y)
+_add_tab5(_btn_kervan_captcha_test, _kervan_x + 174, _kervan_btn_y)
+_btn_kervan_mal_al = QtBind.createButton(gui, 'kervan_captcha_mal_al', ' Mal al ', _kervan_captcha_col_x, _kervan_btn_y)
+_add_tab5(_btn_kervan_mal_al, _kervan_captcha_col_x, _kervan_btn_y)
 
 lblKervanStatus = QtBind.createLabel(gui, 'Durum: Hazır', _kervan_x, _kervan_btn_y + 28)
 _add_tab5(lblKervanStatus, _kervan_x, _kervan_btn_y + 28)
-
-# CAPTCHA otomatik çözüm (2Captcha)
-_kervan_captcha_y = _kervan_btn_y + 52
-_add_tab5(QtBind.createLabel(gui, '2Captcha API Key:', _kervan_x, _kervan_captcha_y), _kervan_x, _kervan_captcha_y)
-_caravan_captcha_api_key_edit = QtBind.createLineEdit(gui, '', _kervan_x + 95, _kervan_captcha_y - 2, 220, 20)
-_add_tab5(_caravan_captcha_api_key_edit, _kervan_x + 95, _kervan_captcha_y - 2)
-_btn_caravan_captcha_save = QtBind.createButton(gui, 'caravan_captcha_save_config', ' Kaydet ', _kervan_x + 320, _kervan_captcha_y - 2)
-_add_tab5(_btn_caravan_captcha_save, _kervan_x + 320, _kervan_captcha_y - 2)
-_cbx_caravan_captcha_auto = QtBind.createCheckBox(gui, 'caravan_captcha_auto_clicked', 'CAPTCHA otomatik çöz (2Captcha)', _kervan_x, _kervan_captcha_y + 22)
-_add_tab5(_cbx_caravan_captcha_auto, _kervan_x, _kervan_captcha_y + 22)
-_cbx_caravan_npc_manual_open = QtBind.createCheckBox(gui, 'caravan_npc_manual_open_clicked', 'NPC\'yi manuel aç (shop opcode ile açılmasın)', _kervan_x, _kervan_captcha_y + 44)
-_add_tab5(_cbx_caravan_npc_manual_open, _kervan_x, _kervan_captcha_y + 44)
 
 # Tab 5 butonları lisans korumasına
 _protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop, _btn_kervan_captcha_test, _btn_kervan_mal_al, _caravan_captcha_api_key_edit, _btn_caravan_captcha_save, _cbx_caravan_captcha_auto, _cbx_caravan_npc_manual_open]

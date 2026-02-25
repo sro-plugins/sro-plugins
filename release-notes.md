@@ -1,3 +1,12 @@
+## v1.7.21 (Oto Kervan – GUI düzeni, 2Captcha test modu)
+
+### Oto Kervan
+- **Script listesi**: Genişlik %50 düşürüldü (400 → 200 px)
+- **API Key / CAPTCHA**: API key, Kaydet, checkbox'lar listenin sağına taşındı
+- **2Captcha test modu**: API Key olarak `TEST` yazınca gerçek API çağrılmaz, akış test edilir (TEST123 yazılır + Confirm + tekrar mal al)
+
+---
+
 ## v1.7.20 (Oto Kervan – Manuel shop, Mal al butonu, Confirm + tekrar mal al)
 
 ### Oto Kervan
