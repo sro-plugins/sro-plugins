@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.17'
+pVersion = '1.7.18'
 
 MOVE_DELAY = 0.25
 
@@ -1450,6 +1450,141 @@ def kervan_stop():
     if ns and 'kervan_stop' in ns:
         ns['kervan_stop']()
 
+# CAPTCHA Test: Jangan/Downhang ticaret NPC'sine gidip NPC aç, mal almayı dene (CAPTCHA çıkacak)
+_kervan_captcha_test_running = False
+_kervan_captcha_test_thread = None
+_kervan_captcha_test_lock = threading.Lock()
+
+# Jangan: Jodaesan (Specialty Trader), Downhang: Leegak (Specialty Shop)
+_CARAVAN_CAPTCHA_TEST_NPC_KEYWORDS = ['jodaesan', 'leegak', 'specialty trader', 'specialty shop']
+
+def _kervan_captcha_test_loop():
+    global _kervan_captcha_test_running
+    try:
+        if not _is_license_valid():
+            log('[%s] [CAPTCHA Test] Geçerli lisans gerekli.' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Lisans gerekli')
+            _kervan_captcha_test_running = False
+            return
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC aranıyor...')
+        log('[%s] [CAPTCHA Test] Jangan/Downhang ticaret NPC\'si aranıyor...' % pName)
+        npcs = get_npcs()
+        if not npcs or not isinstance(npcs, dict):
+            log('[%s] [CAPTCHA Test] Yakında NPC bulunamadı. Jangan veya Downhang\'e gidin.' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: NPC yok (Jangan/Downhang\'e gidin)')
+            _kervan_captcha_test_running = False
+            return
+        pos = get_position()
+        if not pos:
+            log('[%s] [CAPTCHA Test] Pozisyon alınamadı.' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Pozisyon alınamadı')
+            _kervan_captcha_test_running = False
+            return
+        r = int(pos.get('region', 0))
+        px = float(pos.get('x', 0))
+        py = float(pos.get('y', 0))
+        pz = float(pos.get('z', 0))
+        best = None
+        best_dist = float('inf')
+        for nid, n in npcs.items():
+            if not isinstance(n, dict):
+                continue
+            name = (n.get('name') or '').lower()
+            if not any(kw in name for kw in _CARAVAN_CAPTCHA_TEST_NPC_KEYWORDS):
+                continue
+            nr = int(n.get('region', 0))
+            nx = float(n.get('x', 0))
+            ny = float(n.get('y', 0))
+            nz = n.get('z')
+            if nz is not None:
+                d = math.sqrt((px - nx)**2 + (py - ny)**2 + (pz - float(nz))**2)
+            else:
+                d = math.sqrt((px - nx)**2 + (py - ny)**2)
+            if d < best_dist:
+                best_dist = d
+                best = (nid, n, d)
+        if not best:
+            log('[%s] [CAPTCHA Test] Jodaesan/Leegak bulunamadı. Jangan veya Downhang\'de misiniz?' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Ticaret NPC yok')
+            _kervan_captcha_test_running = False
+            return
+        nid, npc, dist = best
+        npc_name = npc.get('name', 'NPC')
+        region = int(npc.get('region', 0))
+        nx = float(npc.get('x', 0))
+        ny = float(npc.get('y', 0))
+        nz = float(npc.get('z', 0)) if npc.get('z') is not None else 0.0
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: %s\'e gidiliyor...' % npc_name)
+        log('[%s] [CAPTCHA Test] %s (mesafe %.0f) - hareket ediliyor.' % (pName, npc_name, dist))
+        try:
+            if r == region:
+                move_to(nx, ny, nz)
+            else:
+                move_to_region(region, nx, ny, nz)
+        except NameError:
+            move_to(nx, ny, nz)
+        except Exception as ex:
+            log('[%s] [CAPTCHA Test] Hareket hatası: %s' % (pName, ex))
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Hareket hatası')
+            _kervan_captcha_test_running = False
+            return
+        # NPC'ye yaklaşana kadar bekle (en fazla 60 saniye)
+        for _ in range(60):
+            if not _kervan_captcha_test_running:
+                QtBind.setText(gui, lblKervanStatus, 'Durum: İptal')
+                return
+            time.sleep(1)
+            pos = get_position()
+            if not pos or int(pos.get('region', 0)) != region:
+                continue
+            dx = float(pos.get('x', 0)) - nx
+            dy = float(pos.get('y', 0)) - ny
+            dz = float(pos.get('z', 0) or 0) - nz
+            d = math.sqrt(dx*dx + dy*dy + dz*dz)
+            if d <= 20:
+                break
+        else:
+            log('[%s] [CAPTCHA Test] NPC\'ye ulaşılamadı (zaman aşımı).' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Zaman aşımı')
+            _kervan_captcha_test_running = False
+            return
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC açılıyor...')
+        log('[%s] [CAPTCHA Test] %s açılıyor.' % (pName, npc_name))
+        npc_id_bytes = struct.pack('<H', nid)
+        try:
+            inject_joymax(0x7045, npc_id_bytes + b'\x00\x00', False)
+            time.sleep(0.5)
+            inject_joymax(0x7046, npc_id_bytes + b'\x00\x00\x01', False)
+            time.sleep(1.0)
+        except Exception as ex:
+            log('[%s] [CAPTCHA Test] NPC açma hatası: %s' % (pName, ex))
+            QtBind.setText(gui, lblKervanStatus, 'Durum: NPC açılamadı')
+            _kervan_captcha_test_running = False
+            return
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC açıldı – mal almayı deneyin')
+        log('[%s] [CAPTCHA Test] NPC açıldı. Mal almayı deneyin; CAPTCHA çıkacak. CAPTCHA\'yı girip işlemi tamamlayın.' % pName)
+        show_notification('CAPTCHA Test', 'Ticaret NPC açıldı. Mal almayı deneyin; CAPTCHA çıkacak.')
+    except Exception as ex:
+        log('[%s] [CAPTCHA Test] Hata: %s' % (pName, str(ex)))
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Hata')
+    finally:
+        _kervan_captcha_test_running = False
+
+def kervan_captcha_test():
+    global _kervan_captcha_test_running, _kervan_captcha_test_thread
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Lisans gerekli')
+        return
+    with _kervan_captcha_test_lock:
+        if _kervan_captcha_test_running:
+            log('[%s] [CAPTCHA Test] Zaten çalışıyor.' % pName)
+            return
+        _kervan_captcha_test_running = True
+        _kervan_captcha_test_thread = threading.Thread(target=_kervan_captcha_test_loop, name=pName + '_captcha_test', daemon=True)
+        _kervan_captcha_test_thread.start()
+    log('[%s] [CAPTCHA Test] Başlatıldı (Jangan/Downhang ticaret NPC).' % pName)
+
 # ______________________________ Script Komutları (Tab 6 - GitHub'dan uzaktan) ______________________________ #
 _script_commands_namespace = None
 
@@ -2299,12 +2434,14 @@ _btn_kervan_start = QtBind.createButton(gui, 'kervan_start', ' Başla ', _kervan
 _add_tab5(_btn_kervan_start, _kervan_x + 80, _kervan_btn_y)
 _btn_kervan_stop = QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_x + 160, _kervan_btn_y)
 _add_tab5(_btn_kervan_stop, _kervan_x + 160, _kervan_btn_y)
+_btn_kervan_captcha_test = QtBind.createButton(gui, 'kervan_captcha_test', ' CAPTCHA Test ', _kervan_x + 250, _kervan_btn_y)
+_add_tab5(_btn_kervan_captcha_test, _kervan_x + 250, _kervan_btn_y)
 
 lblKervanStatus = QtBind.createLabel(gui, 'Durum: Hazır', _kervan_x, _kervan_btn_y + 28)
 _add_tab5(lblKervanStatus, _kervan_x, _kervan_btn_y + 28)
 
 # Tab 5 butonları lisans korumasına
-_protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop]
+_protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop, _btn_kervan_captcha_test]
 
 def _caravan_init_load():
     """Init sonrası script listesini arka planda yükler (uzaktan modül). Karavan profili artık otomatik oluşturulmaz."""

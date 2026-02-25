@@ -1,3 +1,10 @@
+## v1.7.18 (Oto Kervan – CAPTCHA Test butonu)
+
+### Oto Kervan
+- **CAPTCHA Test butonu**: Jangan (Jodaesan) ve Downhang (Leegak) ticaret NPC'sine gidip NPC'yi açar; mal almayı deneyerek CAPTCHA testi yapabilirsiniz (manuel CAPTCHA girişi)
+
+---
+
 ## v1.7.17 (Oto Kervan, Script-Command iyileştirmeleri)
 
 ### Oto Kervan
