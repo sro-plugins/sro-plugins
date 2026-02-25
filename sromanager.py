@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.19'
+pVersion = '1.7.20'
 
 MOVE_DELAY = 0.25
 
@@ -1458,6 +1458,7 @@ _caravan_captcha_watch_until = 0.0
 _caravan_captcha_last_solve_time = 0.0
 _caravan_captcha_auto_solving = False
 _caravan_captcha_solve_busy = False
+_caravan_captcha_last_npc_id_bytes = None
 
 # Jangan: Jodaesan (Specialty Trader), Downhang: Leegak (Specialty Shop)
 _CARAVAN_CAPTCHA_TEST_NPC_KEYWORDS = ['jodaesan', 'leegak', 'specialty trader', 'specialty shop']
@@ -1477,15 +1478,17 @@ def _caravan_captcha_config_path():
 def _caravan_captcha_load_config():
     path = _caravan_captcha_config_path()
     if not path or not os.path.isfile(path):
-        return {'api_key': '', 'auto_solve': False, 'region': {'x': 350, 'y': 280, 'w': 320, 'h': 80}}
+        return {'api_key': '', 'auto_solve': False, 'npc_manual_open': True, 'region': {'x': 350, 'y': 280, 'w': 320, 'h': 80}}
     try:
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         if not isinstance(data.get('region'), dict):
             data['region'] = {'x': 350, 'y': 280, 'w': 320, 'h': 80}
+        if 'npc_manual_open' not in data:
+            data['npc_manual_open'] = True
         return data
     except Exception:
-        return {'api_key': '', 'auto_solve': False, 'region': {'x': 350, 'y': 280, 'w': 320, 'h': 80}}
+        return {'api_key': '', 'auto_solve': False, 'npc_manual_open': True, 'region': {'x': 350, 'y': 280, 'w': 320, 'h': 80}}
 
 def _caravan_captcha_save_config(cfg):
     path = _caravan_captcha_config_path()
@@ -1610,7 +1613,7 @@ def _caravan_captcha_try_buy(npc_id_bytes, npc_model):
         return False
 
 def _caravan_captcha_solve_thread_fn():
-    """CAPTCHA bölgesini yakala, 2Captcha ile çöz, tuşları gönder (tek seferlik thread)."""
+    """CAPTCHA bölgesini yakala, 2Captcha ile çöz, Image Code input'a yaz, Confirm (Enter), sonra tekrar mal al."""
     global _caravan_captcha_last_solve_time, _caravan_captcha_auto_solving, _caravan_captcha_solve_busy
     _caravan_captcha_solve_busy = True
     try:
@@ -1638,10 +1641,15 @@ def _caravan_captcha_solve_thread_fn():
         if text:
             _caravan_captcha_last_solve_time = time.time()
             _caravan_captcha_auto_solving = False
-            log('[%s] [CAPTCHA] Çözüm: %s (tuşlar gönderiliyor)' % (pName, text))
-            QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Çözüm girildi')
+            log('[%s] [CAPTCHA] Çözüm: %s (input\'a yazılıyor + Confirm)' % (pName, text))
+            QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Kod yazılıyor, Confirm...')
             _caravan_captcha_send_keys(hwnd, text)
-            show_notification('CAPTCHA', 'CAPTCHA otomatik girildi.')
+            time.sleep(2.0)
+            if _caravan_captcha_last_npc_id_bytes:
+                log('[%s] [CAPTCHA] Confirm sonrası tekrar mal alma denemesi.' % pName)
+                QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Tekrar mal alınıyor')
+                _caravan_captcha_try_buy(_caravan_captcha_last_npc_id_bytes, None)
+            show_notification('CAPTCHA', 'Kod girildi, Confirm. Tekrar mal alındı.')
         else:
             log('[%s] [CAPTCHA] Çözüm alınamadı.' % pName)
     except Exception as ex:
@@ -1739,9 +1747,19 @@ def _kervan_captcha_test_loop():
             QtBind.setText(gui, lblKervanStatus, 'Durum: Zaman aşımı')
             _kervan_captcha_test_running = False
             return
-        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC açılıyor...')
-        log('[%s] [CAPTCHA Test] %s açılıyor.' % (pName, npc_name))
+        global _caravan_captcha_last_npc_id_bytes
         npc_id_bytes = struct.pack('<H', nid)
+        _caravan_captcha_last_npc_id_bytes = npc_id_bytes
+        cfg = _caravan_captcha_load_config()
+        npc_manual_open = cfg.get('npc_manual_open', True)
+        if npc_manual_open:
+            QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Shop\'u manuel açın, sonra Mal al')
+            log('[%s] [CAPTCHA Test] NPC\'ye ulaştınız. Shop\'u manuel açın (NPC\'ye tıklayıp ticaret seçin), sonra "Mal al" butonuna basın.' % pName)
+            show_notification('CAPTCHA Test', 'Shop\'u manuel açın, açınca "Mal al" butonuna basın.')
+            _kervan_captcha_test_running = False
+            return
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC açılıyor (opcode)...')
+        log('[%s] [CAPTCHA Test] %s opcode ile açılıyor (kervan çantası açılmayabilir).' % (pName, npc_name))
         try:
             inject_joymax(0x7045, npc_id_bytes + b'\x00\x00', False)
             time.sleep(0.5)
@@ -1762,7 +1780,7 @@ def _kervan_captcha_test_loop():
         _caravan_captcha_auto_solving = True
         _caravan_captcha_last_solve_time = 0.0
         QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: CAPTCHA bekleniyor / otomatik çözüm açıksa çözülecek')
-        log('[%s] [CAPTCHA Test] NPC açıldı, mal alma gönderildi. CAPTCHA çıkarsa otomatik çözüm (90 sn) aktif.' % pName)
+        log('[%s] [CAPTCHA Test] Mal alma gönderildi. CAPTCHA çıkarsa otomatik çözüm (90 sn) aktif.' % pName)
         show_notification('CAPTCHA Test', 'Mal alma denendi. CAPTCHA çıkarsa otomatik çözülecek (2Captcha açıksa).')
     except Exception as ex:
         log('[%s] [CAPTCHA Test] Hata: %s' % (pName, str(ex)))
@@ -2636,6 +2654,8 @@ _btn_kervan_stop = QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_x
 _add_tab5(_btn_kervan_stop, _kervan_x + 160, _kervan_btn_y)
 _btn_kervan_captcha_test = QtBind.createButton(gui, 'kervan_captcha_test', ' CAPTCHA Test ', _kervan_x + 250, _kervan_btn_y)
 _add_tab5(_btn_kervan_captcha_test, _kervan_x + 250, _kervan_btn_y)
+_btn_kervan_mal_al = QtBind.createButton(gui, 'kervan_captcha_mal_al', ' Mal al ', _kervan_x + 360, _kervan_btn_y)
+_add_tab5(_btn_kervan_mal_al, _kervan_x + 360, _kervan_btn_y)
 
 lblKervanStatus = QtBind.createLabel(gui, 'Durum: Hazır', _kervan_x, _kervan_btn_y + 28)
 _add_tab5(lblKervanStatus, _kervan_x, _kervan_btn_y + 28)
@@ -2649,9 +2669,28 @@ _btn_caravan_captcha_save = QtBind.createButton(gui, 'caravan_captcha_save_confi
 _add_tab5(_btn_caravan_captcha_save, _kervan_x + 320, _kervan_captcha_y - 2)
 _cbx_caravan_captcha_auto = QtBind.createCheckBox(gui, 'caravan_captcha_auto_clicked', 'CAPTCHA otomatik çöz (2Captcha)', _kervan_x, _kervan_captcha_y + 22)
 _add_tab5(_cbx_caravan_captcha_auto, _kervan_x, _kervan_captcha_y + 22)
+_cbx_caravan_npc_manual_open = QtBind.createCheckBox(gui, 'caravan_npc_manual_open_clicked', 'NPC\'yi manuel aç (shop opcode ile açılmasın)', _kervan_x, _kervan_captcha_y + 44)
+_add_tab5(_cbx_caravan_npc_manual_open, _kervan_x, _kervan_captcha_y + 44)
 
 # Tab 5 butonları lisans korumasına
-_protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop, _btn_kervan_captcha_test, _caravan_captcha_api_key_edit, _btn_caravan_captcha_save, _cbx_caravan_captcha_auto]
+_protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop, _btn_kervan_captcha_test, _btn_kervan_mal_al, _caravan_captcha_api_key_edit, _btn_caravan_captcha_save, _cbx_caravan_captcha_auto, _cbx_caravan_npc_manual_open]
+
+def kervan_captcha_mal_al():
+    """Shop açıkken mal alma paketini gönderir; CAPTCHA tetiklenir, otomatik çözüm izlenir."""
+    global _caravan_captcha_watch_until, _caravan_captcha_auto_solving, _caravan_captcha_last_solve_time
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
+    if not _caravan_captcha_last_npc_id_bytes:
+        log('[%s] [CAPTCHA] Önce CAPTCHA Test ile NPC\'ye gidin (ve gerekirse shop\'u manuel açın).' % pName)
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Önce CAPTCHA Test ile NPC\'ye gidin')
+        return
+    _caravan_captcha_try_buy(_caravan_captcha_last_npc_id_bytes, None)
+    _caravan_captcha_watch_until = time.time() + 90.0
+    _caravan_captcha_auto_solving = True
+    _caravan_captcha_last_solve_time = 0.0
+    QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Mal al gönderildi, CAPTCHA bekleniyor')
+    log('[%s] [CAPTCHA] Mal al gönderildi. Image Code Verification çıkarsa otomatik çözülecek.' % pName)
 
 def caravan_captcha_save_config():
     """2Captcha API key ve otomatik çözüm ayarını kaydeder."""
@@ -2659,8 +2698,9 @@ def caravan_captcha_save_config():
         cfg = _caravan_captcha_load_config()
         cfg['api_key'] = (QtBind.text(gui, _caravan_captcha_api_key_edit) or '').strip()
         cfg['auto_solve'] = QtBind.isChecked(gui, _cbx_caravan_captcha_auto)
+        cfg['npc_manual_open'] = QtBind.isChecked(gui, _cbx_caravan_npc_manual_open)
         _caravan_captcha_save_config(cfg)
-        log('[%s] [CAPTCHA] Ayar kaydedildi (API key: %s, otomatik: %s)' % (pName, '***' if cfg['api_key'] else '(boş)', cfg['auto_solve']))
+        log('[%s] [CAPTCHA] Ayar kaydedildi (API key: %s, otomatik: %s, manuel aç: %s)' % (pName, '***' if cfg['api_key'] else '(boş)', cfg['auto_solve'], cfg['npc_manual_open']))
     except Exception as ex:
         log('[%s] [CAPTCHA] Kaydetme hatası: %s' % (pName, ex))
 
@@ -2670,6 +2710,16 @@ def caravan_captcha_auto_clicked(checked):
         cfg = _caravan_captcha_load_config()
         cfg['auto_solve'] = checked
         cfg['api_key'] = (QtBind.text(gui, _caravan_captcha_api_key_edit) or '').strip()
+        cfg['npc_manual_open'] = QtBind.isChecked(gui, _cbx_caravan_npc_manual_open)
+        _caravan_captcha_save_config(cfg)
+    except Exception:
+        pass
+
+def caravan_npc_manual_open_clicked(checked):
+    """NPC manuel aç checkbox değişince config güncelle."""
+    try:
+        cfg = _caravan_captcha_load_config()
+        cfg['npc_manual_open'] = checked
         _caravan_captcha_save_config(cfg)
     except Exception:
         pass
@@ -2680,6 +2730,7 @@ def _caravan_captcha_ui_load():
         cfg = _caravan_captcha_load_config()
         QtBind.setText(gui, _caravan_captcha_api_key_edit, cfg.get('api_key') or '')
         QtBind.setChecked(gui, _cbx_caravan_captcha_auto, bool(cfg.get('auto_solve')))
+        QtBind.setChecked(gui, _cbx_caravan_npc_manual_open, bool(cfg.get('npc_manual_open', True)))
     except Exception:
         pass
 

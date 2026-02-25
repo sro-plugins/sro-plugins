@@ -1,3 +1,13 @@
+## v1.7.20 (Oto Kervan – Manuel shop, Mal al butonu, Confirm + tekrar mal al)
+
+### Oto Kervan
+- **NPC'yi manuel aç**: Opcode ile kervan çantası açılmıyorsa; "NPC'yi manuel aç" ile sadece NPC'ye gidilir, shop'u siz açarsınız
+- **Mal al butonu**: Shop açıkken Mal al'a basınca satın alma paketi gider, Image Code Verification (CAPTCHA) tetiklenir
+- **Confirm + tekrar mal al**: CAPTCHA çözümü input'a yazılır, Enter (Confirm) basılır, 2 sn sonra otomatik tekrar mal alma denemesi
+- **Config**: `npc_manual_open` (varsayılan true)
+
+---
+
 ## v1.7.19 (Oto Kervan – Mal alma + CAPTCHA otomatik çözüm)
 
 ### Oto Kervan

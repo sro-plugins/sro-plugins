@@ -20,8 +20,8 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.7.19',
-    'name': 'v1.7.19 - Mal alma + CAPTCHA otomatik çözüm',
+    'tag_name': 'v1.7.20',
+    'name': 'v1.7.20 - Manuel shop, Mal al, Confirm + tekrar mal al',
     'body': release_notes,
     'draft': False,
     'prerelease': False
