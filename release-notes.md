@@ -1,3 +1,13 @@
+## v1.7.19 (Oto Kervan – Mal alma + CAPTCHA otomatik çözüm)
+
+### Oto Kervan
+- **Mal alma otomatik**: CAPTCHA Test NPC açtıktan sonra satın alma paketi (0x704B) gönderilir; CAPTCHA tetiklenir
+- **CAPTCHA otomatik çözüm**: 2Captcha API ile ekran bölgesi yakalanıp çözülür, cevap tuş basımı ile yazılır
+- **GUI**: 2Captcha API Key, Kaydet, "CAPTCHA otomatik çöz (2Captcha)" checkbox (Tab 5)
+- **Config**: `Config/SROManager/caravan_captcha.json` (api_key, auto_solve, region x,y,w,h)
+
+---
+
 ## v1.7.18 (Oto Kervan – CAPTCHA Test butonu)
 
 ### Oto Kervan
