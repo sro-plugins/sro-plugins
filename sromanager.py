@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.16'
+pVersion = '1.7.18'
 
 MOVE_DELAY = 0.25
 
@@ -373,6 +373,139 @@ def _validate_license():
         log('[%s] [Server] Lisans doğrulama hatası: %s' % (pName, error_msg))
         return {"valid": False, "message": error_msg}
 
+def _fetch_caravan_script_list_from_server():
+    """
+    Ana sunucudan caravan script listesini çeker (api/list, type=CARAVAN).
+    Licence validate ile aynı imzalı header yapısı kullanılır.
+    
+    Returns:
+        list: .txt dosya adları listesi, hata durumunda None
+    """
+    try:
+        license_key = _get_license_key()
+        if not license_key:
+            return None
+        user_ip = _fetch_user_external_ip()
+        if not user_ip:
+            return None
+        api_url = '%s/api/list?publicId=%s&ip=%s&type=CARAVAN' % (
+            SERVER_BASE_URL,
+            urllib.parse.quote(license_key),
+            urllib.parse.quote(user_ip)
+        )
+        signed_headers = _create_signed_headers(license_key, user_ip, endpoint="list")
+        headers = {
+            'User-Agent': 'phBot-SROManager/' + pVersion,
+            'Accept': 'application/json',
+            **signed_headers
+        }
+        log('[%s] [Oto-Kervan] api/list isteği gönderiliyor (type=CARAVAN)...' % pName)
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=12) as response:
+            data = json.loads(response.read().decode('utf-8'))
+        if not isinstance(data, list):
+            return None
+        names = [f for f in data if isinstance(f, str) and f.endswith('.txt')]
+        names.sort(key=lambda x: x.lower())
+        log('[%s] [Oto-Kervan] Sunucudan %d script listelendi.' % (pName, len(names)))
+        return names
+    except urllib.error.HTTPError as ex:
+        log('[%s] [Oto-Kervan] Sunucu listesi hatası: HTTP %d' % (pName, ex.code))
+        return None
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] Sunucu listesi alınamadı: %s' % (pName, str(ex)))
+        return None
+
+def _download_caravan_script_from_server(filename):
+    """
+    Ana sunucudan caravan script indirir (api/download, type=CARAVAN, filename).
+    Returns:
+        str: Yerel script dosya yolu, hata durumunda None
+    """
+    try:
+        license_key = _get_license_key()
+        if not license_key:
+            return None
+        user_ip = _fetch_user_external_ip()
+        if not user_ip:
+            return None
+        api_url = '%s/api/download?publicId=%s&ip=%s&type=CARAVAN&filename=%s' % (
+            SERVER_BASE_URL,
+            urllib.parse.quote(license_key),
+            urllib.parse.quote(user_ip),
+            urllib.parse.quote(filename, safe='')
+        )
+        signed_headers = _create_signed_headers(license_key, user_ip, endpoint="download")
+        headers = {
+            'User-Agent': 'phBot-SROManager/' + pVersion,
+            **signed_headers
+        }
+        log('[%s] [Oto-Kervan] api/download isteği gönderiliyor (filename=%s)...' % (pName, filename))
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as response:
+            content = response.read()
+        if not content or len(content) < 10:
+            log('[%s] [Oto-Kervan] Sunucudan indirilen dosya geçersiz (boş/kısa)' % pName)
+            return None
+        folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), GITHUB_CARAVAN_FOLDER)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        script_path = os.path.join(folder, filename)
+        with open(script_path, 'wb') as f:
+            f.write(content)
+        log('[%s] [Oto-Kervan] Sunucudan indirildi: %s (%d byte)' % (pName, filename, len(content)))
+        return script_path
+    except urllib.error.HTTPError as ex:
+        log('[%s] [Oto-Kervan] api/download hatası (filename=%s): HTTP %d' % (pName, filename, ex.code))
+        return None
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] api/download başarısız (%s): %s' % (pName, filename, str(ex)))
+        return None
+
+def _download_from_server(file_type, filename, save_path):
+    """
+    api/download ile dosya indirir ve save_path'e kaydeder.
+    file_type: CARAVAN veya SC
+    Returns: True başarılı, False hata
+    """
+    if not save_path or not filename:
+        return False
+    try:
+        license_key = _get_license_key()
+        if not license_key:
+            return False
+        user_ip = _fetch_user_external_ip()
+        if not user_ip:
+            return False
+        api_url = '%s/api/download?publicId=%s&ip=%s&type=%s&filename=%s' % (
+            SERVER_BASE_URL,
+            urllib.parse.quote(license_key),
+            urllib.parse.quote(user_ip),
+            urllib.parse.quote(str(file_type).upper(), safe=''),
+            urllib.parse.quote(filename, safe='')
+        )
+        signed_headers = _create_signed_headers(license_key, user_ip, endpoint="download")
+        headers = {'User-Agent': 'phBot-SROManager/' + pVersion, **signed_headers}
+        log('[%s] [Oto-Kervan] api/download (profil): %s' % (pName, filename))
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as response:
+            content = response.read()
+        if not content or len(content) < 5:
+            return False
+        save_dir = os.path.dirname(save_path)
+        if save_dir and not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
+        with open(save_path, 'wb') as f:
+            f.write(content)
+        log('[%s] [Oto-Kervan] Profil indirildi: %s (%d byte)' % (pName, os.path.basename(save_path), len(content)))
+        return True
+    except urllib.error.HTTPError as ex:
+        log('[%s] [Oto-Kervan] api/download profil hatası (%s): HTTP %d' % (pName, filename, ex.code))
+        return False
+    except Exception as ex:
+        log('[%s] [Oto-Kervan] api/download profil başarısız (%s): %s' % (pName, filename, str(ex)))
+        return False
+
 def _validate_license_and_update_ui():
     """Lisans doğrulama yapar ve UI'ı günceller (thread-safe) - init sırasında çağrılır"""
     try:
@@ -476,29 +609,11 @@ def _download_garden_script(script_type="normal"):
         return False
 
 def _download_caravan_script(filename):
-    """GitHub'dan tek bir karavan scriptini indirir (Oto Kervan modülü yüklüyse oradan, yoksa yerel fallback)."""
+    """Sunucudan (api/download) karavan script indirir (Oto Kervan modülü yüklüyse oradan, yoksa doğrudan)."""
     ns = _get_caravan_namespace()
     if ns and '_download_caravan_script' in ns:
         return ns['_download_caravan_script'](filename)
-    try:
-        folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), GITHUB_CARAVAN_FOLDER)
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        script_path = os.path.join(folder, filename)
-        path_encoded = urllib.parse.quote(GITHUB_CARAVAN_FOLDER, safe='')
-        url = GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE % (GITHUB_REPO, GITHUB_CARAVAN_BRANCH, path_encoded, filename)
-        req = urllib.request.Request(url, headers={'User-Agent': 'phBot-SROManager/1.0'})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            content = r.read()
-        if not content or len(content) < 10:
-            return False
-        with open(script_path, 'wb') as f:
-            f.write(content)
-        log('[%s] [Oto-Kervan] Script indirildi: %s' % (pName, filename))
-        return script_path
-    except Exception as ex:
-        log('[%s] [Oto-Kervan] İndirme hatası (%s): %s' % (pName, filename, str(ex)))
-        return False
+    return _download_caravan_script_from_server(filename)
 
 def _get_script_versions_cache_path():
     """Sürüm önbelleği dosya yolu (kullanıcı sc/ klasöründe görmez; phBot config içinde)"""
@@ -1288,9 +1403,12 @@ def _get_caravan_namespace():
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
     namespace = {
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
+        '_fetch_caravan_script_list_from_server': _fetch_caravan_script_list_from_server,
+        '_download_caravan_script_from_server': _download_caravan_script_from_server,
+        '_download_from_server': _download_from_server,
         'gui': gui, 'QtBind': QtBind, 'plugin_dir': plugin_dir,
         'get_config_dir': get_config_dir, 'get_config_path': get_config_path,
-        'get_character_data': get_character_data, 'get_position': get_position,
+        'get_character_data': get_character_data, 'get_position': get_position, 'get_npcs': get_npcs,
         'get_training_area': get_training_area, 'set_training_area': set_training_area,
         'set_training_script': set_training_script, 'set_training_position': set_training_position,
         'set_training_radius': set_training_radius, 'start_bot': start_bot, 'stop_bot': stop_bot,
@@ -1303,7 +1421,7 @@ def _get_caravan_namespace():
         'GITHUB_CARAVAN_PROFILE_JSON_FILENAME': GITHUB_CARAVAN_PROFILE_JSON_FILENAME,
         'GITHUB_CARAVAN_PROFILE_DB3_FILENAME': GITHUB_CARAVAN_PROFILE_DB3_FILENAME,
         'os': os, 'json': json, 'time': time, 'threading': threading,
-        'urllib': urllib, 'shutil': shutil, 'copy': copy, 'math': math,
+        'urllib': urllib, 'shutil': shutil, 'copy': copy, 'math': math, 'ctypes': ctypes,
     }
     try:
         exec(code, namespace)
@@ -1331,6 +1449,141 @@ def kervan_stop():
     ns = _get_caravan_namespace()
     if ns and 'kervan_stop' in ns:
         ns['kervan_stop']()
+
+# CAPTCHA Test: Jangan/Downhang ticaret NPC'sine gidip NPC aç, mal almayı dene (CAPTCHA çıkacak)
+_kervan_captcha_test_running = False
+_kervan_captcha_test_thread = None
+_kervan_captcha_test_lock = threading.Lock()
+
+# Jangan: Jodaesan (Specialty Trader), Downhang: Leegak (Specialty Shop)
+_CARAVAN_CAPTCHA_TEST_NPC_KEYWORDS = ['jodaesan', 'leegak', 'specialty trader', 'specialty shop']
+
+def _kervan_captcha_test_loop():
+    global _kervan_captcha_test_running
+    try:
+        if not _is_license_valid():
+            log('[%s] [CAPTCHA Test] Geçerli lisans gerekli.' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Lisans gerekli')
+            _kervan_captcha_test_running = False
+            return
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC aranıyor...')
+        log('[%s] [CAPTCHA Test] Jangan/Downhang ticaret NPC\'si aranıyor...' % pName)
+        npcs = get_npcs()
+        if not npcs or not isinstance(npcs, dict):
+            log('[%s] [CAPTCHA Test] Yakında NPC bulunamadı. Jangan veya Downhang\'e gidin.' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: NPC yok (Jangan/Downhang\'e gidin)')
+            _kervan_captcha_test_running = False
+            return
+        pos = get_position()
+        if not pos:
+            log('[%s] [CAPTCHA Test] Pozisyon alınamadı.' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Pozisyon alınamadı')
+            _kervan_captcha_test_running = False
+            return
+        r = int(pos.get('region', 0))
+        px = float(pos.get('x', 0))
+        py = float(pos.get('y', 0))
+        pz = float(pos.get('z', 0))
+        best = None
+        best_dist = float('inf')
+        for nid, n in npcs.items():
+            if not isinstance(n, dict):
+                continue
+            name = (n.get('name') or '').lower()
+            if not any(kw in name for kw in _CARAVAN_CAPTCHA_TEST_NPC_KEYWORDS):
+                continue
+            nr = int(n.get('region', 0))
+            nx = float(n.get('x', 0))
+            ny = float(n.get('y', 0))
+            nz = n.get('z')
+            if nz is not None:
+                d = math.sqrt((px - nx)**2 + (py - ny)**2 + (pz - float(nz))**2)
+            else:
+                d = math.sqrt((px - nx)**2 + (py - ny)**2)
+            if d < best_dist:
+                best_dist = d
+                best = (nid, n, d)
+        if not best:
+            log('[%s] [CAPTCHA Test] Jodaesan/Leegak bulunamadı. Jangan veya Downhang\'de misiniz?' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Ticaret NPC yok')
+            _kervan_captcha_test_running = False
+            return
+        nid, npc, dist = best
+        npc_name = npc.get('name', 'NPC')
+        region = int(npc.get('region', 0))
+        nx = float(npc.get('x', 0))
+        ny = float(npc.get('y', 0))
+        nz = float(npc.get('z', 0)) if npc.get('z') is not None else 0.0
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: %s\'e gidiliyor...' % npc_name)
+        log('[%s] [CAPTCHA Test] %s (mesafe %.0f) - hareket ediliyor.' % (pName, npc_name, dist))
+        try:
+            if r == region:
+                move_to(nx, ny, nz)
+            else:
+                move_to_region(region, nx, ny, nz)
+        except NameError:
+            move_to(nx, ny, nz)
+        except Exception as ex:
+            log('[%s] [CAPTCHA Test] Hareket hatası: %s' % (pName, ex))
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Hareket hatası')
+            _kervan_captcha_test_running = False
+            return
+        # NPC'ye yaklaşana kadar bekle (en fazla 60 saniye)
+        for _ in range(60):
+            if not _kervan_captcha_test_running:
+                QtBind.setText(gui, lblKervanStatus, 'Durum: İptal')
+                return
+            time.sleep(1)
+            pos = get_position()
+            if not pos or int(pos.get('region', 0)) != region:
+                continue
+            dx = float(pos.get('x', 0)) - nx
+            dy = float(pos.get('y', 0)) - ny
+            dz = float(pos.get('z', 0) or 0) - nz
+            d = math.sqrt(dx*dx + dy*dy + dz*dz)
+            if d <= 20:
+                break
+        else:
+            log('[%s] [CAPTCHA Test] NPC\'ye ulaşılamadı (zaman aşımı).' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'Durum: Zaman aşımı')
+            _kervan_captcha_test_running = False
+            return
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC açılıyor...')
+        log('[%s] [CAPTCHA Test] %s açılıyor.' % (pName, npc_name))
+        npc_id_bytes = struct.pack('<H', nid)
+        try:
+            inject_joymax(0x7045, npc_id_bytes + b'\x00\x00', False)
+            time.sleep(0.5)
+            inject_joymax(0x7046, npc_id_bytes + b'\x00\x00\x01', False)
+            time.sleep(1.0)
+        except Exception as ex:
+            log('[%s] [CAPTCHA Test] NPC açma hatası: %s' % (pName, ex))
+            QtBind.setText(gui, lblKervanStatus, 'Durum: NPC açılamadı')
+            _kervan_captcha_test_running = False
+            return
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC açıldı – mal almayı deneyin')
+        log('[%s] [CAPTCHA Test] NPC açıldı. Mal almayı deneyin; CAPTCHA çıkacak. CAPTCHA\'yı girip işlemi tamamlayın.' % pName)
+        show_notification('CAPTCHA Test', 'Ticaret NPC açıldı. Mal almayı deneyin; CAPTCHA çıkacak.')
+    except Exception as ex:
+        log('[%s] [CAPTCHA Test] Hata: %s' % (pName, str(ex)))
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Hata')
+    finally:
+        _kervan_captcha_test_running = False
+
+def kervan_captcha_test():
+    global _kervan_captcha_test_running, _kervan_captcha_test_thread
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Lisans gerekli')
+        return
+    with _kervan_captcha_test_lock:
+        if _kervan_captcha_test_running:
+            log('[%s] [CAPTCHA Test] Zaten çalışıyor.' % pName)
+            return
+        _kervan_captcha_test_running = True
+        _kervan_captcha_test_thread = threading.Thread(target=_kervan_captcha_test_loop, name=pName + '_captcha_test', daemon=True)
+        _kervan_captcha_test_thread.start()
+    log('[%s] [CAPTCHA Test] Başlatıldı (Jangan/Downhang ticaret NPC).' % pName)
 
 # ______________________________ Script Komutları (Tab 6 - GitHub'dan uzaktan) ______________________________ #
 _script_commands_namespace = None
@@ -2181,20 +2434,19 @@ _btn_kervan_start = QtBind.createButton(gui, 'kervan_start', ' Başla ', _kervan
 _add_tab5(_btn_kervan_start, _kervan_x + 80, _kervan_btn_y)
 _btn_kervan_stop = QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_x + 160, _kervan_btn_y)
 _add_tab5(_btn_kervan_stop, _kervan_x + 160, _kervan_btn_y)
+_btn_kervan_captcha_test = QtBind.createButton(gui, 'kervan_captcha_test', ' CAPTCHA Test ', _kervan_x + 250, _kervan_btn_y)
+_add_tab5(_btn_kervan_captcha_test, _kervan_x + 250, _kervan_btn_y)
 
 lblKervanStatus = QtBind.createLabel(gui, 'Durum: Hazır', _kervan_x, _kervan_btn_y + 28)
 _add_tab5(lblKervanStatus, _kervan_x, _kervan_btn_y + 28)
 
 # Tab 5 butonları lisans korumasına
-_protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop]
+_protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop, _btn_kervan_captcha_test]
 
 def _caravan_init_load():
-    """Init sonrası karavan profilini (yoksa) oluşturur, ardından script listesini arka planda yükler (uzaktan modül)."""
+    """Init sonrası script listesini arka planda yükler (uzaktan modül). Karavan profili artık otomatik oluşturulmaz."""
     time.sleep(2)
     try:
-        ns = _get_caravan_namespace()
-        if ns and '_caravan_ensure_karavan_profile_on_init' in ns:
-            ns['_caravan_ensure_karavan_profile_on_init']()
         kervan_refresh_list()
     except Exception:
         pass
@@ -2825,9 +3077,11 @@ _add_tab11(_scm_btnHideDel, _scm_x + 370, _scm_y + 192)
 _scm_lstHide = QtBind.createList(gui, _scm_x + 490, _scm_y + 168, 190, 52)
 _add_tab11(_scm_lstHide, _scm_x + 490, _scm_y + 168)
 _add_tab11(QtBind.createLabel(gui, 'Lider:', _scm_x, _scm_y + 228), _scm_x, _scm_y + 228)
-_scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 200, 20)
+_scm_tbLeader = QtBind.createLineEdit(gui, "", _scm_x + 55, _scm_y + 224, 140, 20)
 _add_tab11(_scm_tbLeader, _scm_x + 55, _scm_y + 224)
-_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_commands_help_clicked', 'Yardım', _scm_x + 270, _scm_y + 223)
+_scm_btnSaveLeader = QtBind.createButton(gui, 'scm_ui_save_leader', 'Lideri Kaydet', _scm_x + 200, _scm_y + 223)
+_add_tab11(_scm_btnSaveLeader, _scm_x + 200, _scm_y + 223)
+_scm_btnHelp = QtBind.createButton(gui, 'scm_btn_commands_help_clicked', 'Yardım', _scm_x + 310, _scm_y + 223)
 _add_tab11(_scm_btnHelp, _scm_x + 270, _scm_y + 223)
 _scm_lblStatus = QtBind.createLabel(gui, 'Hazır', _scm_x, _scm_y + 248)
 _add_tab11(_scm_lblStatus, _scm_x, _scm_y + 248)
@@ -2968,6 +3222,8 @@ def scm_btn_help_clicked():
 
 def scm_ui_save():
     _scm_ns_call('ui_save')
+def scm_ui_save_leader():
+    _scm_ns_call('ui_save_leader')
 def scm_ui_load():
     _scm_ns_call('ui_load')
 def scm_ui_remove():
@@ -3070,7 +3326,7 @@ _protected_buttons[10] = [
 _protected_buttons[11] = [
     _scm_tbChat, _scm_tbScript, _scm_tbOpcode, _scm_tbData, _scm_tbLeader, _scm_tbHide,
     _scm_lstMap, _scm_lstHide, _scm_btnSave, _scm_btnLoad, _scm_btnRemove, _scm_btnEdit,
-    _scm_btnHideAdd, _scm_btnHideDel, _scm_cbLog
+    _scm_btnHideAdd, _scm_btnHideDel, _scm_btnSaveLeader, _scm_cbLog
 ]
 
 _tab_move(_tab2_widgets, True)
