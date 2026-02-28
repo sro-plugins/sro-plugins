@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.18'
+pVersion = '1.7.19'
 
 MOVE_DELAY = 0.25
 
@@ -70,9 +70,6 @@ GITHUB_INVENTORY_COUNTER_URL = 'https://raw.githubusercontent.com/%s/main/featur
 GITHUB_TARGET_SUPPORT_URL = 'https://raw.githubusercontent.com/%s/main/feature/target_support.py' % GITHUB_REPO
 GITHUB_BLESS_QUEUE_URL = 'https://raw.githubusercontent.com/%s/main/feature/bless_queue.py' % GITHUB_REPO
 GITHUB_SCRIPT_COMMAND_MAKER_URL = 'https://raw.githubusercontent.com/%s/main/feature/script_command_maker.py' % GITHUB_REPO
-GITHUB_GARDEN_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon.txt' % GITHUB_REPO
-GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL = 'https://raw.githubusercontent.com/%s/main/sc/garden-dungeon-wizz-cleric.txt' % GITHUB_REPO
-GITHUB_SCRIPT_VERSIONS_URL = 'https://raw.githubusercontent.com/%s/main/sc/versions.json' % GITHUB_REPO
 # Auto Hwt (FGW/HWT): GitHub sc/ klasöründeki scriptler
 GITHUB_FGW_RAW_TEMPLATE = 'https://raw.githubusercontent.com/%s/main/sc/%s' % (GITHUB_REPO, '%s')
 GITHUB_FGW_SCRIPT_FILENAMES = [
@@ -92,8 +89,7 @@ GITHUB_RAW_CARAVAN_SCRIPT_TEMPLATE = 'https://raw.githubusercontent.com/%s/%s/%s
 GITHUB_CARAVAN_PROFILE_FOLDER = 'profile'
 GITHUB_CARAVAN_PROFILE_JSON_FILENAME = 'ServerName_CharName.karavan.json'
 GITHUB_CARAVAN_PROFILE_DB3_FILENAME = 'caravan_profile.db3'
-# Bu eklenti sürümüyle birlikte gelen script versiyonları (kullanıcı manipüle edemez).
-# Repo'da script + versions.json güncellediğinde burayı da aynı versiyonlara çek ve eklenti sürümünü yayınla.
+# Sunucudan hiç indirilmediyse kullanılan varsayılan versiyonlar (fallback).
 EMBEDDED_SCRIPT_VERSIONS = {
     "garden-dungeon.txt": "1.0",
     "garden-dungeon-wizz-cleric.txt": "1.0",
@@ -486,7 +482,7 @@ def _download_from_server(file_type, filename, save_path):
         )
         signed_headers = _create_signed_headers(license_key, user_ip, endpoint="download")
         headers = {'User-Agent': 'phBot-SROManager/' + pVersion, **signed_headers}
-        log('[%s] [Oto-Kervan] api/download (profil): %s' % (pName, filename))
+        log('[%s] api/download: %s' % (pName, filename))
         req = urllib.request.Request(api_url, headers=headers)
         with urllib.request.urlopen(req, timeout=15) as response:
             content = response.read()
@@ -497,14 +493,43 @@ def _download_from_server(file_type, filename, save_path):
             os.makedirs(save_dir, exist_ok=True)
         with open(save_path, 'wb') as f:
             f.write(content)
-        log('[%s] [Oto-Kervan] Profil indirildi: %s (%d byte)' % (pName, os.path.basename(save_path), len(content)))
+        log('[%s] Dosya indirildi: %s (%d byte)' % (pName, os.path.basename(save_path), len(content)))
         return True
     except urllib.error.HTTPError as ex:
-        log('[%s] [Oto-Kervan] api/download profil hatası (%s): HTTP %d' % (pName, filename, ex.code))
+        log('[%s] api/download hatası (%s): HTTP %d' % (pName, filename, ex.code))
         return False
     except Exception as ex:
-        log('[%s] [Oto-Kervan] api/download profil başarısız (%s): %s' % (pName, filename, str(ex)))
+        log('[%s] api/download başarısız (%s): %s' % (pName, filename, str(ex)))
         return False
+
+def _fetch_from_server_raw(file_type, filename):
+    """
+    api/download ile dosya indirir, içeriği döndürür (kaydetmez). versions.json için.
+    Returns: bytes veya None
+    """
+    if not filename:
+        return None
+    try:
+        license_key = _get_license_key()
+        if not license_key:
+            return None
+        user_ip = _fetch_user_external_ip()
+        if not user_ip:
+            return None
+        api_url = '%s/api/download?publicId=%s&ip=%s&type=%s&filename=%s' % (
+            SERVER_BASE_URL,
+            urllib.parse.quote(license_key),
+            urllib.parse.quote(user_ip),
+            urllib.parse.quote(str(file_type).upper(), safe=''),
+            urllib.parse.quote(filename, safe='')
+        )
+        signed_headers = _create_signed_headers(license_key, user_ip, endpoint="download")
+        headers = {'User-Agent': 'phBot-SROManager/' + pVersion, **signed_headers}
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return response.read()
+    except Exception:
+        return None
 
 def _validate_license_and_update_ui():
     """Lisans doğrulama yapar ve UI'ı günceller (thread-safe) - init sırasında çağrılır"""
@@ -556,57 +581,17 @@ def _validate_license_and_update_ui():
             pass
 
 def _download_garden_script(script_type="normal"):
-    """GitHub'dan garden-dungeon script dosyasını indirir"""
-    try:
-        sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
-
-        # Script türüne göre dosya adı ve URL belirle
-        if script_type == "wizz-cleric":
-            script_filename = "garden-dungeon-wizz-cleric.txt"
-            download_url = GITHUB_GARDEN_WIZZ_CLERIC_SCRIPT_URL
-        else:
-            script_filename = "garden-dungeon.txt"
-            download_url = GITHUB_GARDEN_SCRIPT_URL
-
-        script_path = os.path.join(sc_folder, script_filename)
-
-        log('[%s] [Garden-Auto] GitHub\'dan script indiriliyor... (Tür: %s)' % (pName, script_type))
-        log('[%s] [Garden-Auto] URL: %s' % (pName, download_url))
-
-        # sc klasörü yoksa oluştur
-        if not os.path.exists(sc_folder):
-            os.makedirs(sc_folder)
-            log('[%s] [Garden-Auto] sc klasörü oluşturuldu: %s' % (pName, sc_folder))
-
-        # GitHub'dan indir (cache bypass için timestamp ekle)
-        import time
-        cache_buster = int(time.time())
-        url_with_cache_buster = download_url + '?v=' + str(cache_buster)
-
-        req = urllib.request.Request(
-            url_with_cache_buster,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-
-        with urllib.request.urlopen(req, timeout=15) as r:
-            script_content = r.read()
-
-        content_length = len(script_content) if script_content else 0
-        log('[%s] [Garden-Auto] İndirilen boyut: %d byte' % (pName, content_length))
-
-        if not script_content or content_length < 10:
-            log('[%s] [Garden-Auto] İndirilen script geçersiz (çok kısa: %d byte)' % (pName, content_length))
-            return False
-
-        # Dosyaya kaydet
-        with open(script_path, 'wb') as f:
-            f.write(script_content)
-
-        log('[%s] [Garden-Auto] Script başarıyla indirildi: %s (%d byte)' % (pName, script_path, content_length))
+    """Sunucudan (api/download, type=SC) garden-dungeon script indirir."""
+    script_filename = "garden-dungeon-wizz-cleric.txt" if script_type == "wizz-cleric" else "garden-dungeon.txt"
+    sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
+    script_path = os.path.join(sc_folder, script_filename)
+    if not os.path.exists(sc_folder):
+        os.makedirs(sc_folder)
+    log('[%s] [Garden-Auto] Sunucudan script indiriliyor (type=SC): %s' % (pName, script_filename))
+    if _download_from_server('SC', script_filename, script_path):
         return script_path
-    except Exception as ex:
-        log('[%s] [Garden-Auto] Script indirme hatası: %s' % (pName, str(ex)))
-        return False
+    log('[%s] [Garden-Auto] Script indirilemedi: %s' % (pName, script_filename))
+    return False
 
 def _download_caravan_script(filename):
     """Sunucudan (api/download) karavan script indirir (Oto Kervan modülü yüklüyse oradan, yoksa doğrudan)."""
@@ -650,57 +635,49 @@ def _save_local_script_versions(versions):
     except Exception:
         return False
 
+SC_SCRIPT_NAMES = frozenset(('garden-dungeon.txt', 'garden-dungeon-wizz-cleric.txt'))
+
 def _check_script_updates():
-    """GitHub'daki script versiyonlarını kontrol eder ve gerekirse günceller"""
+    """Sunucudaki (api/download JSONS) versions.json'dan script versiyonlarını kontrol eder, garden + caravan günceller"""
     try:
-        log('[%s] [Script-Update] Garden Script güncellemeleri kontrol ediliyor...' % pName)
+        log('[%s] [Script-Update] Script güncellemeleri kontrol ediliyor (versions.json)...' % pName)
 
-        # GitHub'dan versions.json'ı indir (CDN cache bypass: no-cache + benzersiz query)
-        cache_buster = str(int(time.time())) + '_' + str(id(object()))
-        url_with_cache_buster = GITHUB_SCRIPT_VERSIONS_URL + '?v=' + cache_buster
-        req = urllib.request.Request(
-            url_with_cache_buster,
-            headers={
-                'User-Agent': 'phBot-SROManager/1.0',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-            }
-        )
-
-        with urllib.request.urlopen(req, timeout=15) as r:
-            github_versions_data = r.read()
-
-        if not github_versions_data:
-            log('[%s] [Script-Update] GitHub versions.json indirilemedi' % pName)
+        server_versions_data = _fetch_from_server_raw('JSONS', 'versions.json')
+        if not server_versions_data:
+            log('[%s] [Script-Update] Sunucudan versions.json alınamadı (type=JSONS)' % pName)
             return False
 
-        github_versions = json.loads(github_versions_data.decode('utf-8'))
+        server_versions = json.loads(server_versions_data.decode('utf-8'))
         local_versions = _get_local_script_versions()
-        sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
+        plugin_dir = os.path.dirname(os.path.abspath(__file__))
+        sc_folder = os.path.join(plugin_dir, "sc")
+        caravan_folder = os.path.join(plugin_dir, GITHUB_CARAVAN_FOLDER)
         updated_count = 0
 
-        # Karar: yerleşik veya son indirdiğimiz versiyon vs GitHub (indirdikten sonra kaydediyoruz, tekrar indirme olmasın)
-        for script_name, github_info in github_versions.items():
-            if isinstance(github_info, dict):
-                github_version = github_info.get("version", "0.0")
+        for script_name, server_info in server_versions.items():
+            if not script_name or not script_name.endswith('.txt'):
+                continue
+            if isinstance(server_info, dict):
+                server_version = server_info.get("version", "0.0")
             else:
-                github_version = github_info
+                server_version = str(server_info)
 
             embedded_version = EMBEDDED_SCRIPT_VERSIONS.get(script_name, "0.0")
             local_info = local_versions.get(script_name, {})
             stored_version = local_info.get("version", "") if isinstance(local_info, dict) else ""
             current_version = stored_version if stored_version else embedded_version
 
-            script_path = os.path.join(sc_folder, script_name)
+            is_sc = script_name in SC_SCRIPT_NAMES
+            script_path = os.path.join(sc_folder, script_name) if is_sc else os.path.join(caravan_folder, script_name)
 
             needs_update = False
             update_reason = ""
             if not os.path.exists(script_path):
                 needs_update = True
                 update_reason = "dosya yok"
-            elif _version_less(_parse_version(current_version), _parse_version(github_version)):
+            elif _version_less(_parse_version(current_version), _parse_version(server_version)):
                 needs_update = True
-                update_reason = "yeni versiyon (v%s -> v%s)" % (current_version, github_version)
+                update_reason = "yeni versiyon (v%s -> v%s)" % (current_version, server_version)
 
             if needs_update:
                 log('[%s] [Script-Update] %s güncelleniyor... (%s)' % (pName, script_name, update_reason))
@@ -711,13 +688,19 @@ def _check_script_updates():
                     except Exception as ex:
                         log('[%s] [Script-Update] Eski dosya silinemedi: %s' % (pName, str(ex)))
 
-                script_type = "wizz-cleric" if "wizz-cleric" in script_name else "normal"
-                download_result = _download_garden_script(script_type)
+                if is_sc:
+                    script_type = "wizz-cleric" if "wizz-cleric" in script_name else "normal"
+                    download_result = _download_garden_script(script_type)
+                else:
+                    if not os.path.exists(caravan_folder):
+                        os.makedirs(caravan_folder)
+                    download_result = _download_from_server('CARAVAN', script_name, script_path)
+
                 if download_result:
-                    local_versions[script_name] = {"version": github_version}
+                    local_versions[script_name] = {"version": server_version}
                     _save_local_script_versions(local_versions)
                     updated_count += 1
-                    log('[%s] [Script-Update] %s başarıyla güncellendi (v%s)' % (pName, script_name, github_version))
+                    log('[%s] [Script-Update] %s başarıyla güncellendi (v%s)' % (pName, script_name, server_version))
                 else:
                     log('[%s] [Script-Update] %s güncellenemedi!' % (pName, script_name))
 

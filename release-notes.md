@@ -1,3 +1,28 @@
+## v1.7.19 (Sunucu entegrasyonu: Caravan, Garden, versions.json)
+
+### Genel
+- **api/list, api/download**: Caravan, Garden scriptleri ve profil dosyaları artık ana sunucudan (vps.sro-plugins.cloud) indiriliyor
+- **GitHub fallback kaldırıldı**: Caravan list/download, Garden script, Karavan profil JSON tamamen sunucu tabanlı
+
+### Oto Kervan
+- **Liste**: api/list (type=CARAVAN) ile sunucudan script listesi
+- **İndirme**: api/download ile caravan scriptleri
+- **Profil JSON**: ServerName_CharName.karavan.json sunucudan (files/caravan)
+
+### Garden Dungeon
+- **Scriptler**: api/download (type=SC) ile garden-dungeon.txt, garden-dungeon-wizz-cleric.txt
+- **versions.json**: Sunucudan okunuyor
+
+### versions.json (JSONS)
+- **type=JSONS**: files/jsons/ içindeki versiyon dosyaları
+- **Merkezi versiyonlama**: Tüm scriptler (garden + caravan) tek versions.json ile versiyonlanıyor
+- **Otomatik güncelleme**: _check_script_updates hem garden hem caravan scriptlerini günceller
+
+### Karavan Profil
+- **db3**: GitHub indirme kaldırıldı; mevcut config'ten kopyalanır
+
+---
+
 ## v1.7.18 (Oto Kervan – CAPTCHA Test butonu)
 
 ### Oto Kervan

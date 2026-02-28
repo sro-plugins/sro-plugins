@@ -156,14 +156,15 @@ def list_available_files(auth: bool = Depends(authenticate_admin)):
 
 enum_files = {
     "CARAVAN": "files/caravan",
-    "SC": "files/sc"
+    "SC": "files/sc",
+    "JSONS": "files/jsons"
 }
 
 @app.get("/api/download", tags=["Bot API"], summary="Dosya İndirme", description="Botun script ve ayar dosyalarını indirmesini sağlar. Lisans kontrolü ve IP sınırlaması içerir.")
 async def download_file(
     publicId: str = Query(..., description="Kullanıcının lisans anahtarı (Public ID)"), 
     ip: str = Query(..., description="Botun çalıştığı karakterin IP adresi"), 
-    type: str = Query(..., description="Dosya türü (CARAVAN veya SC)"), 
+    type: str = Query(..., description="Dosya türü (CARAVAN, SC veya JSONS)"), 
     filename: str = Query(..., description="İndirilmek istenen dosya adı"),
     db: Session = Depends(get_db)
 ):
@@ -203,7 +204,7 @@ async def download_file(
 
     # 3. Serve File
     if type.upper() not in enum_files:
-        raise HTTPException(status_code=400, detail="Invalid enum type. Use CARAVAN or SC.")
+        raise HTTPException(status_code=400, detail="Invalid enum type. Use CARAVAN, SC or JSONS.")
     
     file_dir = enum_files[type.upper()]
     file_path = os.path.join(file_dir, filename)
