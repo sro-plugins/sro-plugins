@@ -47,19 +47,20 @@ GITHUB_REPO = 'sro-plugins/sro-plugins'
 GITHUB_API_LATEST = 'https://api.github.com/repos/%s/releases/latest' % GITHUB_REPO
 GITHUB_RELEASES_URL = 'https://github.com/%s/releases' % GITHUB_REPO
 GITHUB_RAW_MAIN = 'https://raw.githubusercontent.com/%s/main/%s' % (GITHUB_REPO, PLUGIN_FILENAME)
-GITHUB_BANK_FEATURES_URL = 'https://raw.githubusercontent.com/%s/main/feature/bank_features.py' % GITHUB_REPO
-GITHUB_JEWEL_MERGE_SORT_URL = 'https://raw.githubusercontent.com/%s/main/feature/jewel_merge_sort.py' % GITHUB_REPO
-GITHUB_AUTO_BASE_DUNGEON_URL = 'https://raw.githubusercontent.com/%s/main/feature/auto_base_dungeon.py' % GITHUB_REPO
-GITHUB_GARDEN_DUNGEON_URL = 'https://raw.githubusercontent.com/%s/main/feature/garden_dungeon.py' % GITHUB_REPO
-GITHUB_AUTO_HWT_URL = 'https://raw.githubusercontent.com/%s/main/feature/auto_hwt.py' % GITHUB_REPO
-GITHUB_CARAVAN_URL = 'https://raw.githubusercontent.com/%s/main/feature/caravan.py' % GITHUB_REPO
-GITHUB_SCRIPT_COMMANDS_URL = 'https://raw.githubusercontent.com/%s/main/feature/script_commands.py' % GITHUB_REPO
-GITHUB_INVENTORY_COUNTER_URL = 'https://raw.githubusercontent.com/%s/main/feature/inventory_counter.py' % GITHUB_REPO
-GITHUB_TARGET_SUPPORT_URL = 'https://raw.githubusercontent.com/%s/main/feature/target_support.py' % GITHUB_REPO
-GITHUB_BLESS_QUEUE_URL = 'https://raw.githubusercontent.com/%s/main/feature/bless_queue.py' % GITHUB_REPO
-GITHUB_SCRIPT_COMMAND_MAKER_URL = 'https://raw.githubusercontent.com/%s/main/feature/script_command_maker.py' % GITHUB_REPO
+# GitHub: files/feature/ (vps uyumlu yapı)
+GITHUB_BANK_FEATURES_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/bank_features.py' % GITHUB_REPO
+GITHUB_JEWEL_MERGE_SORT_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/jewel_merge_sort.py' % GITHUB_REPO
+GITHUB_AUTO_BASE_DUNGEON_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/auto_base_dungeon.py' % GITHUB_REPO
+GITHUB_GARDEN_DUNGEON_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/garden_dungeon.py' % GITHUB_REPO
+GITHUB_AUTO_HWT_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/auto_hwt.py' % GITHUB_REPO
+GITHUB_CARAVAN_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/caravan.py' % GITHUB_REPO
+GITHUB_SCRIPT_COMMANDS_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/script_commands.py' % GITHUB_REPO
+GITHUB_INVENTORY_COUNTER_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/inventory_counter.py' % GITHUB_REPO
+GITHUB_TARGET_SUPPORT_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/target_support.py' % GITHUB_REPO
+GITHUB_BLESS_QUEUE_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/bless_queue.py' % GITHUB_REPO
+GITHUB_SCRIPT_COMMAND_MAKER_URL = 'https://raw.githubusercontent.com/%s/main/files/feature/script_command_maker.py' % GITHUB_REPO
 # Auto Hwt (FGW/HWT): GitHub sc/ klasöründeki scriptler
-GITHUB_FGW_RAW_TEMPLATE = 'https://raw.githubusercontent.com/%s/main/sc/%s' % (GITHUB_REPO, '%s')
+GITHUB_FGW_RAW_TEMPLATE = 'https://raw.githubusercontent.com/%s/main/files/sc/%s' % (GITHUB_REPO, '%s')
 GITHUB_FGW_SCRIPT_FILENAMES = [
     'Togui Village Forgotten World.txt', 'Ship Wreck 1-2 Stars Forgotten World.txt',
     'Ship Wreck 3-4 Stars Forgotten World.txt', 'Flame Mountain Forgotten World.txt',
@@ -67,7 +68,22 @@ GITHUB_FGW_SCRIPT_FILENAMES = [
 ]
 # Oto Kervan: GitHub'daki karavan scriptleri klasörü (API ile liste, raw ile indirme)
 # GitHub'da klasör yoksa veya 404 alırsa yerel "caravan" klasörü kullanılır (plugin yanında).
-GITHUB_CARAVAN_FOLDER = 'caravan'
+GITHUB_CARAVAN_FOLDER = 'files/caravan'
+# files/ yapısı (vps ile uyumlu): files/sc, files/caravan, files/feature
+def _get_plugin_sc_folder():
+    """Script klasörü: files/sc varsa onu, yoksa sc."""
+    d = os.path.dirname(os.path.abspath(__file__))
+    for p in [os.path.join(d, 'files', 'sc'), os.path.join(d, 'sc')]:
+        if os.path.exists(p):
+            return p
+    return os.path.join(d, 'files', 'sc')
+def _get_plugin_caravan_folder():
+    """Caravan klasörü: files/caravan varsa onu, yoksa caravan."""
+    d = os.path.dirname(os.path.abspath(__file__))
+    for p in [os.path.join(d, 'files', 'caravan'), os.path.join(d, GITHUB_CARAVAN_FOLDER)]:
+        if os.path.exists(p):
+            return p
+    return os.path.join(d, 'files', 'caravan')
 GITHUB_CARAVAN_BRANCH = 'main'
 # API URL _fetch_caravan_script_list içinde quote ile oluşturulur (400 hatası önlemi)
 # Raw template: tek format çağrısında (repo, branch, filename)
@@ -431,7 +447,7 @@ def _download_caravan_script_from_server(filename):
         if not content or len(content) < 10:
             log('[%s] [Oto-Kervan] Sunucudan indirilen dosya geçersiz (boş/kısa)' % pName)
             return None
-        folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), GITHUB_CARAVAN_FOLDER)
+        folder = _get_plugin_caravan_folder()
         if not os.path.exists(folder):
             os.makedirs(folder)
         script_path = os.path.join(folder, filename)
@@ -571,7 +587,7 @@ def _validate_license_and_update_ui():
 def _download_garden_script(script_type="normal"):
     """Sunucudan (api/download, type=SC) garden-dungeon script indirir."""
     script_filename = "garden-dungeon-wizz-cleric.txt" if script_type == "wizz-cleric" else "garden-dungeon.txt"
-    sc_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sc")
+    sc_folder = _get_plugin_sc_folder()
     script_path = os.path.join(sc_folder, script_filename)
     if not os.path.exists(sc_folder):
         os.makedirs(sc_folder)
@@ -637,9 +653,8 @@ def _check_script_updates():
 
         server_versions = json.loads(server_versions_data.decode('utf-8'))
         local_versions = _get_local_script_versions()
-        plugin_dir = os.path.dirname(os.path.abspath(__file__))
-        sc_folder = os.path.join(plugin_dir, "sc")
-        caravan_folder = os.path.join(plugin_dir, GITHUB_CARAVAN_FOLDER)
+        sc_folder = _get_plugin_sc_folder()
+        caravan_folder = _get_plugin_caravan_folder()
         updated_count = 0
 
         for script_name, server_info in server_versions.items():
@@ -1298,15 +1313,18 @@ def _get_auto_hwt_namespace():
     auto_hwt_path = None
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
     for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
-        local_path = os.path.join(base, 'feature', 'auto_hwt.py')
-        if os.path.exists(local_path):
-            try:
-                with open(local_path, 'r', encoding='utf-8') as f:
-                    code = f.read()
-                auto_hwt_path = local_path
-                break
-            except Exception as ex:
-                log('[%s] [Auto Hwt] Yerel modül okunamadı: %s' % (pName, str(ex)))
+        for sub in ['files/feature', 'feature']:
+            local_path = os.path.join(base, sub.replace('/', os.sep), 'auto_hwt.py')
+            if os.path.exists(local_path):
+                try:
+                    with open(local_path, 'r', encoding='utf-8') as f:
+                        code = f.read()
+                    auto_hwt_path = local_path
+                    break
+                except Exception as ex:
+                    log('[%s] [Auto Hwt] Yerel modül okunamadı: %s' % (pName, str(ex)))
+        if code:
+            break
     if not code:
         try:
             req = urllib.request.Request(
@@ -1319,7 +1337,12 @@ def _get_auto_hwt_namespace():
             log('[%s] Auto Hwt modülü indirilemedi: %s' % (pName, str(ex)))
             return None
     if auto_hwt_path is None:
-        auto_hwt_path = os.path.join(plugin_dir, 'feature', 'auto_hwt.py')
+        for p in [os.path.join(plugin_dir, 'files', 'feature', 'auto_hwt.py'), os.path.join(plugin_dir, 'feature', 'auto_hwt.py')]:
+            if os.path.exists(p):
+                auto_hwt_path = p
+                break
+        if auto_hwt_path is None:
+            auto_hwt_path = os.path.join(plugin_dir, 'files', 'feature', 'auto_hwt.py')
     g = globals()
     namespace = {
         '__file__': auto_hwt_path,
@@ -3213,8 +3236,13 @@ def _get_target_support_namespace():
         return _target_support_namespace
     code = None
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
-    local_path = os.path.join(plugin_dir, 'feature', 'target_support.py')
-    if os.path.exists(local_path):
+    local_path = None
+    for sub in ['files/feature', 'feature']:
+        p = os.path.join(plugin_dir, sub.replace('/', os.sep), 'target_support.py')
+        if os.path.exists(p):
+            local_path = p
+            break
+    if local_path:
         try:
             with open(local_path, 'r', encoding='utf-8') as f:
                 code = f.read()
@@ -3341,8 +3369,13 @@ def _get_bless_queue_namespace():
         return _bless_queue_namespace
     code = None
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
-    local_path = os.path.join(plugin_dir, 'feature', 'bless_queue.py')
-    if os.path.exists(local_path):
+    local_path = None
+    for sub in ['files/feature', 'feature']:
+        p = os.path.join(plugin_dir, sub.replace('/', os.sep), 'bless_queue.py')
+        if os.path.exists(p):
+            local_path = p
+            break
+    if local_path:
         try:
             with open(local_path, 'r', encoding='utf-8') as f:
                 code = f.read()
@@ -3489,9 +3522,14 @@ def _get_script_command_maker_namespace():
         return _script_command_maker_namespace
     code = None
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    local_path = None
     for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
-        local_path = os.path.join(base, 'feature', 'script_command_maker.py')
-        if os.path.exists(local_path):
+        for sub in ['files/feature', 'feature']:
+            p = os.path.join(base, sub.replace('/', os.sep), 'script_command_maker.py')
+            if os.path.exists(p):
+                local_path = p
+                break
+        if local_path:
             try:
                 with open(local_path, 'r', encoding='utf-8') as f:
                     code = f.read()

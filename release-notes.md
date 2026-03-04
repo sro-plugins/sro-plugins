@@ -1,6 +1,10 @@
-## v1.7.22 (Merge main - Auto Hwt Gemi Enkazı, CAPTCHA)
+## v1.7.22 (files/ yapısı - vps uyumlu)
 
-### Auto Hwt (FGW/HWT) - main'den
+### Genel
+- **files/ yapısı**: feature/, sc/, caravan/ → files/feature/, files/sc/, files/caravan/ (vps ile aynı)
+- **main-vps uyumu**: Merge çakışmaları azaltıldı, tek yapı
+
+### Auto Hwt (FGW/HWT)
 - **Gemi Enkazı 1-2★ / 3-4★**: Scriptler artık sunucudan indiriliyor (`api/download`, type=SC)
 - **Dosya adları**: `Ship Wreck 1-2 Stars Forgotten World.txt`, `Ship Wreck 3-4 Stars Forgotten World.txt`
 
