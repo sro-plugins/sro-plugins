@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.21'
+pVersion = '1.7.22'
 
 MOVE_DELAY = 0.25
 
@@ -1422,13 +1422,341 @@ def kervan_stop():
     if ns and 'kervan_stop' in ns:
         ns['kervan_stop']()
 
-# CAPTCHA Test: Jangan/Downhang ticaret NPC'sine gidip NPC aç, mal almayı dene (CAPTCHA çıkacak)
+# CAPTCHA Test: Jangan/Downhang ticaret NPC'sine gidip NPC aç, mal al + CAPTCHA otomatik çöz
 _kervan_captcha_test_running = False
 _kervan_captcha_test_thread = None
 _kervan_captcha_test_lock = threading.Lock()
+_caravan_captcha_watch_until = 0.0
+_caravan_captcha_last_solve_time = 0.0
+_caravan_captcha_auto_solving = False
+_caravan_captcha_solve_busy = False
+_caravan_captcha_last_npc_id_bytes = None
 
 # Jangan: Jodaesan (Specialty Trader), Downhang: Leegak (Specialty Shop)
 _CARAVAN_CAPTCHA_TEST_NPC_KEYWORDS = ['jodaesan', 'leegak', 'specialty trader', 'specialty shop']
+
+# NPC satın alma (VSRO/MaxiGuard sunucuya göre opcode değişebilir)
+_CARAVAN_NPC_BUY_OPCODE = 0x704B
+
+def _caravan_captcha_config_path():
+    try:
+        d = get_config_dir()
+        if not d:
+            return None
+        return (d.rstrip('/\\') + '\\' + pName + '\\caravan_captcha.json').replace('/', '\\')
+    except Exception:
+        return None
+
+def _caravan_captcha_load_config():
+    path = _caravan_captcha_config_path()
+    default = {'api_key': '', 'auto_solve': False, 'npc_manual_open': True, 'region': {'x': 350, 'y': 280, 'w': 320, 'h': 80}, 'input_click': {'x': 0, 'y': 0}, 'input_relative_center': {'dx': 0, 'dy': 60}, 'confirm_button_offset': {'dx': 80, 'dy': 0}}
+    if not path or not os.path.isfile(path):
+        return default
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data.get('region'), dict):
+            data['region'] = {'x': 350, 'y': 280, 'w': 320, 'h': 80}
+        if 'npc_manual_open' not in data:
+            data['npc_manual_open'] = True
+        if not isinstance(data.get('input_click'), dict):
+            data['input_click'] = {'x': 0, 'y': 0}
+        if not isinstance(data.get('input_relative_center'), dict):
+            data['input_relative_center'] = {'dx': 0, 'dy': 60}
+        if not isinstance(data.get('confirm_button_offset'), dict):
+            data['confirm_button_offset'] = {'dx': 80, 'dy': 0}
+        return data
+    except Exception:
+        return default
+
+def _caravan_captcha_save_config(cfg):
+    path = _caravan_captcha_config_path()
+    if not path:
+        return
+    try:
+        d = os.path.dirname(path)
+        if d and not os.path.isdir(d):
+            os.makedirs(d, exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Config kaydedilemedi: %s' % (pName, ex))
+
+def _caravan_captcha_capture_region(hwnd, x, y, w, h):
+    """Oyun penceresinden (x,y,w,h) bölgesini yakalar, BMP olarak base64 döndürür. Windows ctypes."""
+    if not hwnd or w <= 0 or h <= 0:
+        return None
+    try:
+        user32 = ctypes.windll.user32
+        gdi32 = ctypes.windll.gdi32
+        dc = user32.GetWindowDC(hwnd)
+        if not dc:
+            return None
+        mem_dc = gdi32.CreateCompatibleDC(dc)
+        bmp = gdi32.CreateCompatibleBitmap(dc, w, h)
+        gdi32.SelectObject(mem_dc, bmp)
+        gdi32.BitBlt(mem_dc, 0, 0, w, h, dc, x, y, 0x00CC0020)
+        user32.ReleaseDC(hwnd, dc)
+        row = (w * 3 + 3) & ~3
+        size = row * h
+        buf = (ctypes.c_ubyte * size)()
+        bmi = struct.pack('<iLLhhLLiiii', 40, w, -h, 1, 24, 0, 0, 0, 0, 0, 0)
+        c_bmi = (ctypes.c_ubyte * 40).from_buffer_copy(bmi)
+        gdi32.GetDIBits(mem_dc, bmp, 0, h, buf, ctypes.byref(c_bmi), 0)
+        gdi32.DeleteObject(bmp)
+        gdi32.DeleteDC(mem_dc)
+        bmp_header = bytearray(14 + 40)
+        bmp_header[0:2] = b'BM'
+        bmp_header[2:6] = struct.pack('<I', 14 + 40 + size)
+        bmp_header[10:14] = struct.pack('<I', 14 + 40)
+        bmp_header[14:54] = bmi
+        pixels = bytes(buf)
+        img_bytes = bytes(bmp_header) + pixels
+        return base64.b64encode(img_bytes).decode('ascii')
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Ekran yakalama hatası: %s' % (pName, ex))
+        return None
+
+def _caravan_captcha_solve_2captcha(api_key, image_base64):
+    """2Captcha ImageToTextTask ile çözüm döndürür. None hata veya zaman aşımı."""
+    if not api_key or not image_base64:
+        return None
+    try:
+        create_url = 'https://api.2captcha.com/createTask'
+        result_url = 'https://api.2captcha.com/getTaskResult'
+        body = json.dumps({
+            'clientKey': api_key,
+            'task': {'type': 'ImageToTextTask', 'body': image_base64}
+        }).encode('utf-8')
+        req = urllib.request.Request(create_url, data=body, headers={'Content-Type': 'application/json'}, method='POST')
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode('utf-8'))
+        if data.get('errorId') or not data.get('taskId'):
+            log('[%s] [CAPTCHA] 2Captcha createTask hata: %s' % (pName, data.get('errorDescription', data)))
+            return None
+        task_id = data['taskId']
+        for _ in range(24):
+            time.sleep(2)
+            body2 = json.dumps({'clientKey': api_key, 'taskId': task_id}).encode('utf-8')
+            req2 = urllib.request.Request(result_url, data=body2, headers={'Content-Type': 'application/json'}, method='POST')
+            with urllib.request.urlopen(req2, timeout=10) as r2:
+                data2 = json.loads(r2.read().decode('utf-8'))
+            if data2.get('status') == 'ready' and data2.get('solution', {}).get('text'):
+                return data2['solution']['text'].strip()
+            if data2.get('errorId'):
+                log('[%s] [CAPTCHA] 2Captcha getResult hata: %s' % (pName, data2.get('errorDescription', data2)))
+                return None
+        log('[%s] [CAPTCHA] 2Captcha zaman aşımı.' % pName)
+        return None
+    except Exception as ex:
+        log('[%s] [CAPTCHA] 2Captcha istek hatası: %s' % (pName, ex))
+        return None
+
+def _caravan_captcha_find_edit_center(hwnd):
+    """Oyun penceresindeki ilk Edit kontrolünü bulur; merkezinin client koordinatlarını (x, y) döndürür. Bulunamazsa None."""
+    if not hwnd:
+        return None
+    try:
+        user32 = ctypes.windll.user32
+        edits = []
+        def _enum_cb(child_hwnd, _lparam):
+            buf = ctypes.create_unicode_buffer(256)
+            if user32.GetClassNameW(child_hwnd, buf, 256):
+                if buf.value.strip().lower() == 'edit':
+                    edits.append(child_hwnd)
+            return 1
+        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+        user32.EnumChildWindows(hwnd, WNDENUMPROC(_enum_cb), 0)
+        if not edits:
+            return None
+        class RECT(ctypes.Structure):
+            _fields_ = [('left', ctypes.c_long), ('top', ctypes.c_long), ('right', ctypes.c_long), ('bottom', ctypes.c_long)]
+        class POINT(ctypes.Structure):
+            _fields_ = [('x', ctypes.c_long), ('y', ctypes.c_long)]
+        rect = RECT()
+        if not user32.GetWindowRect(edits[0], ctypes.byref(rect)):
+            return None
+        sx = (rect.left + rect.right) // 2
+        sy = (rect.top + rect.bottom) // 2
+        pt = POINT(sx, sy)
+        if not user32.ScreenToClient(hwnd, ctypes.byref(pt)):
+            return None
+        return (pt.x, pt.y)
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Edit kontrolü aranırken hata: %s' % (pName, ex))
+        return None
+
+def _caravan_captcha_input_from_center(hwnd, dx, dy):
+    """Oyun penceresinin client merkezine göre tıklama noktası: (width/2 + dx, height/2 + dy)."""
+    if not hwnd:
+        return (0, 0)
+    try:
+        class RECT(ctypes.Structure):
+            _fields_ = [('left', ctypes.c_long), ('top', ctypes.c_long), ('right', ctypes.c_long), ('bottom', ctypes.c_long)]
+        user32 = ctypes.windll.user32
+        r = RECT()
+        if not user32.GetClientRect(hwnd, ctypes.byref(r)):
+            return (0, 0)
+        w, h = r.right - r.left, r.bottom - r.top
+        return (max(0, w // 2 + int(dx)), max(0, h // 2 + int(dy)))
+    except Exception:
+        return (0, 0)
+
+def _caravan_captcha_click_input(hwnd, client_x, client_y):
+    """Oyun penceresinde (client_x, client_y) noktasına tıklar; Image Code input alanı odaklanır."""
+    if not hwnd or (client_x == 0 and client_y == 0):
+        return
+    try:
+        user32 = ctypes.windll.user32
+        user32.SetForegroundWindow(hwnd)
+        time.sleep(0.15)
+        class POINT(ctypes.Structure):
+            _fields_ = [('x', ctypes.c_long), ('y', ctypes.c_long)]
+        pt = POINT(client_x, client_y)
+        if user32.ClientToScreen(hwnd, ctypes.byref(pt)):
+            user32.SetCursorPos(pt.x, pt.y)
+            time.sleep(0.05)
+            user32.mouse_event(0x0002, 0, 0, 0, 0)
+            time.sleep(0.05)
+            user32.mouse_event(0x0004, 0, 0, 0, 0)
+            time.sleep(0.2)
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Input tıklama hatası: %s' % (pName, ex))
+    try:
+        user32 = ctypes.windll.user32
+        user32.SetForegroundWindow(hwnd)
+        time.sleep(0.15)
+        class POINT(ctypes.Structure):
+            _fields_ = [('x', ctypes.c_long), ('y', ctypes.c_long)]
+        pt = POINT(client_x, client_y)
+        if user32.ClientToScreen(hwnd, ctypes.byref(pt)):
+            user32.SetCursorPos(pt.x, pt.y)
+            time.sleep(0.05)
+            user32.mouse_event(0x0002, 0, 0, 0, 0)
+            time.sleep(0.05)
+            user32.mouse_event(0x0004, 0, 0, 0, 0)
+            time.sleep(0.2)
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Input tıklama hatası: %s' % (pName, ex))
+
+def _caravan_captcha_send_keys(hwnd, text, input_click_x=0, input_click_y=0, confirm_offset_x=0, confirm_offset_y=0):
+    """Input'a tıkla, kodu yaz; Confirm için Enter yerine input'un sağındaki butona tıkla (confirm_offset verilmişse)."""
+    if not hwnd or not text:
+        return
+    try:
+        user32 = ctypes.windll.user32
+        user32.SetForegroundWindow(hwnd)
+        time.sleep(0.2)
+        if input_click_x != 0 or input_click_y != 0:
+            _caravan_captcha_click_input(hwnd, input_click_x, input_click_y)
+        VK_SHIFT = 0x10
+        for ch in text:
+            code = user32.VkKeyScanW(ord(ch))
+            vk = code & 0xFF
+            shift = (code >> 8) & 1
+            if shift:
+                user32.keybd_event(VK_SHIFT, 0, 0, 0)
+            user32.keybd_event(vk, 0, 0, 0)
+            user32.keybd_event(vk, 0, 2, 0)
+            if shift:
+                user32.keybd_event(VK_SHIFT, 0, 2, 0)
+            time.sleep(0.05)
+        time.sleep(0.1)
+        if confirm_offset_x != 0 or confirm_offset_y != 0:
+            btn_x = input_click_x + confirm_offset_x
+            btn_y = input_click_y + confirm_offset_y
+            _caravan_captcha_click_input(hwnd, btn_x, btn_y)
+            log('[%s] [CAPTCHA] Confirm butonuna tıklandı (input + %s, %s)' % (pName, confirm_offset_x, confirm_offset_y))
+        else:
+            user32.keybd_event(0x0D, 0, 0, 0)
+            user32.keybd_event(0x0D, 0, 2, 0)
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Tuş gönderme hatası: %s' % (pName, ex))
+
+def _caravan_captcha_try_buy(npc_id_bytes, npc_model):
+    """NPC'den ilk ürünü satın almayı dener (paket; sunucuya göre opcode değişebilir)."""
+    try:
+        packet = bytearray(npc_id_bytes)
+        packet += struct.pack('<H', 0)
+        packet += struct.pack('<H', 0)
+        packet += struct.pack('<H', 1)
+        inject_joymax(_CARAVAN_NPC_BUY_OPCODE, bytes(packet), False)
+        time.sleep(0.5)
+        return True
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Satın alma paketi hatası: %s' % (pName, ex))
+        return False
+
+def _caravan_captcha_solve_thread_fn():
+    """CAPTCHA bölgesini yakala, 2Captcha ile çöz, Image Code input'a yaz, Confirm (Enter), sonra tekrar mal al."""
+    global _caravan_captcha_last_solve_time, _caravan_captcha_auto_solving, _caravan_captcha_solve_busy
+    _caravan_captcha_solve_busy = True
+    try:
+        cfg = _caravan_captcha_load_config()
+        if not cfg.get('auto_solve') or not (cfg.get('api_key') or '').strip():
+            return
+        api_key = (cfg.get('api_key') or '').strip()
+        reg = cfg.get('region') or {}
+        x = int(reg.get('x', 350))
+        y = int(reg.get('y', 280))
+        w = int(reg.get('w', 320))
+        h = int(reg.get('h', 80))
+        if w < 50 or h < 20:
+            return
+        client = get_client()
+        if not client or not client.get('window') or not client.get('running'):
+            return
+        hwnd = client['window']
+        b64 = _caravan_captcha_capture_region(hwnd, x, y, w, h)
+        if not b64 or len(b64) < 100:
+            return
+        test_mode = (api_key or '').strip().upper() == 'TEST'
+        if test_mode:
+            log('[%s] [CAPTCHA] Test modu: 2Captcha atlandı, sahte kod yazılıyor (akış testi).' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Test modu – kod yazılıyor')
+            text = 'TEST123'
+        else:
+            log('[%s] [CAPTCHA] 2Captcha\'ya gönderiliyor...' % pName)
+            QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: CAPTCHA çözülüyor...')
+            text = _caravan_captcha_solve_2captcha(api_key, b64)
+        if text:
+            _caravan_captcha_last_solve_time = time.time()
+            _caravan_captcha_auto_solving = False
+            ix, iy = 0, 0
+            edit_center = _caravan_captcha_find_edit_center(hwnd)
+            if edit_center:
+                ix, iy = edit_center
+                log('[%s] [CAPTCHA] Input konumu: penceredeki Edit kontrolü (dinamik)' % pName)
+            else:
+                rel = cfg.get('input_relative_center') or {}
+                dx, dy = int(rel.get('dx', 0)), int(rel.get('dy', 60))
+                if dx != 0 or dy != 0:
+                    ix, iy = _caravan_captcha_input_from_center(hwnd, dx, dy)
+                    log('[%s] [CAPTCHA] Input konumu: pencere merkezi + (%s, %s)' % (pName, dx, dy))
+            if ix == 0 and iy == 0:
+                inp = cfg.get('input_click') or {}
+                ix, iy = int(inp.get('x', 0)), int(inp.get('y', 0))
+                if ix != 0 or iy != 0:
+                    log('[%s] [CAPTCHA] Input konumu: config sabit (x,y)' % pName)
+            cbo = cfg.get('confirm_button_offset') or {}
+            cdx, cdy = int(cbo.get('dx', 80)), int(cbo.get('dy', 0))
+            if ix == 0 and iy == 0:
+                cdx, cdy = 0, 0
+            log('[%s] [CAPTCHA] Çözüm: %s (input\'a %s + Confirm butonu)' % (pName, text, 'tıklanıp yazılıyor' if (ix != 0 or iy != 0) else 'yazılıyor'))
+            QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Kod yazılıyor, Confirm...')
+            _caravan_captcha_send_keys(hwnd, text, ix, iy, cdx, cdy)
+            time.sleep(2.0)
+            if _caravan_captcha_last_npc_id_bytes:
+                log('[%s] [CAPTCHA] Confirm sonrası tekrar mal alma denemesi.' % pName)
+                QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Tekrar mal alınıyor')
+                _caravan_captcha_try_buy(_caravan_captcha_last_npc_id_bytes, None)
+            show_notification('CAPTCHA', 'Kod girildi, Confirm. Tekrar mal alındı.')
+        else:
+            log('[%s] [CAPTCHA] Çözüm alınamadı.' % pName)
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Çözüm thread hatası: %s' % (pName, ex))
+    finally:
+        _caravan_captcha_solve_busy = False
 
 def _kervan_captcha_test_loop():
     global _kervan_captcha_test_running
@@ -1520,9 +1848,19 @@ def _kervan_captcha_test_loop():
             QtBind.setText(gui, lblKervanStatus, 'Durum: Zaman aşımı')
             _kervan_captcha_test_running = False
             return
-        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC açılıyor...')
-        log('[%s] [CAPTCHA Test] %s açılıyor.' % (pName, npc_name))
+        global _caravan_captcha_last_npc_id_bytes
         npc_id_bytes = struct.pack('<H', nid)
+        _caravan_captcha_last_npc_id_bytes = npc_id_bytes
+        cfg = _caravan_captcha_load_config()
+        npc_manual_open = cfg.get('npc_manual_open', True)
+        if npc_manual_open:
+            QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Shop\'u manuel açın, sonra Mal al')
+            log('[%s] [CAPTCHA Test] NPC\'ye ulaştınız. Shop\'u manuel açın (NPC\'ye tıklayıp ticaret seçin), sonra "Mal al" butonuna basın.' % pName)
+            show_notification('CAPTCHA Test', 'Shop\'u manuel açın, açınca "Mal al" butonuna basın.')
+            _kervan_captcha_test_running = False
+            return
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC açılıyor (opcode)...')
+        log('[%s] [CAPTCHA Test] %s opcode ile açılıyor (kervan çantası açılmayabilir).' % (pName, npc_name))
         try:
             inject_joymax(0x7045, npc_id_bytes + b'\x00\x00', False)
             time.sleep(0.5)
@@ -1533,9 +1871,18 @@ def _kervan_captcha_test_loop():
             QtBind.setText(gui, lblKervanStatus, 'Durum: NPC açılamadı')
             _kervan_captcha_test_running = False
             return
-        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: NPC açıldı – mal almayı deneyin')
-        log('[%s] [CAPTCHA Test] NPC açıldı. Mal almayı deneyin; CAPTCHA çıkacak. CAPTCHA\'yı girip işlemi tamamlayın.' % pName)
-        show_notification('CAPTCHA Test', 'Ticaret NPC açıldı. Mal almayı deneyin; CAPTCHA çıkacak.')
+        npc_model = npc.get('model')
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Mal alınıyor...')
+        log('[%s] [CAPTCHA Test] Mal alma denemesi (CAPTCHA tetiklenir).' % pName)
+        _caravan_captcha_try_buy(npc_id_bytes, npc_model)
+        time.sleep(2.0)
+        global _caravan_captcha_watch_until, _caravan_captcha_auto_solving, _caravan_captcha_last_solve_time
+        _caravan_captcha_watch_until = time.time() + 90.0
+        _caravan_captcha_auto_solving = True
+        _caravan_captcha_last_solve_time = 0.0
+        QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: CAPTCHA bekleniyor / otomatik çözüm açıksa çözülecek')
+        log('[%s] [CAPTCHA Test] Mal alma gönderildi. CAPTCHA çıkarsa otomatik çözüm (90 sn) aktif.' % pName)
+        show_notification('CAPTCHA Test', 'Mal alma denendi. CAPTCHA çıkarsa otomatik çözülecek (2Captcha açıksa).')
     except Exception as ex:
         log('[%s] [CAPTCHA Test] Hata: %s' % (pName, str(ex)))
         QtBind.setText(gui, lblKervanStatus, 'Durum: Hata')
@@ -2384,6 +2731,8 @@ def hwt_btn_hwt_advanced():
 # Tab 5 - Oto Kervan (GitHub'dan script listesi, seçilen ile Başla/Durdur)
 _kervan_x = _tab_bar_x + 30
 _kervan_y = _content_y + 20
+_kervan_list_w = 200
+_kervan_captcha_col_x = _kervan_x + _kervan_list_w + 12
 
 # Aktif profil gösterimi
 _kervan_profile_y = _kervan_y
@@ -2391,35 +2740,109 @@ _add_tab5(QtBind.createLabel(gui, 'Aktif Profil:', _kervan_x, _kervan_profile_y)
 lblKervanProfile = QtBind.createLabel(gui, 'Yükleniyor...', _kervan_x + 75, _kervan_profile_y)
 _add_tab5(lblKervanProfile, _kervan_x + 75, _kervan_profile_y)
 
-# Script listesi
+# Script listesi (genişlik %50 düşürüldü)
 _kervan_list_y = _kervan_profile_y + 25
 _add_tab5(QtBind.createLabel(gui, 'Script listesi:', _kervan_x, _kervan_list_y), _kervan_x, _kervan_list_y)
-lstKervanScripts = QtBind.createList(gui, _kervan_x, _kervan_list_y + 20, 400, 120)
+lstKervanScripts = QtBind.createList(gui, _kervan_x, _kervan_list_y + 20, _kervan_list_w, 120)
 _add_tab5(lstKervanScripts, _kervan_x, _kervan_list_y + 20)
 QtBind.append(gui, lstKervanScripts, '(Önce "Yenile" ile listeyi yükleyin)')
 
-# Yenile / Başla / Durdur
+# CAPTCHA / API Key bloğu listenin sağında
+_kervan_captcha_y = _kervan_list_y + 20
+_add_tab5(QtBind.createLabel(gui, '2Captcha API Key (TEST=test):', _kervan_captcha_col_x, _kervan_captcha_y), _kervan_captcha_col_x, _kervan_captcha_y)
+_caravan_captcha_api_key_edit = QtBind.createLineEdit(gui, '', _kervan_captcha_col_x, _kervan_captcha_y + 18, 165, 20)
+_add_tab5(_caravan_captcha_api_key_edit, _kervan_captcha_col_x, _kervan_captcha_y + 18)
+_btn_caravan_captcha_save = QtBind.createButton(gui, 'caravan_captcha_save_config', ' Kaydet ', _kervan_captcha_col_x + 170, _kervan_captcha_y + 17)
+_add_tab5(_btn_caravan_captcha_save, _kervan_captcha_col_x + 170, _kervan_captcha_y + 17)
+_cbx_caravan_captcha_auto = QtBind.createCheckBox(gui, 'caravan_captcha_auto_clicked', 'CAPTCHA otomatik çöz (2Captcha)', _kervan_captcha_col_x, _kervan_captcha_y + 42)
+_add_tab5(_cbx_caravan_captcha_auto, _kervan_captcha_col_x, _kervan_captcha_y + 42)
+_cbx_caravan_npc_manual_open = QtBind.createCheckBox(gui, 'caravan_npc_manual_open_clicked', 'NPC\'yi manuel aç', _kervan_captcha_col_x, _kervan_captcha_y + 62)
+_add_tab5(_cbx_caravan_npc_manual_open, _kervan_captcha_col_x, _kervan_captcha_y + 62)
+
+# Yenile / Başla / Durdur / CAPTCHA Test / Mal al
 _kervan_btn_y = _kervan_list_y + 145
 _btn_kervan_refresh = QtBind.createButton(gui, 'kervan_refresh_list', ' Yenile ', _kervan_x, _kervan_btn_y)
 _add_tab5(_btn_kervan_refresh, _kervan_x, _kervan_btn_y)
-_btn_kervan_start = QtBind.createButton(gui, 'kervan_start', ' Başla ', _kervan_x + 80, _kervan_btn_y)
-_add_tab5(_btn_kervan_start, _kervan_x + 80, _kervan_btn_y)
-_btn_kervan_stop = QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_x + 160, _kervan_btn_y)
-_add_tab5(_btn_kervan_stop, _kervan_x + 160, _kervan_btn_y)
-_btn_kervan_captcha_test = QtBind.createButton(gui, 'kervan_captcha_test', ' CAPTCHA Test ', _kervan_x + 250, _kervan_btn_y)
-_add_tab5(_btn_kervan_captcha_test, _kervan_x + 250, _kervan_btn_y)
+_btn_kervan_start = QtBind.createButton(gui, 'kervan_start', ' Başla ', _kervan_x + 58, _kervan_btn_y)
+_add_tab5(_btn_kervan_start, _kervan_x + 58, _kervan_btn_y)
+_btn_kervan_stop = QtBind.createButton(gui, 'kervan_stop', ' Durdur ', _kervan_x + 116, _kervan_btn_y)
+_add_tab5(_btn_kervan_stop, _kervan_x + 116, _kervan_btn_y)
+_btn_kervan_captcha_test = QtBind.createButton(gui, 'kervan_captcha_test', ' CAPTCHA Test ', _kervan_x + 174, _kervan_btn_y)
+_add_tab5(_btn_kervan_captcha_test, _kervan_x + 174, _kervan_btn_y)
+_btn_kervan_mal_al = QtBind.createButton(gui, 'kervan_captcha_mal_al', ' Mal al ', _kervan_captcha_col_x, _kervan_btn_y)
+_add_tab5(_btn_kervan_mal_al, _kervan_captcha_col_x, _kervan_btn_y)
 
 lblKervanStatus = QtBind.createLabel(gui, 'Durum: Hazır', _kervan_x, _kervan_btn_y + 28)
 _add_tab5(lblKervanStatus, _kervan_x, _kervan_btn_y + 28)
 
 # Tab 5 butonları lisans korumasına
-_protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop, _btn_kervan_captcha_test]
+_protected_buttons[5] = [lblKervanProfile, lstKervanScripts, lblKervanStatus, _btn_kervan_refresh, _btn_kervan_start, _btn_kervan_stop, _btn_kervan_captcha_test, _btn_kervan_mal_al, _caravan_captcha_api_key_edit, _btn_caravan_captcha_save, _cbx_caravan_captcha_auto, _cbx_caravan_npc_manual_open]
+
+def kervan_captcha_mal_al():
+    """Shop açıkken mal alma paketini gönderir; CAPTCHA tetiklenir, otomatik çözüm izlenir."""
+    global _caravan_captcha_watch_until, _caravan_captcha_auto_solving, _caravan_captcha_last_solve_time
+    if not _is_license_valid():
+        log('[%s] Bu özelliği kullanmak için geçerli bir lisans anahtarı gereklidir!' % pName)
+        return
+    if not _caravan_captcha_last_npc_id_bytes:
+        log('[%s] [CAPTCHA] Önce CAPTCHA Test ile NPC\'ye gidin (ve gerekirse shop\'u manuel açın).' % pName)
+        QtBind.setText(gui, lblKervanStatus, 'Durum: Önce CAPTCHA Test ile NPC\'ye gidin')
+        return
+    _caravan_captcha_try_buy(_caravan_captcha_last_npc_id_bytes, None)
+    _caravan_captcha_watch_until = time.time() + 90.0
+    _caravan_captcha_auto_solving = True
+    _caravan_captcha_last_solve_time = 0.0
+    QtBind.setText(gui, lblKervanStatus, 'CAPTCHA Test: Mal al gönderildi, CAPTCHA bekleniyor')
+    log('[%s] [CAPTCHA] Mal al gönderildi. Image Code Verification çıkarsa otomatik çözülecek.' % pName)
+
+def caravan_captcha_save_config():
+    """2Captcha API key ve otomatik çözüm ayarını kaydeder."""
+    try:
+        cfg = _caravan_captcha_load_config()
+        cfg['api_key'] = (QtBind.text(gui, _caravan_captcha_api_key_edit) or '').strip()
+        cfg['auto_solve'] = QtBind.isChecked(gui, _cbx_caravan_captcha_auto)
+        cfg['npc_manual_open'] = QtBind.isChecked(gui, _cbx_caravan_npc_manual_open)
+        _caravan_captcha_save_config(cfg)
+        log('[%s] [CAPTCHA] Ayar kaydedildi (API key: %s, otomatik: %s, manuel aç: %s)' % (pName, '***' if cfg['api_key'] else '(boş)', cfg['auto_solve'], cfg['npc_manual_open']))
+    except Exception as ex:
+        log('[%s] [CAPTCHA] Kaydetme hatası: %s' % (pName, ex))
+
+def caravan_captcha_auto_clicked(checked):
+    """CAPTCHA otomatik çöz checkbox değişince config güncelle."""
+    try:
+        cfg = _caravan_captcha_load_config()
+        cfg['auto_solve'] = checked
+        cfg['api_key'] = (QtBind.text(gui, _caravan_captcha_api_key_edit) or '').strip()
+        cfg['npc_manual_open'] = QtBind.isChecked(gui, _cbx_caravan_npc_manual_open)
+        _caravan_captcha_save_config(cfg)
+    except Exception:
+        pass
+
+def caravan_npc_manual_open_clicked(checked):
+    """NPC manuel aç checkbox değişince config güncelle."""
+    try:
+        cfg = _caravan_captcha_load_config()
+        cfg['npc_manual_open'] = checked
+        _caravan_captcha_save_config(cfg)
+    except Exception:
+        pass
+
+def _caravan_captcha_ui_load():
+    """CAPTCHA config'i GUI'ye yükler (API key, checkbox)."""
+    try:
+        cfg = _caravan_captcha_load_config()
+        QtBind.setText(gui, _caravan_captcha_api_key_edit, cfg.get('api_key') or '')
+        QtBind.setChecked(gui, _cbx_caravan_captcha_auto, bool(cfg.get('auto_solve')))
+        QtBind.setChecked(gui, _cbx_caravan_npc_manual_open, bool(cfg.get('npc_manual_open', True)))
+    except Exception:
+        pass
 
 def _caravan_init_load():
     """Init sonrası script listesini arka planda yükler (uzaktan modül). Karavan profili artık otomatik oluşturulmaz."""
     time.sleep(2)
     try:
         kervan_refresh_list()
+        _caravan_captcha_ui_load()
     except Exception:
         pass
 threading.Thread(target=_caravan_init_load, name=pName + '_caravan_init', daemon=True).start()
@@ -3329,7 +3752,13 @@ if not os.path.exists(_auto_dungeon_config_path):
 # ______________________________ Events ______________________________ #
 
 def event_loop():
-    """Script Komutları: StartBot/CloseBot zamanlama kontrolü (uzaktan modül)"""
+    """Script Komutları: StartBot/CloseBot zamanlama kontrolü (uzaktan modül). CAPTCHA otomatik çözüm."""
+    now = time.time()
+    if (_caravan_captcha_auto_solving and now < _caravan_captcha_watch_until and not _caravan_captcha_solve_busy and
+            (now - _caravan_captcha_last_solve_time > 15 or _caravan_captcha_last_solve_time == 0)):
+        cfg = _caravan_captcha_load_config()
+        if cfg.get('auto_solve') and (cfg.get('api_key') or '').strip():
+            threading.Thread(target=_caravan_captcha_solve_thread_fn, name=pName + '_captcha_solve', daemon=True).start()
     ns = _get_script_commands_namespace()
     if ns and '_script_cmds_event_tick' in ns:
         ns['_script_cmds_event_tick']()

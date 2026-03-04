@@ -1,9 +1,12 @@
-## v1.7.21 (Auto Hwt - Gemi Enkazı sunucudan)
+## v1.7.22 (Merge main - Auto Hwt Gemi Enkazı, CAPTCHA)
 
-### Auto Hwt (FGW/HWT)
+### Auto Hwt (FGW/HWT) - main'den
 - **Gemi Enkazı 1-2★ / 3-4★**: Scriptler artık sunucudan indiriliyor (`api/download`, type=SC)
 - **Dosya adları**: `Ship Wreck 1-2 Stars Forgotten World.txt`, `Ship Wreck 3-4 Stars Forgotten World.txt`
-- **GitHub kaldırıldı**: Gemi Enkazı scriptleri sadece sunucu (files/sc/) üzerinden
+
+### Oto Kervan / CAPTCHA - vps
+- **Input konumu dinamik**: Sabit (x,y) kaldırıldı; Edit kontrolü aranır, yoksa pencere merkezi + ofset
+- **Confirm butonu**: Enter yerine Confirm butonuna tıklanır
 
 ---
 
@@ -29,6 +32,35 @@
 
 ### Karavan Profil
 - **db3**: GitHub indirme kaldırıldı; mevcut config'ten kopyalanır
+
+---
+
+## v1.7.21 (Oto Kervan – GUI düzeni, 2Captcha test modu)
+
+### Oto Kervan
+- **Script listesi**: Genişlik %50 düşürüldü (400 → 200 px)
+- **API Key / CAPTCHA**: API key, Kaydet, checkbox'lar listenin sağına taşındı
+- **2Captcha test modu**: API Key olarak `TEST` yazınca gerçek API çağrılmaz, akış test edilir (TEST123 yazılır + Confirm + tekrar mal al)
+
+---
+
+## v1.7.20 (Oto Kervan – Manuel shop, Mal al butonu, Confirm + tekrar mal al)
+
+### Oto Kervan
+- **NPC'yi manuel aç**: Opcode ile kervan çantası açılmıyorsa; "NPC'yi manuel aç" ile sadece NPC'ye gidilir, shop'u siz açarsınız
+- **Mal al butonu**: Shop açıkken Mal al'a basınca satın alma paketi gider, Image Code Verification (CAPTCHA) tetiklenir
+- **Confirm + tekrar mal al**: CAPTCHA çözümü input'a yazılır, Enter (Confirm) basılır, 2 sn sonra otomatik tekrar mal alma denemesi
+- **Config**: `npc_manual_open` (varsayılan true)
+
+---
+
+## v1.7.19 (Oto Kervan – Mal alma + CAPTCHA otomatik çözüm)
+
+### Oto Kervan
+- **Mal alma otomatik**: CAPTCHA Test NPC açtıktan sonra satın alma paketi (0x704B) gönderilir; CAPTCHA tetiklenir
+- **CAPTCHA otomatik çözüm**: 2Captcha API ile ekran bölgesi yakalanıp çözülür, cevap tuş basımı ile yazılır
+- **GUI**: 2Captcha API Key, Kaydet, "CAPTCHA otomatik çöz (2Captcha)" checkbox (Tab 5)
+- **Config**: `Config/SROManager/caravan_captcha.json` (api_key, auto_solve, region x,y,w,h)
 
 ---
 

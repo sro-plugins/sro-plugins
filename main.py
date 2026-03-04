@@ -60,6 +60,15 @@ def authenticate_admin(request: Request):
         )
     return True
 
+@app.middleware("http")
+async def add_no_cache_header(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/admin") or request.url.path.startswith("/static"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 @app.get("/", include_in_schema=False)
 async def root_redirect(request: Request):
     session_id = request.cookies.get("admin_session")
@@ -137,6 +146,7 @@ class FileType(str, Enum):
     SC = "SC"
     JSONS = "JSONS"
     FEATURE = "FEATURE"
+    JSONS = "JSONS"
 
 FILE_CATEGORIES = {
     "CARAVAN": "files/caravan",
@@ -227,12 +237,12 @@ async def upload_file(
     """Upload a file to caravan, sc or feature directory."""
     category = category.upper()
     if category not in FILE_CATEGORIES:
-        raise HTTPException(status_code=400, detail="Invalid category. Use CARAVAN, SC or FEATURE.")
+        raise HTTPException(status_code=400, detail="Invalid category. Use CARAVAN, SC, FEATURE or JSONS.")
     
     if not file.filename.endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail="Only .txt, .json and .py files are allowed.")
     
-    dir_path = f"files/{category.lower()}"
+    dir_path = FILE_CATEGORIES[category]
     os.makedirs(dir_path, exist_ok=True)
     
     file_path = os.path.join(dir_path, file.filename)
@@ -258,7 +268,7 @@ def delete_file(category: str, filename: str, auth: bool = Depends(authenticate_
     if category not in FILE_CATEGORIES:
         raise HTTPException(status_code=400, detail="Invalid category")
     
-    file_path = os.path.join(f"files/{category.lower()}", filename)
+    file_path = os.path.join(FILE_CATEGORIES[category], filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     
@@ -273,7 +283,7 @@ def get_file_content(category: str, filename: str, auth: bool = Depends(authenti
     if category not in FILE_CATEGORIES:
         raise HTTPException(status_code=400, detail="Invalid category")
     
-    file_path = os.path.join(f"files/{category.lower()}", filename)
+    file_path = os.path.join(FILE_CATEGORIES[category], filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     
