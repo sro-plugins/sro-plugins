@@ -14,26 +14,14 @@ import ssl
 import urllib.request
 import urllib.parse
 
-# SSL: Windows'ta CERTIFICATE_VERIFY_FAILED için CA paketi kullan (ek kurulum gerekmez)
-# Önce plugin dizinindeki cacert.pem, yoksa certifi (başka paketlerle gelmiş olabilir)
-try:
-    from urllib.request import HTTPSHandler, build_opener, install_opener
-    _ssl_dir = os.path.dirname(os.path.abspath(__file__))
-    _cacert_path = os.path.join(_ssl_dir, 'cacert.pem')
-    if os.path.isfile(_cacert_path):
-        _cafile = _cacert_path
-    else:
-        try:
-            import certifi
-            _cafile = certifi.where()
-        except ImportError:
-            _cafile = None
-    if _cafile:
-        _ssl_ctx = ssl.create_default_context(cafile=_cafile)
-        _opener = build_opener(HTTPSHandler(context=_ssl_ctx))
-        install_opener(_opener)
-except Exception:
-    pass
+# SSL: Windows CERTIFICATE_VERIFY_FAILED - phBot embedded Python'da CA yok, tüm HTTPS'e unverified context zorla
+_ssl_unverified_ctx = ssl._create_unverified_context()
+_orig_urlopen = urllib.request.urlopen
+def _urlopen_ssl_fix(*args, **kwargs):
+    if 'context' not in kwargs:
+        kwargs['context'] = _ssl_unverified_ctx
+    return _orig_urlopen(*args, **kwargs)
+urllib.request.urlopen = _urlopen_ssl_fix
 import base64
 import ctypes
 import hmac
@@ -46,7 +34,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.19'
+pVersion = '1.7.20'
 
 MOVE_DELAY = 0.25
 
