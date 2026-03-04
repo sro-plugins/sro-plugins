@@ -1,3 +1,60 @@
+## v1.7.21 (Auto Hwt - Gemi Enkazı sunucudan)
+
+### Auto Hwt (FGW/HWT)
+- **Gemi Enkazı 1-2★ / 3-4★**: Scriptler artık sunucudan indiriliyor (`api/download`, type=SC)
+- **Dosya adları**: `Ship Wreck 1-2 Stars Forgotten World.txt`, `Ship Wreck 3-4 Stars Forgotten World.txt`
+- **GitHub kaldırıldı**: Gemi Enkazı scriptleri sadece sunucu (files/sc/) üzerinden
+
+---
+
+## v1.7.19 (Sunucu entegrasyonu: Caravan, Garden, versions.json)
+
+### Genel
+- **api/list, api/download**: Caravan, Garden scriptleri ve profil dosyaları artık ana sunucudan (vps.sro-plugins.cloud) indiriliyor
+- **GitHub fallback kaldırıldı**: Caravan list/download, Garden script, Karavan profil JSON tamamen sunucu tabanlı
+
+### Oto Kervan
+- **Liste**: api/list (type=CARAVAN) ile sunucudan script listesi
+- **İndirme**: api/download ile caravan scriptleri
+- **Profil JSON**: ServerName_CharName.karavan.json sunucudan (files/caravan)
+
+### Garden Dungeon
+- **Scriptler**: api/download (type=SC) ile garden-dungeon.txt, garden-dungeon-wizz-cleric.txt
+- **versions.json**: Sunucudan okunuyor
+
+### versions.json (JSONS)
+- **type=JSONS**: files/jsons/ içindeki versiyon dosyaları
+- **Merkezi versiyonlama**: Tüm scriptler (garden + caravan) tek versions.json ile versiyonlanıyor
+- **Otomatik güncelleme**: _check_script_updates hem garden hem caravan scriptlerini günceller
+
+### Karavan Profil
+- **db3**: GitHub indirme kaldırıldı; mevcut config'ten kopyalanır
+
+---
+
+## v1.7.18 (Oto Kervan – CAPTCHA Test butonu)
+
+### Oto Kervan
+- **CAPTCHA Test butonu**: Jangan (Jodaesan) ve Downhang (Leegak) ticaret NPC'sine gidip NPC'yi açar; mal almayı deneyerek CAPTCHA testi yapabilirsiniz (manuel CAPTCHA girişi)
+
+---
+
+## v1.7.17 (Oto Kervan, Script-Command iyileştirmeleri)
+
+### Oto Kervan
+- **NPC tabanlı varış**: Leegak (Downhang), Jodaesan (Jangan) ticaret NPC'lerine yaklaşınca otomatik durdur (5 birim)
+- **Profil yoksa dialog**: Karavan profili seçili değilse talimat dialogu, otomatik profil oluşturma kaldırıldı
+- **Profil üstüne yazma**: Karavan profilindeyken tweak'ler mevcut config'e uygulanır (backup/restore yok)
+- **Varış mesafesi**: 5 birim threshold, son 8 waypoint + 2 saniye onay
+
+### Script-Command (Varsayılan komutlar)
+- **Lideri Kaydet butonu**: Sadece lider adını kaydeder, varsayılan komutlar için opcode gerekmez
+- **Lider kaydı**: Kaydet'e basıldığında lider de kaydedilir
+- **Çoklu lider**: Virgülle ayrılmış (Lider1,Lider2) desteklenir
+- **Varsayılan komutlar**: START, STOP, TRACE, NOTRACE, ZERK, SETPOS, GETPOS, SETRADIUS, SETSCRIPT, SETAREA, PROFILE, FOLLOW, NOFOLLOW — liste yazıldığında o lider(ler)den çalışır
+
+---
+
 ## v1.7.16 (Auto Hwt - FGW/HWT sc/ GitHub entegrasyonu)
 
 ### Değişiklikler

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # Auto Hwt (Tab 4) - SROMaster FGW & HWT mantığı, UI sromanager'da.
-# Scriptler: GitHub sc/ klasöründen indirilir (İndir butonu) veya yerel sc/ kullanılır.
+# Scriptler: Gemi Enkazı 1-2/3-4 sunucudan (api/download SC), diğerleri GitHub sc/ veya yerel.
 # Attack Area 1-8: Config/SROManager/FGW_<PC>/ - Her PC kendi klasörüne yazar (4 PC çakışmasız).
 # Enjekte: gui, QtBind, log, pName, get_config_dir, plugin_dir, urllib,
-# GITHUB_FGW_RAW_TEMPLATE, GITHUB_FGW_SCRIPT_FILENAMES,
+# GITHUB_FGW_RAW_TEMPLATE, GITHUB_FGW_SCRIPT_FILENAMES, _download_from_server,
 # get_position, get_monsters, set_training_script, set_training_position, start_bot, stop_bot,
 # create_notification, get_training_script, time, os, _is_license_valid, cbEnabled, cbP1..cbP8
 
@@ -39,6 +39,9 @@ ATTACKAREA_FILENAME = ATTACKAREA_FILENAMES[0]
 DYNAMIC_ATTACK_FILENAME = "FGW_DYNAMIC_ATTACKAREA.txt"
 
 # Script dosya eşlemesi (display_name -> filename)
+# Gemi Enkazı 1-2/3-4: api/download SC ile sunucudan. Eski GitHub linkleri (referans):
+#   Ship Wreck 1-2: GITHUB_FGW_RAW_TEMPLATE % 'Ship Wreck 1-2 Stars Forgotten World.txt'
+#   Ship Wreck 3-4: GITHUB_FGW_RAW_TEMPLATE % 'Ship Wreck 3-4 Stars Forgotten World.txt'
 FGW_SCRIPT_MAP = [
     ('Togui Köyü', 'Togui Village Forgotten World.txt', 'SCRIPT_TOGUI'),
     ('Gemi Enkazı 1-2★', 'Ship Wreck 1-2 Stars Forgotten World.txt', 'SCRIPT_SHIP12'),
@@ -91,6 +94,17 @@ def _ensure_fgw_folder():
     except Exception as e:
         log('[%s] FGW klasörü oluşturulamadı %s: %s' % (pName, FGW_FOLDER, e))
 
+def _download_script_from_server(filename):
+    """Sunucudan (api/download, type=SC) script indirir, sc/ klasörüne kaydeder. Başarılıysa path döner."""
+    fn_dl = globals().get('_download_from_server')
+    if not fn_dl:
+        return None
+    _ensure_sc_folder()
+    dest = os.path.join(SC_FOLDER, filename)
+    if fn_dl('SC', filename, dest):
+        return dest
+    return None
+
 def _download_script_from_github(filename):
     """GitHub'dan tek script indirir, sc/ klasörüne kaydeder. Başarılıysa path döner."""
     _ensure_sc_folder()
@@ -125,14 +139,19 @@ def _write_empty_file(full_path):
         return False
 
 def _download_all_scripts():
-    """GitHub'dan FGW scriptlerini sc/'ye indirir; Attack Area dosyalarını FGW_<PC>/'ye oluşturur."""
+    """FGW scriptlerini indirir: Gemi Enkazı 1-2/3-4 sunucudan (api/download SC), diğerleri GitHub'dan."""
     _ensure_sc_folder()
     _ensure_fgw_folder()
     count = 0
 
     for disp, filename, _ in FGW_SCRIPT_MAP:
-        if _download_script_from_github(filename):
-            count += 1
+        if disp in ('Gemi Enkazı 1-2★', 'Gemi Enkazı 3-4★'):
+            if _download_script_from_server(filename):
+                count += 1
+            # if _download_script_from_github(filename): count += 1  # eski: GitHub
+        else:
+            if _download_script_from_github(filename):
+                count += 1
 
     for fn in ATTACKAREA_FILENAMES:
         p = os.path.join(FGW_FOLDER, fn)
@@ -149,23 +168,33 @@ def _get_fgw_script_path(filename):
     path = os.path.join(SC_FOLDER, filename)
     return path if os.path.exists(path) and os.path.getsize(path) > 50 else None
 
-def _ensure_script_file(display_name, filename, _fallback_var=None):
+def _ensure_script_file(display_name, filename, _fallback_var=None, from_server=False):
     """
-    Script dosyasının mevcut olduğundan emin olur. Önce sc/'de arar, yoksa GitHub'dan indirir.
-    Fallback: GitHub başarısızsa gömülü içerik kullanılabilir (opsiyonel).
+    Script dosyasının mevcut olduğundan emin olur.
+    from_server=True (Gemi Enkazı): sc/'de varsa kullan, yoksa api/download SC ile sunucudan indir (GitHub yok).
+    from_server=False: sc/'de arar, yoksa GitHub'dan indirir.
     """
     path = _get_fgw_script_path(filename)
     if path:
         return path
+    if from_server:
+        path = _download_script_from_server(filename)
+        if path:
+            return path
+        # path = _download_script_from_github(filename)  # eski: GitHub fallback
+        # if path: return path
+        log('[%s] Script bulunamadı/indirilemedi (sunucu): %s' % (pName, display_name))
+        return None
     path = _download_script_from_github(filename)
     if path:
         return path
     log('[%s] Script bulunamadı/indirilemedi: %s' % (pName, display_name))
     return None
 
-def _set_training_script_from_file(display_name, filename, _fallback_var=None):
+def _set_training_script_from_file(display_name, filename, _fallback_var=None, from_server=False):
+    """Script ayarlar. from_server=True ise Gemi Enkazı 1-2/3-4 için sunucudan indirir."""
     global _last_fgw_script_path, _current_state
-    path = _ensure_script_file(display_name, filename, _fallback_var)
+    path = _ensure_script_file(display_name, filename, _fallback_var, from_server)
     if not path:
         return
     try:

@@ -245,6 +245,19 @@ def ui_edit():
     QtBind.setText(gui, tbData, _data_for_display(m.get("data", "")))
     QtBind.setText(gui, lblStatus, f"Düzenleniyor [{idx}]")
 
+def ui_save_leader():
+    """Sadece Lider alanını kaydeder. Varsayılan komutlar (START, STOP vb.) bu liderden çalışır."""
+    if not _scm_check_license():
+        return
+    try:
+        leader = QtBind.text(gui, tbLeader).strip()
+    except:
+        leader = ""
+    _cfg["leader"] = leader
+    _save_cfg()
+    QtBind.setText(gui, lblStatus, "Lider kaydedildi. Varsayılan komutlar bu isimden çalışır.")
+    log(f"[{pName}] [Script-Command] Lider kaydedildi: {leader or '(boş)'}")
+
 def ui_save():
     if not _scm_check_license():
         return
@@ -254,6 +267,7 @@ def ui_save():
     except:
         leader = ""
     _cfg["leader"] = leader
+    _save_cfg()
     chat = QtBind.text(gui, tbChat).strip()
     script = QtBind.text(gui, tbScript).strip()
     opcode = _norm_hex(QtBind.text(gui, tbOpcode))

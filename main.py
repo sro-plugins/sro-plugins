@@ -135,11 +135,13 @@ class UserResponse(BaseModel):
 class FileType(str, Enum):
     CARAVAN = "CARAVAN"
     SC = "SC"
+    JSONS = "JSONS"
     FEATURE = "FEATURE"
 
 FILE_CATEGORIES = {
     "CARAVAN": "files/caravan",
     "SC": "files/sc",
+    "JSONS": "files/jsons",
     "FEATURE": "files/feature"
 }
 
@@ -295,7 +297,12 @@ def get_file_content(category: str, filename: str, auth: bool = Depends(authenti
 
 # --- PUBLIC API ROUTES ---
 
-enum_files = FILE_CATEGORIES
+enum_files = {
+    "CARAVAN": "files/caravan",
+    "SC": "files/sc",
+    "JSONS": "files/jsons",
+    "FEATURE": "files/feature"
+}
 
 # Signed Request Verification
 SIGNED_REQUEST_MAX_AGE = 300  # 5 minutes
@@ -361,7 +368,7 @@ async def download_file(
     request: Request,
     publicId: str = Query(..., description="Kullanıcının lisans anahtarı (Public ID)"), 
     ip: str = Query(..., description="Botun çalıştığı karakterin IP adresi"), 
-    type: FileType = Query(..., description="Dosya türü"), 
+    type: str = Query(..., description="Dosya türü (CARAVAN, SC, JSONS veya FEATURE)"), 
     filename: str = Query(..., description="İndirilmek istenen dosya adı"),
     db: Session = Depends(get_db)
 ):
@@ -407,7 +414,7 @@ async def download_file(
 
     # 4. Serve File
     if type.upper() not in enum_files:
-        raise HTTPException(status_code=400, detail="Invalid enum type. Use CARAVAN, SC or FEATURE.")
+        raise HTTPException(status_code=400, detail="Invalid enum type. Use CARAVAN, SC, JSONS or FEATURE.")
     
     file_dir = enum_files[type.upper()]
     file_path = os.path.join(file_dir, filename)
@@ -490,7 +497,6 @@ async def list_files_public(
         else:
             raise HTTPException(status_code=401, detail="No active session and limit reached")
     else:
-        # Update activity
         session.last_active = datetime.utcnow()
         db.commit()
 

@@ -115,8 +115,8 @@ def garden_dungeon_start():
         default_wizz = os.path.join(plugin_dir, "sc", "garden-dungeon-wizz-cleric.txt")
 
         if _garden_dungeon_script_path in [default_normal, default_wizz]:
-            log('[%s] [Garden-Auto] Script bulunamadı, GitHub\'dan indiriliyor...' % pName)
-            QtBind.setText(gui, lblGardenScriptStatus, 'Durum: GitHub\'dan indiriliyor...')
+            log('[%s] [Garden-Auto] Script bulunamadı, sunucudan indiriliyor...' % pName)
+            QtBind.setText(gui, lblGardenScriptStatus, 'Durum: Sunucudan indiriliyor...')
 
             downloaded_path = _download_garden_script(_garden_dungeon_script_type)
             if downloaded_path:
