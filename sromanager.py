@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.20'
+pVersion = '1.7.21'
 
 MOVE_DELAY = 0.25
 
@@ -1335,6 +1335,7 @@ def _get_auto_hwt_namespace():
         'plugin_dir': plugin_dir,
         'GITHUB_FGW_RAW_TEMPLATE': GITHUB_FGW_RAW_TEMPLATE,
         'GITHUB_FGW_SCRIPT_FILENAMES': GITHUB_FGW_SCRIPT_FILENAMES,
+        '_download_from_server': _download_from_server,
         'cbEnabled': g.get('_hwt_cbEnabled'), 'cbP1': g.get('_hwt_cbP1'), 'cbP2': g.get('_hwt_cbP2'),
         'cbP3': g.get('_hwt_cbP3'), 'cbP4': g.get('_hwt_cbP4'), 'cbP5': g.get('_hwt_cbP5'),
         'cbP6': g.get('_hwt_cbP6'), 'cbP7': g.get('_hwt_cbP7'), 'cbP8': g.get('_hwt_cbP8'),
@@ -2353,12 +2354,12 @@ def hwt_btn_togui():
 def hwt_btn_ship12():
     if not _is_license_valid():
         return
-    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 1-2★', 'Ship Wreck 1-2 Stars Forgotten World.txt', 'SCRIPT_SHIP12')
+    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 1-2★', 'Ship Wreck 1-2 Stars Forgotten World.txt', 'SCRIPT_SHIP12', True)
 
 def hwt_btn_ship34():
     if not _is_license_valid():
         return
-    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 3-4★', 'Ship Wreck 3-4 Stars Forgotten World.txt', 'SCRIPT_SHIP34')
+    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 3-4★', 'Ship Wreck 3-4 Stars Forgotten World.txt', 'SCRIPT_SHIP34', True)
 
 def hwt_btn_flame():
     if not _is_license_valid():

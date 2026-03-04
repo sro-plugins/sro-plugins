@@ -1,3 +1,12 @@
+## v1.7.21 (Auto Hwt - Gemi Enkazı sunucudan)
+
+### Auto Hwt (FGW/HWT)
+- **Gemi Enkazı 1-2★ / 3-4★**: Scriptler artık sunucudan indiriliyor (`api/download`, type=SC)
+- **Dosya adları**: `Ship Wreck 1-2 Stars Forgotten World.txt`, `Ship Wreck 3-4 Stars Forgotten World.txt`
+- **GitHub kaldırıldı**: Gemi Enkazı scriptleri sadece sunucu (files/sc/) üzerinden
+
+---
+
 ## v1.7.19 (Sunucu entegrasyonu: Caravan, Garden, versions.json)
 
 ### Genel
