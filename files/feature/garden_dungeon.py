@@ -96,10 +96,10 @@ def garden_dungeon_start():
         log('[%s] [Garden-Auto] Özel script yolu: %s' % (pName, _garden_dungeon_script_path))
     elif not _garden_dungeon_script_path:
         if _garden_dungeon_script_type == "wizz-cleric":
-            _garden_dungeon_script_path = os.path.join(plugin_dir, "sc", "garden-dungeon-wizz-cleric.txt")
+            _garden_dungeon_script_path = os.path.join(plugin_dir, "files", "sc", "garden-dungeon-wizz-cleric.txt")
             log('[%s] [Garden-Auto] Wizz/Cleric script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
         else:
-            _garden_dungeon_script_path = os.path.join(plugin_dir, "sc", "garden-dungeon.txt")
+            _garden_dungeon_script_path = os.path.join(plugin_dir, "files", "sc", "garden-dungeon.txt")
             log('[%s] [Garden-Auto] Normal script kullanılıyor: %s' % (pName, _garden_dungeon_script_path))
 
     has_training_area = False
@@ -111,8 +111,8 @@ def garden_dungeon_start():
         pass
 
     if not has_training_area and not os.path.exists(_garden_dungeon_script_path):
-        default_normal = os.path.join(plugin_dir, "sc", "garden-dungeon.txt")
-        default_wizz = os.path.join(plugin_dir, "sc", "garden-dungeon-wizz-cleric.txt")
+        default_normal = os.path.join(plugin_dir, "files", "sc", "garden-dungeon.txt")
+        default_wizz = os.path.join(plugin_dir, "files", "sc", "garden-dungeon-wizz-cleric.txt")
 
         if _garden_dungeon_script_path in [default_normal, default_wizz]:
             log('[%s] [Garden-Auto] Script bulunamadı, sunucudan indiriliyor...' % pName)

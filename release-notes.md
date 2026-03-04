@@ -1,3 +1,17 @@
+## v1.7.22 (files/ yapısı - vps uyumlu)
+
+### Genel
+- **files/ yapısı**: feature/, sc/, caravan/ → files/feature/, files/sc/, files/caravan/ (vps ile aynı)
+- **main-vps uyumu**: Merge çakışmaları azaltıldı, tek yapı
+- **Geriye uyumluluk**: Eski sc/, feature/ varsa fallback ile çalışır
+
+### Değişiklikler
+- Plugin modülleri files/feature/ altında
+- Scriptler files/sc/, karavan files/caravan/
+- GitHub URL'leri main/files/feature/, main/files/sc/ güncellendi
+
+---
+
 ## v1.7.21 (Auto Hwt - Gemi Enkazı sunucudan)
 
 ### Auto Hwt (FGW/HWT)

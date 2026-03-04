@@ -15,8 +15,12 @@ def _get_pc_id():
         return 'PC1'
 
 def _get_sc_folder():
-    """Script klasörü: plugin_dir/sc/ - GitHub ile senkron, sabit path yok."""
-    return os.path.join(plugin_dir, 'sc')
+    """Script klasörü: files/sc (vps uyumlu) veya sc/ - GitHub ile senkron."""
+    for sub in ['files/sc', 'sc']:
+        p = os.path.join(plugin_dir, sub.replace('/', os.sep))
+        if os.path.exists(p):
+            return p
+    return os.path.join(plugin_dir, 'files', 'sc')
 
 def _get_fgw_folder():
     """Attack Area klasörü: Config/SROManager/FGW_<PC>/ - PC bazlı (4 PC uyumlu)."""

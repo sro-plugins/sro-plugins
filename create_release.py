@@ -20,8 +20,8 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.7.21',
-    'name': 'v1.7.21 - Auto Hwt Gemi Enkazı sunucudan (api/download SC)',
+    'tag_name': 'v1.7.22',
+    'name': 'v1.7.22 - files/ yapısı (vps uyumlu), main-vps merge kolaylaştırma',
     'body': release_notes,
     'draft': False,
     'prerelease': False
