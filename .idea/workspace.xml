@@ -4,14 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="fix jsons" />
+    <list default="true" id="d56ec1e0-6acc-477f-a63e-a1a4ca7170c4" name="Changes" comment="fix jsons">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="87" />
+    <option name="cachedIndexableFilesCount" value="50" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="Git.Settings">
@@ -106,6 +109,7 @@
       <workItem from="1770652318912" duration="961000" />
       <workItem from="1771156590652" duration="4092000" />
       <workItem from="1771879727302" duration="805000" />
+      <workItem from="1772691945596" duration="378000" />
     </task>
     <task id="LOCAL-00001" summary="vps test">
       <option name="closed" value="true" />
@@ -427,7 +431,15 @@
       <option name="project" value="LOCAL" />
       <updated>1771881305050</updated>
     </task>
-    <option name="localTasksCounter" value="41" />
+    <task id="LOCAL-00041" summary="fix jsons">
+      <option name="closed" value="true" />
+      <created>1771881792529</created>
+      <option name="number" value="00041" />
+      <option name="presentableId" value="LOCAL-00041" />
+      <option name="project" value="LOCAL" />
+      <updated>1771881792529</updated>
+    </task>
+    <option name="localTasksCounter" value="42" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

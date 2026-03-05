@@ -146,7 +146,6 @@ class FileType(str, Enum):
     SC = "SC"
     JSONS = "JSONS"
     FEATURE = "FEATURE"
-    JSONS = "JSONS"
 
 FILE_CATEGORIES = {
     "CARAVAN": "files/caravan",
