@@ -1,3 +1,11 @@
+## v1.7.23 (Auto Hwt - Gemi Enkazı script isimleri)
+
+### Auto Hwt
+- **Gemi Enkazı 1-2★**: `Shipwreck 91-100 101-110.txt`
+- **Gemi Enkazı 3-4★**: `Shipwreck 101-110 3-4 Yıldız.txt`
+
+---
+
 ## v1.7.22 (files/ yapısı - vps uyumlu)
 
 ### Genel

@@ -43,13 +43,12 @@ ATTACKAREA_FILENAME = ATTACKAREA_FILENAMES[0]
 DYNAMIC_ATTACK_FILENAME = "FGW_DYNAMIC_ATTACKAREA.txt"
 
 # Script dosya eşlemesi (display_name -> filename)
-# Gemi Enkazı 1-2/3-4: api/download SC ile sunucudan. Eski GitHub linkleri (referans):
-#   Ship Wreck 1-2: GITHUB_FGW_RAW_TEMPLATE % 'Ship Wreck 1-2 Stars Forgotten World.txt'
-#   Ship Wreck 3-4: GITHUB_FGW_RAW_TEMPLATE % 'Ship Wreck 3-4 Stars Forgotten World.txt'
+# Gemi Enkazı 1-2/3-4: api/download SC ile sunucudan. Eski isimler (referans):
+#   Ship Wreck 1-2 Stars Forgotten World.txt, Ship Wreck 3-4 Stars Forgotten World.txt
 FGW_SCRIPT_MAP = [
     ('Togui Köyü', 'Togui Village Forgotten World.txt', 'SCRIPT_TOGUI'),
-    ('Gemi Enkazı 1-2★', 'Ship Wreck 1-2 Stars Forgotten World.txt', 'SCRIPT_SHIP12'),
-    ('Gemi Enkazı 3-4★', 'Ship Wreck 3-4 Stars Forgotten World.txt', 'SCRIPT_SHIP34'),
+    ('Gemi Enkazı 1-2★', 'Shipwreck 91-100 101-110.txt', 'SCRIPT_SHIP12'),
+    ('Gemi Enkazı 3-4★', 'Shipwreck 101-110 3-4 Yıldız.txt', 'SCRIPT_SHIP34'),
     ('Alev Dağı', 'Flame Mountain Forgotten World.txt', 'SCRIPT_FLAME'),
     ('HWT Başlangıç', 'Holy Water Temple Beginner.txt', 'SCRIPT_HWT_BEGINNER'),
     ('HWT Orta', 'Holy Water Temple Intermediate.txt', 'SCRIPT_HWT_INTERMEDIATE'),
