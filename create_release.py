@@ -20,8 +20,8 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.7.22',
-    'name': 'v1.7.22 - files/ yapısı (vps uyumlu), Auto Hwt, CAPTCHA',
+    'tag_name': 'v1.7.23',
+    'name': 'v1.7.23 - Auto Hwt Gemi Enkazı script isimleri güncellendi',
     'body': release_notes,
     'draft': False,
     'prerelease': False
