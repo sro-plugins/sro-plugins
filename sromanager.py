@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.24'
+pVersion = '1.7.25'
 
 MOVE_DELAY = 0.25
 
@@ -62,8 +62,8 @@ GITHUB_SCRIPT_COMMAND_MAKER_URL = 'https://raw.githubusercontent.com/%s/main/fil
 # Auto Hwt (FGW/HWT): GitHub sc/ klasöründeki scriptler
 GITHUB_FGW_RAW_TEMPLATE = 'https://raw.githubusercontent.com/%s/main/files/sc/%s' % (GITHUB_REPO, '%s')
 GITHUB_FGW_SCRIPT_FILENAMES = [
-    'Togui Village Forgotten World.txt', 'Shipwreck 91-100 101-110.txt',
-    'Shipwreck 101-110 3-4 Yıldız.txt', 'Flame Mountain Forgotten World.txt',
+    'Togui Village Forgotten World.txt', 'Ship Wreck 1-2 Stars Forgotten World.txt',
+    'Ship Wreck 3-4 Stars Forgotten World.txt', 'Flame Mountain Forgotten World.txt',
     'Holy Water Temple Beginner.txt', 'Holy Water Temple Intermediate.txt', 'Holy Water Temple Advanced.txt',
 ]
 # Oto Kervan: GitHub'daki karavan scriptleri klasörü (API ile liste, raw ile indirme)
@@ -2694,12 +2694,12 @@ def hwt_btn_togui():
 def hwt_btn_ship12():
     if not _is_license_valid():
         return
-    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 1-2★', 'Shipwreck 91-100 101-110.txt', 'SCRIPT_SHIP12', True)
+    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 1-2★', 'Ship Wreck 1-2 Stars Forgotten World.txt', 'SCRIPT_SHIP12', True)
 
 def hwt_btn_ship34():
     if not _is_license_valid():
         return
-    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 3-4★', 'Shipwreck 101-110 3-4 Yıldız.txt', 'SCRIPT_SHIP34', True)
+    _auto_hwt_call('_set_training_script_from_file', 'Gemi Enkazı 3-4★', 'Ship Wreck 3-4 Stars Forgotten World.txt', 'SCRIPT_SHIP34', True)
 
 def hwt_btn_flame():
     if not _is_license_valid():

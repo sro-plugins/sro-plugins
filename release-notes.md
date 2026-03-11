@@ -1,3 +1,10 @@
+## v1.7.25 (Gemi Enkazı script dosya adı düzeltmesi)
+
+### Auto Hwt
+- **Script İndir / Gemi Enkazı**: Sunucudaki dosya adlarıyla eşleştirildi (`Ship Wreck 1-2 Stars Forgotten World.txt`, `Ship Wreck 3-4 Stars Forgotten World.txt`)
+
+---
+
 ## v1.7.24 (Yerel önce yükleme, Auto Hwt iyileştirmeleri)
 
 ### Genel
@@ -13,8 +20,8 @@
 ## v1.7.23 (Auto Hwt - Gemi Enkazı script isimleri)
 
 ### Auto Hwt
-- **Gemi Enkazı 1-2★**: `Shipwreck 91-100 101-110.txt`
-- **Gemi Enkazı 3-4★**: `Shipwreck 101-110 3-4 Yıldız.txt`
+- **Gemi Enkazı 1-2★**: `Ship Wreck 1-2 Stars Forgotten World.txt`
+- **Gemi Enkazı 3-4★**: `Ship Wreck 3-4 Stars Forgotten World.txt`
 
 ---
 
