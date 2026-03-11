@@ -100,8 +100,13 @@ EMBEDDED_SCRIPT_VERSIONS = {
 }
 UPDATE_CHECK_DELAY = 3
 
-def _load_feature_code(module_filename, github_url, log_label):
-    """Yerel files/feature/ önce, GitHub yedek. (code, local_path) döner; hata durumunda (None, None)."""
+def _load_feature_code(module_filename, log_label):
+    """
+    Test: Yerel files/feature/ önce.
+    Release: Sunucudan (api/download, type=FEATURE).
+    GitHub kullanılmaz.
+    (code, local_path) döner; hata durumunda (None, None).
+    """
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
     for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
         for sub in ['files/feature', 'feature']:
@@ -114,15 +119,17 @@ def _load_feature_code(module_filename, github_url, log_label):
                     return code, local_path
                 except Exception as ex:
                     log('[%s] [%s] Yerel modül okunamadı: %s' % (pName, log_label, str(ex)))
-    try:
-        req = urllib.request.Request(github_url, headers={'User-Agent': 'phBot-SROManager/1.0'})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-        log('[%s] [%s] Modül indiriliyor: %s' % (pName, log_label, github_url))
-        return code, None
-    except Exception as ex:
-        log('[%s] [%s] Modül indirilemedi: %s' % (pName, log_label, str(ex)))
-        return None, None
+    raw = _fetch_from_server_raw('FEATURE', module_filename)
+    if raw and len(raw) > 100:
+        try:
+            code = raw.decode('utf-8')
+            log('[%s] [%s] Sunucudan modül yüklendi: %s' % (pName, log_label, module_filename))
+            return code, None
+        except Exception as ex:
+            log('[%s] [%s] Sunucu modülü decode edilemedi: %s' % (pName, log_label, str(ex)))
+    else:
+        log('[%s] [%s] Modül bulunamadı (yerel yok, sunucu boş/hata): %s' % (pName, log_label, module_filename))
+    return None, None
 
 def _parse_version(s):
     if not s or not isinstance(s, str):
@@ -999,7 +1006,7 @@ def _get_jewel_merge_sort_namespace():
     global _jewel_merge_sort_namespace
     if _jewel_merge_sort_namespace is not None:
         return _jewel_merge_sort_namespace
-    code, _ = _load_feature_code('jewel_merge_sort.py', GITHUB_JEWEL_MERGE_SORT_URL, 'Jewel/Birleştirme/Sıralama')
+    code, _ = _load_feature_code('jewel_merge_sort.py', 'Jewel/Birleştirme/Sıralama')
     if not code:
         return None
     namespace = {
@@ -1047,7 +1054,7 @@ def _get_bank_features_namespace():
     if _bank_features_namespace is not None:
         log('[%s] [Banka] Modül zaten yüklü (cache kullanılıyor).' % pName)
         return _bank_features_namespace
-    code, _ = _load_feature_code('bank_features.py', GITHUB_BANK_FEATURES_URL, 'Banka')
+    code, _ = _load_feature_code('bank_features.py', 'Banka')
     if not code:
         return None
     log('[%s] [Banka] Modül yükleniyor (%d byte)...' % (pName, len(code)))
@@ -1125,7 +1132,7 @@ def _get_auto_dungeon_namespace():
     global _auto_dungeon_namespace
     if _auto_dungeon_namespace is not None:
         return _auto_dungeon_namespace
-    code, _ = _load_feature_code('auto_base_dungeon.py', GITHUB_AUTO_BASE_DUNGEON_URL, 'Auto-Dungeon')
+    code, _ = _load_feature_code('auto_base_dungeon.py', 'Auto-Dungeon')
     if not code:
         return None
     g = globals()
@@ -1250,7 +1257,7 @@ def _get_garden_dungeon_namespace():
     global _garden_dungeon_namespace
     if _garden_dungeon_namespace is not None:
         return _garden_dungeon_namespace
-    code, _ = _load_feature_code('garden_dungeon.py', GITHUB_GARDEN_DUNGEON_URL, 'Garden Dungeon')
+    code, _ = _load_feature_code('garden_dungeon.py', 'Garden Dungeon')
     if not code:
         return None
     g = globals()
@@ -1303,7 +1310,7 @@ def _get_auto_hwt_namespace():
     global _auto_hwt_namespace
     if _auto_hwt_namespace is not None:
         return _auto_hwt_namespace
-    code, auto_hwt_path = _load_feature_code('auto_hwt.py', GITHUB_AUTO_HWT_URL, 'Auto Hwt')
+    code, auto_hwt_path = _load_feature_code('auto_hwt.py', 'Auto Hwt')
     if not code:
         return None
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1352,7 +1359,7 @@ def _get_caravan_namespace():
     global _caravan_namespace
     if _caravan_namespace is not None:
         return _caravan_namespace
-    code, _ = _load_feature_code('caravan.py', GITHUB_CARAVAN_URL, 'Oto Kervan')
+    code, _ = _load_feature_code('caravan.py', 'Oto Kervan')
     if not code:
         return None
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1894,7 +1901,7 @@ def _get_script_commands_namespace():
     global _script_commands_namespace
     if _script_commands_namespace is not None:
         return _script_commands_namespace
-    code, _ = _load_feature_code('script_commands.py', GITHUB_SCRIPT_COMMANDS_URL, 'Script Komutları')
+    code, _ = _load_feature_code('script_commands.py', 'Script Komutları')
     if not code:
         return None
     script_cmds_path = get_config_dir()[:-7] if get_config_dir() else ''
@@ -2955,7 +2962,7 @@ def _get_inventory_counter_namespace():
     global _inventory_counter_namespace
     if _inventory_counter_namespace is not None:
         return _inventory_counter_namespace
-    code, _ = _load_feature_code('inventory_counter.py', GITHUB_INVENTORY_COUNTER_URL, 'Envanter Sayacı')
+    code, _ = _load_feature_code('inventory_counter.py', 'Envanter Sayacı')
     if not code:
         return None
     namespace = {
@@ -3180,7 +3187,7 @@ def _get_target_support_namespace():
     global _target_support_namespace
     if _target_support_namespace is not None:
         return _target_support_namespace
-    code, _ = _load_feature_code('target_support.py', GITHUB_TARGET_SUPPORT_URL, 'TargetSupport')
+    code, _ = _load_feature_code('target_support.py', 'TargetSupport')
     if not code:
         return None
     namespace = {
@@ -3291,7 +3298,7 @@ def _get_bless_queue_namespace():
     global _bless_queue_namespace
     if _bless_queue_namespace is not None:
         return _bless_queue_namespace
-    code, _ = _load_feature_code('bless_queue.py', GITHUB_BLESS_QUEUE_URL, 'Sıralı Bless')
+    code, _ = _load_feature_code('bless_queue.py', 'Sıralı Bless')
     if not code:
         return None
     import ctypes
@@ -3422,7 +3429,7 @@ def _get_script_command_maker_namespace():
     global _script_command_maker_namespace
     if _script_command_maker_namespace is not None:
         return _script_command_maker_namespace
-    code, _ = _load_feature_code('script_command_maker.py', GITHUB_SCRIPT_COMMAND_MAKER_URL, 'Script-Command')
+    code, _ = _load_feature_code('script_command_maker.py', 'Script-Command')
     if not code:
         return None
     script_cmds_path = get_config_dir()[:-7] if get_config_dir() else ''
