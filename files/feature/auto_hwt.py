@@ -60,7 +60,10 @@ _last_fgw_script_path = None
 _current_state = 'fgw'
 _last_check = 0.0
 _pluginEnabled = False
+_attack_to_normal_wait_since = 0.0  # attack'tan normal'e geçişte 5 sn bekleme
+_pre_attack_position = None  # attack'a geçmeden önceki script konumu (region, x, y, z)
 CHECK_INTERVAL = 1.5
+ATTACK_TO_NORMAL_DELAY = 5.0  # saniye
 IGNORE_MONSTER_SUBSTR = (
     'ghost curse', 'telbasta', 'chief hyena', 'statue of eternal life',
     'mummy of arrogance', 'mummy of wrath', 'bast', 'sand hyena', 'heron',
@@ -285,7 +288,7 @@ def _get_nearest_monster_position():
     return best
 
 def event_loop():
-    global _last_check, _current_state, _last_fgw_script_path
+    global _last_check, _current_state, _last_fgw_script_path, _attack_to_normal_wait_since, _pre_attack_position
     if not _is_license_valid() or not _pluginEnabled:
         return
     _ensure_fgw_folder()
@@ -296,7 +299,18 @@ def event_loop():
     valid = _get_valid_monsters()
     has_mobs = len(valid) > 0
 
+    if has_mobs:
+        _attack_to_normal_wait_since = 0.0  # mob varsa bekleme iptal
     if has_mobs and _current_state != 'attack':
+        pos = get_position()
+        if pos:
+            try:
+                _pre_attack_position = (
+                    int(pos.get('region', 0)),
+                    float(pos.get('x', 0)), float(pos.get('y', 0)), float(pos.get('z', 0))
+                )
+            except (TypeError, ValueError):
+                _pre_attack_position = None
         stop_bot()
         attack_path = _attackarea_path_for_slot(_my_slot)
         _ensure_attackarea_files()
@@ -317,14 +331,35 @@ def event_loop():
         return
 
     if not has_mobs and _current_state == 'attack':
+        if _attack_to_normal_wait_since == 0:
+            _attack_to_normal_wait_since = now
+        if now - _attack_to_normal_wait_since < ATTACK_TO_NORMAL_DELAY:
+            return  # 5 sn bekle, sonra normal scripte geç
+        _attack_to_normal_wait_since = 0.0
         stop_bot()
         if _last_fgw_script_path:
             try:
                 set_training_script(_last_fgw_script_path)
             except Exception:
                 pass
-        pos = get_position()
-        if pos:
+        if _pre_attack_position:
+            try:
+                region, x, y, z = _pre_attack_position
+                set_training_position(region, x, y, z)
+                move_to_fn = globals().get('move_to')
+                move_to_region_fn = globals().get('move_to_region')
+                pos = get_position()
+                if pos and (move_to_fn or move_to_region_fn):
+                    cur_r = int(pos.get('region', 0))
+                    if cur_r == region and move_to_fn:
+                        move_to_fn(x, y, z)
+                    elif move_to_region_fn:
+                        move_to_region_fn(region, x, y, z)
+                _pre_attack_position = None
+            except Exception:
+                pass
+        elif get_position():
+            pos = get_position()
             try:
                 set_training_position(int(pos.get('region', 0)), 0.0, 0.0, 0.0)
             except Exception:

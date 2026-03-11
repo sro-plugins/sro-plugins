@@ -20,10 +20,10 @@ with open('release-notes.md', 'r', encoding='utf-8') as f:
 
 # Release oluştur
 release_data = {
-    'tag_name': 'v1.7.23',
-    'name': 'v1.7.23 - Auto Hwt Gemi Enkazı script isimleri güncellendi',
+    'tag_name': 'v1.7.24',
+    'name': 'v1.7.24 - Yerel önce yükleme, Auto Hwt iyileştirmeleri',
     'body': release_notes,
-    'draft': False,
+    'draft': True,
     'prerelease': False
 }
 

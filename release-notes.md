@@ -1,3 +1,15 @@
+## v1.7.24 (Yerel önce yükleme, Auto Hwt iyileştirmeleri)
+
+### Genel
+- **Yerel önce (local-first)**: Tüm feature modülleri önce `files/feature/` altından okunur, yoksa GitHub'dan indirilir
+- **Test kolaylığı**: Sadece sromanager yükleyerek yerel değişikliklerle test edilebilir
+
+### Auto Hwt (FGW/HWT)
+- **Attack → Normal geçiş**: 5 sn bekleme (mob kısa süre kaybolunca hemen değişmez)
+- **Konum geri dönüşü**: Attack'tan normal scripte dönerken son script konumuna geri döner, oradan devam eder
+
+---
+
 ## v1.7.23 (Auto Hwt - Gemi Enkazı script isimleri)
 
 ### Auto Hwt

@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 
 pName = 'SROManager'
 PLUGIN_FILENAME = 'sromanager.py'
-pVersion = '1.7.23'
+pVersion = '1.7.24'
 
 MOVE_DELAY = 0.25
 
@@ -99,6 +99,30 @@ EMBEDDED_SCRIPT_VERSIONS = {
     "garden-dungeon-wizz-cleric.txt": "1.0",
 }
 UPDATE_CHECK_DELAY = 3
+
+def _load_feature_code(module_filename, github_url, log_label):
+    """Yerel files/feature/ önce, GitHub yedek. (code, local_path) döner; hata durumunda (None, None)."""
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
+    for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
+        for sub in ['files/feature', 'feature']:
+            local_path = os.path.join(base, sub.replace('/', os.sep), module_filename)
+            if os.path.exists(local_path):
+                try:
+                    with open(local_path, 'r', encoding='utf-8') as f:
+                        code = f.read()
+                    log('[%s] [%s] Yerel modül yükleniyor: %s' % (pName, log_label, local_path))
+                    return code, local_path
+                except Exception as ex:
+                    log('[%s] [%s] Yerel modül okunamadı: %s' % (pName, log_label, str(ex)))
+    try:
+        req = urllib.request.Request(github_url, headers={'User-Agent': 'phBot-SROManager/1.0'})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            code = r.read().decode('utf-8')
+        log('[%s] [%s] Modül indiriliyor: %s' % (pName, log_label, github_url))
+        return code, None
+    except Exception as ex:
+        log('[%s] [%s] Modül indirilemedi: %s' % (pName, log_label, str(ex)))
+        return None, None
 
 def _parse_version(s):
     if not s or not isinstance(s, str):
@@ -968,22 +992,15 @@ NPC_STORAGE_SERVERNAMES = [
     'NPC_SD_T_AREA_WAREHOUSE2'
 ]
 
-# Tab 1 - Jewel / Birleştirme / Sıralama: GitHub'dan uzaktan
+# Tab 1 - Jewel / Birleştirme / Sıralama: Yerel önce, GitHub yedek
 _jewel_merge_sort_namespace = None
 
 def _get_jewel_merge_sort_namespace():
     global _jewel_merge_sort_namespace
     if _jewel_merge_sort_namespace is not None:
         return _jewel_merge_sort_namespace
-    try:
-        req = urllib.request.Request(
-            GITHUB_JEWEL_MERGE_SORT_URL,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-    except Exception as ex:
-        log('[%s] Jewel/Birleştirme/Sıralama modülü indirilemedi: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('jewel_merge_sort.py', GITHUB_JEWEL_MERGE_SORT_URL, 'Jewel/Birleştirme/Sıralama')
+    if not code:
         return None
     namespace = {
         'log': log, 'pName': pName, 'threading': threading, 'time': time, 'struct': struct, 'copy': copy,
@@ -1022,7 +1039,7 @@ def sort_start():
 def sort_stop():
     _jms_call('sort_stop')
 
-# Banka özellikleri: GitHub'dan indirilip cache'lenir, buton tıklanınca exec ile çalıştırılır (ana pluginde banka kodu yok)
+# Banka özellikleri: Yerel önce, GitHub yedek; cache'lenir, buton tıklanınca exec ile çalıştırılır
 _bank_features_namespace = None
 
 def _get_bank_features_namespace():
@@ -1030,18 +1047,10 @@ def _get_bank_features_namespace():
     if _bank_features_namespace is not None:
         log('[%s] [Banka] Modül zaten yüklü (cache kullanılıyor).' % pName)
         return _bank_features_namespace
-    log('[%s] [Banka] Modül cache\'de yok, GitHub\'dan indiriliyor: %s' % (pName, GITHUB_BANK_FEATURES_URL))
-    try:
-        req = urllib.request.Request(
-            GITHUB_BANK_FEATURES_URL,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-        log('[%s] [Banka] İndirme tamamlandı (%d byte), exec ile yükleniyor...' % (pName, len(code)))
-    except Exception as ex:
-        log('[%s] Banka özellikleri indirilemedi: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('bank_features.py', GITHUB_BANK_FEATURES_URL, 'Banka')
+    if not code:
         return None
+    log('[%s] [Banka] Modül yükleniyor (%d byte)...' % (pName, len(code)))
     jms_ns = _get_jewel_merge_sort_namespace()
     namespace = {
         'log': log,
@@ -1102,7 +1111,7 @@ def bank_sort_stop():
         log('[%s] [Banka] Uzak bank_sort_stop çalıştırılıyor.' % pName)
         ns['bank_sort_stop']()
 
-# Auto Dungeon (Tab 2): GitHub'dan indirilip exec ile çalıştırılır (ana pluginde Tab2 fonksiyon kodu yok)
+# Auto Dungeon (Tab 2): Yerel önce (files/feature/auto_base_dungeon.py), GitHub yedek
 _auto_dungeon_namespace = None
 
 def _set_item_used_by_plugin(item):
@@ -1116,16 +1125,8 @@ def _get_auto_dungeon_namespace():
     global _auto_dungeon_namespace
     if _auto_dungeon_namespace is not None:
         return _auto_dungeon_namespace
-    log('[%s] [Auto-Dungeon] Modül indiriliyor: %s' % (pName, GITHUB_AUTO_BASE_DUNGEON_URL))
-    try:
-        req = urllib.request.Request(
-            GITHUB_AUTO_BASE_DUNGEON_URL,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-    except Exception as ex:
-        log('[%s] Auto Dungeon modülü indirilemedi: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('auto_base_dungeon.py', GITHUB_AUTO_BASE_DUNGEON_URL, 'Auto-Dungeon')
+    if not code:
         return None
     g = globals()
     namespace = {
@@ -1242,22 +1243,15 @@ def _call_remote_EnterToDimensional(name):
     if ns and 'EnterToDimensional' in ns:
         ns['EnterToDimensional'](name)
 
-# Garden Dungeon (Tab 3): GitHub'dan indirilip exec ile çalıştırılır (ana pluginde Tab3 fonksiyon kodu yok)
+# Garden Dungeon (Tab 3): Yerel önce, GitHub yedek
 _garden_dungeon_namespace = None
 
 def _get_garden_dungeon_namespace():
     global _garden_dungeon_namespace
     if _garden_dungeon_namespace is not None:
         return _garden_dungeon_namespace
-    try:
-        req = urllib.request.Request(
-            GITHUB_GARDEN_DUNGEON_URL,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-    except Exception as ex:
-        log('[%s] Garden Dungeon modülü indirilemedi: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('garden_dungeon.py', GITHUB_GARDEN_DUNGEON_URL, 'Garden Dungeon')
+    if not code:
         return None
     g = globals()
     namespace = {
@@ -1302,47 +1296,19 @@ def garden_dungeon_stop():
     if ns and 'garden_dungeon_stop' in ns:
         ns['garden_dungeon_stop']()
 
-# Auto Hwt (Tab 4): SROMaster FGW & HWT - feature/auto_hwt.py (yerel önce, GitHub yedek)
+# Auto Hwt (Tab 4): SROMaster FGW & HWT - Yerel önce, GitHub yedek
 _auto_hwt_namespace = None
 
 def _get_auto_hwt_namespace():
     global _auto_hwt_namespace
     if _auto_hwt_namespace is not None:
         return _auto_hwt_namespace
-    code = None
-    auto_hwt_path = None
-    plugin_dir = os.path.dirname(os.path.abspath(__file__))
-    for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
-        for sub in ['files/feature', 'feature']:
-            local_path = os.path.join(base, sub.replace('/', os.sep), 'auto_hwt.py')
-            if os.path.exists(local_path):
-                try:
-                    with open(local_path, 'r', encoding='utf-8') as f:
-                        code = f.read()
-                    auto_hwt_path = local_path
-                    break
-                except Exception as ex:
-                    log('[%s] [Auto Hwt] Yerel modül okunamadı: %s' % (pName, str(ex)))
-        if code:
-            break
+    code, auto_hwt_path = _load_feature_code('auto_hwt.py', GITHUB_AUTO_HWT_URL, 'Auto Hwt')
     if not code:
-        try:
-            req = urllib.request.Request(
-                GITHUB_AUTO_HWT_URL,
-                headers={'User-Agent': 'phBot-SROManager/1.0'}
-            )
-            with urllib.request.urlopen(req, timeout=15) as r:
-                code = r.read().decode('utf-8')
-        except Exception as ex:
-            log('[%s] Auto Hwt modülü indirilemedi: %s' % (pName, str(ex)))
-            return None
+        return None
+    plugin_dir = os.path.dirname(os.path.abspath(__file__))
     if auto_hwt_path is None:
-        for p in [os.path.join(plugin_dir, 'files', 'feature', 'auto_hwt.py'), os.path.join(plugin_dir, 'feature', 'auto_hwt.py')]:
-            if os.path.exists(p):
-                auto_hwt_path = p
-                break
-        if auto_hwt_path is None:
-            auto_hwt_path = os.path.join(plugin_dir, 'files', 'feature', 'auto_hwt.py')
+        auto_hwt_path = os.path.join(plugin_dir, 'files', 'feature', 'auto_hwt.py')
     g = globals()
     namespace = {
         '__file__': auto_hwt_path,
@@ -1352,6 +1318,7 @@ def _get_auto_hwt_namespace():
         'get_position': get_position, 'get_monsters': get_monsters,
         'set_training_script': set_training_script, 'set_training_position': set_training_position,
         'start_bot': start_bot, 'stop_bot': stop_bot,
+        'move_to': globals().get('move_to'), 'move_to_region': globals().get('move_to_region'),
         'create_notification': globals().get('create_notification', lambda x: log('[%s] %s' % (pName, x))),
         'get_training_script': globals().get('get_training_script', lambda: None),
         'time': time, 'os': os, 'urllib': __import__('urllib'),
@@ -1378,22 +1345,15 @@ def _auto_hwt_call(name, *args, **kwargs):
         return fn(*args, **kwargs) if args or kwargs else fn()
     return None
 
-# ______________________________ Oto Kervan (Tab 5 - GitHub'dan uzaktan) ______________________________ #
+# ______________________________ Oto Kervan (Tab 5 - Yerel önce, GitHub yedek) ______________________________ #
 _caravan_namespace = None
 
 def _get_caravan_namespace():
     global _caravan_namespace
     if _caravan_namespace is not None:
         return _caravan_namespace
-    try:
-        req = urllib.request.Request(
-            GITHUB_CARAVAN_URL,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-    except Exception as ex:
-        log('[%s] Oto Kervan modülü indirilemedi: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('caravan.py', GITHUB_CARAVAN_URL, 'Oto Kervan')
+    if not code:
         return None
     plugin_dir = os.path.dirname(os.path.abspath(__file__))
     namespace = {
@@ -1927,22 +1887,15 @@ def kervan_captcha_test():
         _kervan_captcha_test_thread.start()
     log('[%s] [CAPTCHA Test] Başlatıldı (Jangan/Downhang ticaret NPC).' % pName)
 
-# ______________________________ Script Komutları (Tab 6 - GitHub'dan uzaktan) ______________________________ #
+# ______________________________ Script Komutları (Tab 6 - Yerel önce, GitHub yedek) ______________________________ #
 _script_commands_namespace = None
 
 def _get_script_commands_namespace():
     global _script_commands_namespace
     if _script_commands_namespace is not None:
         return _script_commands_namespace
-    try:
-        req = urllib.request.Request(
-            GITHUB_SCRIPT_COMMANDS_URL,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-    except Exception as ex:
-        log('[%s] Script Komutları modülü indirilemedi: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('script_commands.py', GITHUB_SCRIPT_COMMANDS_URL, 'Script Komutları')
+    if not code:
         return None
     script_cmds_path = get_config_dir()[:-7] if get_config_dir() else ''
     namespace = {
@@ -2995,22 +2948,15 @@ _add_tab7(_inv_cnt_lstInfo, _ic_x, _ic_y + 50)
 QtBind.append(gui, _inv_cnt_lstInfo, "   Envanter Sayacı - Lider ekleyip sohbetten komut gönderin (ENV, DEPO, GOLD, EXP, SOX vb.).")
 QtBind.append(gui, _inv_cnt_lstInfo, "   Komut listesi için üstteki butonlara tıklayın.")
 
-# Envanter Sayacı (Tab 7) - GitHub'dan uzaktan
+# Envanter Sayacı (Tab 7) - Yerel önce, GitHub yedek
 _inventory_counter_namespace = None
 
 def _get_inventory_counter_namespace():
     global _inventory_counter_namespace
     if _inventory_counter_namespace is not None:
         return _inventory_counter_namespace
-    try:
-        req = urllib.request.Request(
-            GITHUB_INVENTORY_COUNTER_URL,
-            headers={'User-Agent': 'phBot-SROManager/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.read().decode('utf-8')
-    except Exception as ex:
-        log('[%s] Envanter Sayacı modülü indirilemedi: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('inventory_counter.py', GITHUB_INVENTORY_COUNTER_URL, 'Envanter Sayacı')
+    if not code:
         return None
     namespace = {
         'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
@@ -3227,38 +3173,16 @@ _add_tab9(QtBind.createLabel(gui, '• Fortress War, Unique, Guild party senkron
 _add_tab9(QtBind.createLabel(gui, '• TARGET ON / OFF ile chat üzerinden yönetim', _ts_features_x, _ts_features_y + 84), _ts_features_x, _ts_features_y + 84)
 _add_tab9(QtBind.createLabel(gui, '• Kapsamlı arayüz ve profil desteği', _ts_features_x, _ts_features_y + 100), _ts_features_x, _ts_features_y + 100)
 
-# TargetSupport modülü
+# TargetSupport modülü - Yerel önce, GitHub yedek
 _target_support_namespace = None
 
 def _get_target_support_namespace():
     global _target_support_namespace
     if _target_support_namespace is not None:
         return _target_support_namespace
-    code = None
-    plugin_dir = os.path.dirname(os.path.abspath(__file__))
-    local_path = None
-    for sub in ['files/feature', 'feature']:
-        p = os.path.join(plugin_dir, sub.replace('/', os.sep), 'target_support.py')
-        if os.path.exists(p):
-            local_path = p
-            break
-    if local_path:
-        try:
-            with open(local_path, 'r', encoding='utf-8') as f:
-                code = f.read()
-        except Exception as ex:
-            log('[%s] [TargetSupport] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('target_support.py', GITHUB_TARGET_SUPPORT_URL, 'TargetSupport')
     if not code:
-        try:
-            req = urllib.request.Request(
-                GITHUB_TARGET_SUPPORT_URL,
-                headers={'User-Agent': 'phBot-SROManager/1.0'}
-            )
-            with urllib.request.urlopen(req, timeout=15) as r:
-                code = r.read().decode('utf-8')
-        except Exception as ex:
-            log('[%s] [TargetSupport] Modül indirilemedi: %s' % (pName, str(ex)))
-            return None
+        return None
     namespace = {
         'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
         'get_config_dir': get_config_dir, 'get_character_data': get_character_data, 'get_party': get_party,
@@ -3360,38 +3284,16 @@ _add_tab10(_bq_btnWSave, _bq_x0 + 450, _bq_y0 + 226)
 _bq_btnHelpEN = QtBind.createButton(gui, 'bq_btn_help_en', 'Yardım', _bq_x0 + 520, _bq_y0 + 8)
 _add_tab10(_bq_btnHelpEN, _bq_x0 + 520, _bq_y0 + 8)
 
-# Bless Queue modülü
+# Bless Queue modülü - Yerel önce, GitHub yedek
 _bless_queue_namespace = None
 
 def _get_bless_queue_namespace():
     global _bless_queue_namespace
     if _bless_queue_namespace is not None:
         return _bless_queue_namespace
-    code = None
-    plugin_dir = os.path.dirname(os.path.abspath(__file__))
-    local_path = None
-    for sub in ['files/feature', 'feature']:
-        p = os.path.join(plugin_dir, sub.replace('/', os.sep), 'bless_queue.py')
-        if os.path.exists(p):
-            local_path = p
-            break
-    if local_path:
-        try:
-            with open(local_path, 'r', encoding='utf-8') as f:
-                code = f.read()
-        except Exception as ex:
-            log('[%s] [Sıralı Bless] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('bless_queue.py', GITHUB_BLESS_QUEUE_URL, 'Sıralı Bless')
     if not code:
-        try:
-            req = urllib.request.Request(
-                GITHUB_BLESS_QUEUE_URL,
-                headers={'User-Agent': 'phBot-SROManager/1.0'}
-            )
-            with urllib.request.urlopen(req, timeout=15) as r:
-                code = r.read().decode('utf-8')
-        except Exception as ex:
-            log('[%s] [Sıralı Bless] Modül indirilemedi: %s' % (pName, str(ex)))
-            return None
+        return None
     import ctypes
     namespace = {
         'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
@@ -3520,33 +3422,9 @@ def _get_script_command_maker_namespace():
     global _script_command_maker_namespace
     if _script_command_maker_namespace is not None:
         return _script_command_maker_namespace
-    code = None
-    plugin_dir = os.path.dirname(os.path.abspath(__file__))
-    local_path = None
-    for base in [plugin_dir, os.path.join(plugin_dir, 'sro-plugins-repo')]:
-        for sub in ['files/feature', 'feature']:
-            p = os.path.join(base, sub.replace('/', os.sep), 'script_command_maker.py')
-            if os.path.exists(p):
-                local_path = p
-                break
-        if local_path:
-            try:
-                with open(local_path, 'r', encoding='utf-8') as f:
-                    code = f.read()
-                break
-            except Exception as ex:
-                log('[%s] [Script-Command] Yerel modül okunamadı: %s' % (pName, str(ex)))
+    code, _ = _load_feature_code('script_command_maker.py', GITHUB_SCRIPT_COMMAND_MAKER_URL, 'Script-Command')
     if not code:
-        try:
-            req = urllib.request.Request(
-                GITHUB_SCRIPT_COMMAND_MAKER_URL,
-                headers={'User-Agent': 'phBot-SROManager/1.0'}
-            )
-            with urllib.request.urlopen(req, timeout=15) as r:
-                code = r.read().decode('utf-8')
-        except Exception as ex:
-            log('[%s] [Script-Command] Modül indirilemedi: %s' % (pName, str(ex)))
-            return None
+        return None
     script_cmds_path = get_config_dir()[:-7] if get_config_dir() else ''
     namespace = {
         'gui': gui, 'QtBind': QtBind, 'log': log, 'pName': pName, '_is_license_valid': _is_license_valid,
