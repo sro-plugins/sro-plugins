@@ -5,7 +5,7 @@
 # Enjekte: gui, QtBind, log, pName, get_config_dir, plugin_dir, urllib,
 # GITHUB_FGW_RAW_TEMPLATE, GITHUB_FGW_SCRIPT_FILENAMES, _download_from_server,
 # get_position, get_monsters, set_training_script, set_training_position, start_bot, stop_bot,
-# create_notification, get_training_script, time, os, _is_license_valid, cbEnabled, cbP1..cbP8
+# create_notification, get_training_script, time, os, _is_license_valid, cbEnabled, cbMobIgnore, cbP1..cbP8
 
 def _get_pc_id():
     """Bilgisayar adı - 4 PC'de her biri kendi FGW klasörüne yazar."""
@@ -60,10 +60,67 @@ _last_fgw_script_path = None
 _current_state = 'fgw'
 _last_check = 0.0
 _pluginEnabled = False
+_mobIgnoreEnabled = True  # Mob Yoksay: True ise Ghost Curse vb. yoksayılır
 _attack_to_normal_wait_since = 0.0  # attack'tan normal'e geçişte 5 sn bekleme
 _pre_attack_position = None  # attack'a geçmeden önceki script konumu (region, x, y, z)
+_last_attack_had_unique = False  # önceki tick'te slotta Unique vardı mı
+_unique_kill_wait_until = 0.0  # Unique öldü, drop bekleme bitiş zamanı
+# Engel takılma: konum değişmezse geri dönüp tekrar dene
+_last_attack_pos = None
+_attack_pos_unchanged_since = 0.0
+_last_known_moving_pos = None
+
+def _dist2(ax, ay, bx, by):
+    return (bx - ax) ** 2 + (by - ay) ** 2
+
+def _do_stuck_recovery():
+    """Engelde takılı kaldı; önceki konuma dönüp tekrar dene."""
+    global _last_attack_pos, _attack_pos_unchanged_since, _last_known_moving_pos
+    back_pos = _last_known_moving_pos or _pre_attack_position
+    if not back_pos or len(back_pos) < 4:
+        return
+    pos = get_position()
+    if not pos:
+        return
+    try:
+        region = int(pos.get('region', 0))
+    except (TypeError, ValueError):
+        return
+    stop_bot()
+    log('[%s] Engel tespit edildi, önceki konuma dönülüyor...' % pName)
+    create_notification('FGW: Engel tespit, geri dönülüyor')
+    move_to_fn = globals().get('move_to')
+    move_to_region_fn = globals().get('move_to_region')
+    br, bx, by, bz = back_pos[0], back_pos[1], back_pos[2], back_pos[3]
+    if region == br and move_to_fn:
+        move_to_fn(bx, by, bz)
+    elif move_to_region_fn:
+        move_to_region_fn(br, bx, by, bz)
+    _last_attack_pos = None
+    _attack_pos_unchanged_since = 0.0
+
+    def _restart_after_stuck():
+        mpos = _get_nearest_monster_position()
+        attack_path = _attackarea_path_for_slot(_my_slot)
+        if mpos:
+            region, x, y, z = mpos
+            _write_attackarea_walk(attack_path, x, y, z)
+            try:
+                set_training_position(region, x, y, z)
+            except Exception:
+                pass
+        start_bot()
+
+    threading.Timer(STUCK_RECOVERY_DELAY, _restart_after_stuck).start()
+
 CHECK_INTERVAL = 1.5
 ATTACK_TO_NORMAL_DELAY = 5.0  # saniye
+ATTACK_AREA_RADIUS = 100  # AttackArea script ile aynı (slot içi mob kontrolü)
+UNIQUE_MOB_TYPE = 8  # phBot monster type: Unique
+UNIQUE_KILL_WAIT_DELAY = 5.0  # Unique öldürünce drop almak için bekleme (saniye)
+STUCK_DETECT_SEC = 6.0  # konum değişmezse bu süre sonra "takılı" sayılır
+STUCK_MOVE_THRESHOLD = 2.0  # bu mesafeden az hareket = hareket yok
+STUCK_RECOVERY_DELAY = 5.0  # geri dönüp tekrar denemek için bekleme
 IGNORE_MONSTER_SUBSTR = (
     'ghost curse', 'telbasta', 'chief hyena', 'statue of eternal life',
     'mummy of arrogance', 'mummy of wrath', 'bast', 'sand hyena', 'heron',
@@ -81,6 +138,11 @@ def cbx_toggle_enabled(checked):
     global _pluginEnabled
     _pluginEnabled = bool(checked)
     log('[%s] AttackArea mantığı %s' % (pName, 'AÇIK' if _pluginEnabled else 'KAPALI'))
+
+def cbx_toggle_mob_ignore(checked):
+    global _mobIgnoreEnabled
+    _mobIgnoreEnabled = bool(checked)
+    log('[%s] Mob yoksay %s' % (pName, 'AÇIK' if _mobIgnoreEnabled else 'KAPALI'))
 
 def _ensure_sc_folder():
     global SC_FOLDER
@@ -265,7 +327,26 @@ def _get_valid_monsters():
     mobs = get_monsters()
     if not mobs:
         return []
-    return [(mid, m) for mid, m in mobs.items() if m.get('name') and not _is_ignored_monster(m.get('name', ''))]
+    mob_ignore = QtBind.isChecked(gui, cbMobIgnore) if cbMobIgnore else _mobIgnoreEnabled
+    base = [(mid, m) for mid, m in mobs.items() if m.get('name')]
+    if not mob_ignore:
+        return base
+    return [(mid, m) for mid, m in base if not _is_ignored_monster(m.get('name', ''))]
+
+def _get_valid_monsters_in_attack_radius():
+    """Attack modunda: sadece slot/alan (ATTACK_AREA_RADIUS) içindeki mob'ları döner."""
+    valid = _get_valid_monsters()
+    if not valid:
+        return []
+    pos = get_position()
+    if not pos:
+        return valid
+    try:
+        px, py = float(pos.get('x', 0)), float(pos.get('y', 0))
+        r2 = ATTACK_AREA_RADIUS * ATTACK_AREA_RADIUS
+        return [(mid, m) for mid, m in valid if (float(m.get('x', 0)) - px) ** 2 + (float(m.get('y', 0)) - py) ** 2 <= r2]
+    except (TypeError, ValueError):
+        return valid
 
 def _get_nearest_monster_position():
     pos = get_position()
@@ -289,15 +370,62 @@ def _get_nearest_monster_position():
 
 def event_loop():
     global _last_check, _current_state, _last_fgw_script_path, _attack_to_normal_wait_since, _pre_attack_position
+    global _last_attack_had_unique, _unique_kill_wait_until
+    global _last_attack_pos, _attack_pos_unchanged_since, _last_known_moving_pos
     if not _is_license_valid() or not _pluginEnabled:
         return
     _ensure_fgw_folder()
     now = time.time()
+    if _unique_kill_wait_until > 0:
+        if now < _unique_kill_wait_until:
+            return  # Unique öldü, drop almak için bekleniyor
+        _unique_kill_wait_until = 0.0
+        # Bekleme bitti, mob yoksa hemen normal scripte geç (zaten 5 sn bekledik)
+        _attack_to_normal_wait_since = now - ATTACK_TO_NORMAL_DELAY
     if now - _last_check < CHECK_INTERVAL:
         return
     _last_check = now
-    valid = _get_valid_monsters()
+    # Attack modunda: sadece slot içindeki (100 birim) mob'lar sayılır; normal modda tüm harita
+    valid = _get_valid_monsters_in_attack_radius() if _current_state == 'attack' else _get_valid_monsters()
     has_mobs = len(valid) > 0
+    had_unique = any(m.get('type') == UNIQUE_MOB_TYPE for _, m in valid)
+
+    # Engel takılma: attack modunda mob var, konum değişmiyor VE en yakın mob uzaktaysa (saldırmıyor) -> geri dön
+    if _current_state == 'attack' and has_mobs and _unique_kill_wait_until <= 0:
+        pos = get_position()
+        if pos:
+            try:
+                px, py = float(pos.get('x', 0)), float(pos.get('y', 0))
+                mpos = _get_nearest_monster_position()
+                nearest_d2 = 999999
+                if mpos:
+                    mx, my = mpos[1], mpos[2]
+                    nearest_d2 = _dist2(px, py, mx, my)
+                # Sadece mob uzaktaysa (saldırmıyorsa) takılı say - yakınsa melee attack olabilir
+                if nearest_d2 > 30 * 30:  # 30 birimden uzak
+                    if _last_attack_pos:
+                        d2 = _dist2(_last_attack_pos[0], _last_attack_pos[1], px, py)
+                        if d2 < STUCK_MOVE_THRESHOLD * STUCK_MOVE_THRESHOLD:
+                            if _attack_pos_unchanged_since == 0:
+                                _attack_pos_unchanged_since = now
+                            elif now - _attack_pos_unchanged_since >= STUCK_DETECT_SEC:
+                                _do_stuck_recovery()
+                                return
+                        else:
+                            _attack_pos_unchanged_since = 0
+                            _last_known_moving_pos = (int(pos.get('region', 0)), px, py, float(pos.get('z', 0)))
+                    _last_attack_pos = (px, py)
+            except (TypeError, ValueError):
+                pass
+
+    # Unique öldü: önceki tick'te vardı, şimdi yok -> 5 sn dur, drop al
+    if _current_state == 'attack' and _last_attack_had_unique and not had_unique:
+        stop_bot()
+        _unique_kill_wait_until = now + UNIQUE_KILL_WAIT_DELAY
+        _last_attack_had_unique = False
+        log('[%s] Unique öldürüldü, %d sn drop bekleniyor...' % (pName, int(UNIQUE_KILL_WAIT_DELAY)))
+        return
+    _last_attack_had_unique = had_unique
 
     if has_mobs:
         _attack_to_normal_wait_since = 0.0  # mob varsa bekleme iptal
@@ -327,6 +455,16 @@ def event_loop():
             except Exception:
                 pass
         _current_state = 'attack'
+        _last_attack_pos = None
+        _attack_pos_unchanged_since = 0.0
+        pos = get_position()
+        if pos:
+            try:
+                _last_known_moving_pos = (int(pos.get('region', 0)), float(pos.get('x', 0)), float(pos.get('y', 0)), float(pos.get('z', 0)))
+            except (TypeError, ValueError):
+                _last_known_moving_pos = _pre_attack_position
+        else:
+            _last_known_moving_pos = _pre_attack_position
         start_bot()
         return
 
@@ -365,4 +503,12 @@ def event_loop():
             except Exception:
                 pass
         _current_state = 'fgw'
+        _last_attack_had_unique = False
+        _last_attack_pos = None
+        _attack_pos_unchanged_since = 0.0
+        start_bot()
+        return
+
+    # Unique beklemeden çıktık, hâlâ attack modunda ve mob var -> botu tekrar başlat
+    if _current_state == 'attack' and has_mobs:
         start_bot()

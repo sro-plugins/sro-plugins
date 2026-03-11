@@ -1328,12 +1328,13 @@ def _get_auto_hwt_namespace():
         'move_to': globals().get('move_to'), 'move_to_region': globals().get('move_to_region'),
         'create_notification': globals().get('create_notification', lambda x: log('[%s] %s' % (pName, x))),
         'get_training_script': globals().get('get_training_script', lambda: None),
-        'time': time, 'os': os, 'urllib': __import__('urllib'),
+        'time': time, 'os': os, 'urllib': __import__('urllib'), 'threading': threading,
         'plugin_dir': plugin_dir,
         'GITHUB_FGW_RAW_TEMPLATE': GITHUB_FGW_RAW_TEMPLATE,
         'GITHUB_FGW_SCRIPT_FILENAMES': GITHUB_FGW_SCRIPT_FILENAMES,
         '_download_from_server': _download_from_server,
-        'cbEnabled': g.get('_hwt_cbEnabled'), 'cbP1': g.get('_hwt_cbP1'), 'cbP2': g.get('_hwt_cbP2'),
+        'cbEnabled': g.get('_hwt_cbEnabled'), 'cbMobIgnore': g.get('_hwt_cbMobIgnore'),
+        'cbP1': g.get('_hwt_cbP1'), 'cbP2': g.get('_hwt_cbP2'),
         'cbP3': g.get('_hwt_cbP3'), 'cbP4': g.get('_hwt_cbP4'), 'cbP5': g.get('_hwt_cbP5'),
         'cbP6': g.get('_hwt_cbP6'), 'cbP7': g.get('_hwt_cbP7'), 'cbP8': g.get('_hwt_cbP8'),
     }
@@ -2586,58 +2587,62 @@ _hwt_y = _content_y + 10
 
 _add_tab4(QtBind.createLabel(gui, '%s FGW / HWT v2.0' % pName, _hwt_x, _hwt_y), _hwt_x, _hwt_y)
 
-_hwt_cbEnabled = QtBind.createCheckBox(gui, 'hwt_cbx_toggle_enabled', 'Eklentiyi Etkinleştir (Ghost Curse Yoksayılır)', _hwt_x, _hwt_y + 25)
+_hwt_cbEnabled = QtBind.createCheckBox(gui, 'hwt_cbx_toggle_enabled', 'Eklentiyi Etkinleştir', _hwt_x, _hwt_y + 25)
 _add_tab4(_hwt_cbEnabled, _hwt_x, _hwt_y + 25)
 
-_add_tab4(QtBind.createLabel(gui, 'FGW / HWT Scriptleri (Eğitim scriptine yüklenecek):', _hwt_x, _hwt_y + 60), _hwt_x, _hwt_y + 60)
-_add_tab4(QtBind.createLabel(gui, 'PC Hesabı:', _hwt_x + 290, _hwt_y + 60), _hwt_x + 290, _hwt_y + 60)
+_hwt_cbMobIgnore = QtBind.createCheckBox(gui, 'hwt_cbx_mob_ignore', 'Mob Yoksay (Ghost Curse vb.)', _hwt_x, _hwt_y + 45)
+QtBind.setChecked(gui, _hwt_cbMobIgnore, True)
+_add_tab4(_hwt_cbMobIgnore, _hwt_x, _hwt_y + 45)
 
-_hwt_cbP1 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_1', '1', _hwt_x + 360, _hwt_y + 58)
-_hwt_cbP2 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_2', '2', _hwt_x + 390, _hwt_y + 58)
-_hwt_cbP3 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_3', '3', _hwt_x + 420, _hwt_y + 58)
-_hwt_cbP4 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_4', '4', _hwt_x + 450, _hwt_y + 58)
-_hwt_cbP5 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_5', '5', _hwt_x + 480, _hwt_y + 58)
-_hwt_cbP6 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_6', '6', _hwt_x + 510, _hwt_y + 58)
-_hwt_cbP7 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_7', '7', _hwt_x + 540, _hwt_y + 58)
-_hwt_cbP8 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_8', '8', _hwt_x + 570, _hwt_y + 58)
+_add_tab4(QtBind.createLabel(gui, 'FGW / HWT Scriptleri (Eğitim scriptine yüklenecek):', _hwt_x, _hwt_y + 75), _hwt_x, _hwt_y + 75)
+_add_tab4(QtBind.createLabel(gui, 'PC Hesabı:', _hwt_x + 290, _hwt_y + 75), _hwt_x + 290, _hwt_y + 75)
+
+_hwt_cbP1 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_1', '1', _hwt_x + 360, _hwt_y + 73)
+_hwt_cbP2 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_2', '2', _hwt_x + 390, _hwt_y + 73)
+_hwt_cbP3 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_3', '3', _hwt_x + 420, _hwt_y + 73)
+_hwt_cbP4 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_4', '4', _hwt_x + 450, _hwt_y + 73)
+_hwt_cbP5 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_5', '5', _hwt_x + 480, _hwt_y + 73)
+_hwt_cbP6 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_6', '6', _hwt_x + 510, _hwt_y + 73)
+_hwt_cbP7 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_7', '7', _hwt_x + 540, _hwt_y + 73)
+_hwt_cbP8 = QtBind.createCheckBox(gui, 'hwt_cbx_slot_8', '8', _hwt_x + 570, _hwt_y + 73)
 QtBind.setChecked(gui, _hwt_cbP1, True)
-_add_tab4(_hwt_cbP1, _hwt_x + 360, _hwt_y + 58)
-_add_tab4(_hwt_cbP2, _hwt_x + 390, _hwt_y + 58)
-_add_tab4(_hwt_cbP3, _hwt_x + 420, _hwt_y + 58)
-_add_tab4(_hwt_cbP4, _hwt_x + 450, _hwt_y + 58)
-_add_tab4(_hwt_cbP5, _hwt_x + 480, _hwt_y + 58)
-_add_tab4(_hwt_cbP6, _hwt_x + 510, _hwt_y + 58)
-_add_tab4(_hwt_cbP7, _hwt_x + 540, _hwt_y + 58)
-_add_tab4(_hwt_cbP8, _hwt_x + 570, _hwt_y + 58)
+_add_tab4(_hwt_cbP1, _hwt_x + 360, _hwt_y + 73)
+_add_tab4(_hwt_cbP2, _hwt_x + 390, _hwt_y + 73)
+_add_tab4(_hwt_cbP3, _hwt_x + 420, _hwt_y + 73)
+_add_tab4(_hwt_cbP4, _hwt_x + 450, _hwt_y + 73)
+_add_tab4(_hwt_cbP5, _hwt_x + 480, _hwt_y + 73)
+_add_tab4(_hwt_cbP6, _hwt_x + 510, _hwt_y + 73)
+_add_tab4(_hwt_cbP7, _hwt_x + 540, _hwt_y + 73)
+_add_tab4(_hwt_cbP8, _hwt_x + 570, _hwt_y + 73)
 
-_hwt_btn_togui = QtBind.createButton(gui, 'hwt_btn_togui', 'Togui Köyü', _hwt_x, _hwt_y + 85)
-_hwt_btn_ship12 = QtBind.createButton(gui, 'hwt_btn_ship12', 'Gemi Enkazı 1-2★', _hwt_x + 120, _hwt_y + 85)
-_hwt_btn_ship34 = QtBind.createButton(gui, 'hwt_btn_ship34', 'Gemi Enkazı 3-4★', _hwt_x + 270, _hwt_y + 85)
-_hwt_btn_flame = QtBind.createButton(gui, 'hwt_btn_flame', 'Alev Dağı', _hwt_x + 420, _hwt_y + 85)
-_hwt_btn_hwt_beg = QtBind.createButton(gui, 'hwt_btn_hwt_beginner', 'HWT Başlangıç', _hwt_x, _hwt_y + 118)
-_hwt_btn_hwt_int = QtBind.createButton(gui, 'hwt_btn_hwt_intermediate', 'HWT Orta', _hwt_x + 120, _hwt_y + 118)
-_hwt_btn_hwt_adv = QtBind.createButton(gui, 'hwt_btn_hwt_advanced', 'HWT İleri', _hwt_x + 270, _hwt_y + 118)
+_hwt_btn_togui = QtBind.createButton(gui, 'hwt_btn_togui', 'Togui Köyü', _hwt_x, _hwt_y + 100)
+_hwt_btn_ship12 = QtBind.createButton(gui, 'hwt_btn_ship12', 'Gemi Enkazı 1-2★', _hwt_x + 120, _hwt_y + 100)
+_hwt_btn_ship34 = QtBind.createButton(gui, 'hwt_btn_ship34', 'Gemi Enkazı 3-4★', _hwt_x + 270, _hwt_y + 100)
+_hwt_btn_flame = QtBind.createButton(gui, 'hwt_btn_flame', 'Alev Dağı', _hwt_x + 420, _hwt_y + 100)
+_hwt_btn_hwt_beg = QtBind.createButton(gui, 'hwt_btn_hwt_beginner', 'HWT Başlangıç', _hwt_x, _hwt_y + 133)
+_hwt_btn_hwt_int = QtBind.createButton(gui, 'hwt_btn_hwt_intermediate', 'HWT Orta', _hwt_x + 120, _hwt_y + 133)
+_hwt_btn_hwt_adv = QtBind.createButton(gui, 'hwt_btn_hwt_advanced', 'HWT İleri', _hwt_x + 270, _hwt_y + 133)
 
-_add_tab4(_hwt_btn_togui, _hwt_x, _hwt_y + 85)
-_add_tab4(_hwt_btn_ship12, _hwt_x + 120, _hwt_y + 85)
-_add_tab4(_hwt_btn_ship34, _hwt_x + 270, _hwt_y + 85)
-_add_tab4(_hwt_btn_flame, _hwt_x + 420, _hwt_y + 85)
-_add_tab4(_hwt_btn_hwt_beg, _hwt_x, _hwt_y + 118)
-_add_tab4(_hwt_btn_hwt_int, _hwt_x + 120, _hwt_y + 118)
-_add_tab4(_hwt_btn_hwt_adv, _hwt_x + 270, _hwt_y + 118)
+_add_tab4(_hwt_btn_togui, _hwt_x, _hwt_y + 100)
+_add_tab4(_hwt_btn_ship12, _hwt_x + 120, _hwt_y + 100)
+_add_tab4(_hwt_btn_ship34, _hwt_x + 270, _hwt_y + 100)
+_add_tab4(_hwt_btn_flame, _hwt_x + 420, _hwt_y + 100)
+_add_tab4(_hwt_btn_hwt_beg, _hwt_x, _hwt_y + 133)
+_add_tab4(_hwt_btn_hwt_int, _hwt_x + 120, _hwt_y + 133)
+_add_tab4(_hwt_btn_hwt_adv, _hwt_x + 270, _hwt_y + 133)
 
-_hwt_btn_download = QtBind.createButton(gui, 'hwt_btn_download', 'Scriptleri İndir', _hwt_x + 420, _hwt_y + 32)
-_add_tab4(_hwt_btn_download, _hwt_x + 420, _hwt_y + 32)
+_hwt_btn_download = QtBind.createButton(gui, 'hwt_btn_download', 'Scriptleri İndir', _hwt_x + 420, _hwt_y + 47)
+_add_tab4(_hwt_btn_download, _hwt_x + 420, _hwt_y + 47)
 
-_add_tab4(QtBind.createLabel(gui, 'Nasıl kullanılır SROMaster FGW Yöneticisi:', _hwt_x, _hwt_y + 165), _hwt_x, _hwt_y + 165)
-_add_tab4(QtBind.createLabel(gui, '1. Adım: "Scriptleri İndir" tuşuna basın', _hwt_x, _hwt_y + 185), _hwt_x, _hwt_y + 185)
-_add_tab4(QtBind.createLabel(gui, '2. Adım: İstediğiniz FGW butonuna basın (Togui / Gemi / Alev / HWT)', _hwt_x, _hwt_y + 203), _hwt_x, _hwt_y + 203)
-_add_tab4(QtBind.createLabel(gui, '3. Adım: PC Hesabı 1~8 seçin (takılmamak için her karakter kendi scripti)', _hwt_x, _hwt_y + 221), _hwt_x, _hwt_y + 221)
-_add_tab4(QtBind.createLabel(gui, '4. Adım: Attack Area etkin > Bot Başlat', _hwt_x, _hwt_y + 239), _hwt_x, _hwt_y + 239)
+_add_tab4(QtBind.createLabel(gui, 'Nasıl kullanılır SROMaster FGW Yöneticisi:', _hwt_x, _hwt_y + 180), _hwt_x, _hwt_y + 180)
+_add_tab4(QtBind.createLabel(gui, '1. Adım: "Scriptleri İndir" tuşuna basın', _hwt_x, _hwt_y + 200), _hwt_x, _hwt_y + 200)
+_add_tab4(QtBind.createLabel(gui, '2. Adım: İstediğiniz FGW butonuna basın (Togui / Gemi / Alev / HWT)', _hwt_x, _hwt_y + 218), _hwt_x, _hwt_y + 218)
+_add_tab4(QtBind.createLabel(gui, '3. Adım: PC Hesabı 1~8 seçin (takılmamak için her karakter kendi scripti)', _hwt_x, _hwt_y + 236), _hwt_x, _hwt_y + 236)
+_add_tab4(QtBind.createLabel(gui, '4. Adım: Attack Area etkin > Bot Başlat', _hwt_x, _hwt_y + 254), _hwt_x, _hwt_y + 254)
 
 # Tab 4 butonları lisans korumasına
 _protected_buttons[4] = [
-    _hwt_cbEnabled, _hwt_cbP1, _hwt_cbP2, _hwt_cbP3, _hwt_cbP4, _hwt_cbP5, _hwt_cbP6, _hwt_cbP7, _hwt_cbP8,
+    _hwt_cbEnabled, _hwt_cbMobIgnore, _hwt_cbP1, _hwt_cbP2, _hwt_cbP3, _hwt_cbP4, _hwt_cbP5, _hwt_cbP6, _hwt_cbP7, _hwt_cbP8,
     _hwt_btn_togui, _hwt_btn_ship12, _hwt_btn_ship34, _hwt_btn_flame, _hwt_btn_hwt_beg, _hwt_btn_hwt_int, _hwt_btn_hwt_adv, _hwt_btn_download
 ]
 
@@ -2645,6 +2650,11 @@ def hwt_cbx_toggle_enabled(checked):
     if not _is_license_valid():
         return
     _auto_hwt_call('cbx_toggle_enabled', checked)
+
+def hwt_cbx_mob_ignore(checked):
+    if not _is_license_valid():
+        return
+    _auto_hwt_call('cbx_toggle_mob_ignore', checked)
 
 def hwt_cbx_slot_1(checked):
     if checked and _is_license_valid():
